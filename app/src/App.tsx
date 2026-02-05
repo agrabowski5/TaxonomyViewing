@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useMemo } from "react";
 import { TreeApi } from "react-arborist";
 import { useData } from "./useData";
 import { TaxonomyTree } from "./TaxonomyTree";
-import type { TreeNode, LookupEntry } from "./types";
+import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping } from "./types";
 import "./App.css";
 
 // Color palette for section-based coloring
@@ -98,8 +98,33 @@ function findMappedEntry(
   hsBase: string,
   targetTaxonomy: TaxonomyType,
   lookup: Record<string, LookupEntry>,
+  concordance?: ConcordanceData,
 ): MappedEntry | null {
-  if (targetTaxonomy === "cpc") return null; // CPC uses different coding
+  // CPC uses concordance table, not HS prefix matching
+  if (targetTaxonomy === "cpc") {
+    if (!concordance) return null;
+    for (let len = Math.min(6, hsBase.length); len >= 4; len -= 2) {
+      const prefix = hsBase.substring(0, len);
+      const mappings = concordance.hsToCpc[prefix];
+      if (mappings && mappings.length > 0) {
+        // Prefer non-partial matches
+        const sorted = [...mappings].sort((a, b) =>
+          a.cpcPartial === b.cpcPartial ? 0 : a.cpcPartial ? 1 : -1
+        );
+        const best = sorted[0];
+        const entry = lookup[best.code];
+        if (entry) {
+          return {
+            taxonomy: "cpc",
+            code: best.code,
+            description: entry.description,
+            nodeId: `cpc-${best.code}`,
+          };
+        }
+      }
+    }
+    return null;
+  }
 
   // Try progressively shorter prefixes: 6-digit, 4-digit, 2-digit
   for (let len = Math.min(6, hsBase.length); len >= 2; len -= 2) {
@@ -248,16 +273,41 @@ function App() {
   // Compute mappings from selected node to all other taxonomies
   const mappings = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return [];
-    const hsBase = getHsBase(selectedNode.code, selectedFrom);
-    if (!hsBase) return [];
 
-    const results: MappedEntry[] = [];
-    for (const tax of ALL_TAXONOMIES) {
-      if (tax === selectedFrom) continue;
-      const entry = findMappedEntry(hsBase, tax, getLookup(tax));
-      if (entry) results.push(entry);
+    // Case 1: Source is an HS-family taxonomy
+    if (HS_FAMILY.includes(selectedFrom)) {
+      const hsBase = getHsBase(selectedNode.code, selectedFrom);
+      if (!hsBase) return [];
+      const results: MappedEntry[] = [];
+      for (const tax of ALL_TAXONOMIES) {
+        if (tax === selectedFrom) continue;
+        const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
+        if (entry) results.push(entry);
+      }
+      return results;
     }
-    return results;
+
+    // Case 2: Source is CPC - use concordance reverse lookup
+    if (selectedFrom === "cpc") {
+      const cleanCpc = stripCode(selectedNode.code);
+      // Try exact code, then progressively shorter
+      for (let len = cleanCpc.length; len >= 4; len--) {
+        const prefix = cleanCpc.substring(0, len);
+        const hsMappings = data.concordance.cpcToHs[prefix];
+        if (hsMappings && hsMappings.length > 0) {
+          const firstHsCode = hsMappings[0].code;
+          const results: MappedEntry[] = [];
+          for (const tax of ALL_TAXONOMIES) {
+            if (tax === "cpc") continue;
+            const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+            if (entry) results.push(entry);
+          }
+          return results;
+        }
+      }
+    }
+
+    return [];
   }, [selectedNode, selectedFrom, data, getLookup]);
 
   // Handle node selection: update state + sync other pane
@@ -269,27 +319,47 @@ function App() {
       setSelectedNode(node);
       setSelectedFrom(sourceTax);
 
-      // Cross-pane sync: find equivalent in other pane's taxonomy
-      const hsBase = getHsBase(node.code, sourceTax);
-      if (hsBase && data) {
-        const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax));
-        if (mapped?.nodeId) {
-          const otherRef = treeRefs[otherTax];
-          // Small delay to let React finish rendering
-          setTimeout(() => {
-            const tree = otherRef.current;
-            if (tree) {
-              const targetNode = tree.get(mapped.nodeId!);
-              if (targetNode) {
-                // Open ancestors so the node is visible
-                targetNode.openParents();
-                // Scroll to and focus the node
-                tree.scrollTo(targetNode.id);
-                targetNode.select();
-              }
-            }
-          }, 50);
+      if (!data) return;
+
+      let mappedNodeId: string | null = null;
+
+      if (HS_FAMILY.includes(sourceTax)) {
+        // HS-family source: use hsBase prefix matching + concordance for CPC
+        const hsBase = getHsBase(node.code, sourceTax);
+        if (hsBase) {
+          const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+          mappedNodeId = mapped?.nodeId ?? null;
         }
+      } else if (sourceTax === "cpc") {
+        // CPC source: use concordance reverse lookup to find HS code, then map
+        const cleanCpc = stripCode(node.code);
+        for (let len = cleanCpc.length; len >= 4; len--) {
+          const prefix = cleanCpc.substring(0, len);
+          const hsMappings = data.concordance.cpcToHs[prefix];
+          if (hsMappings && hsMappings.length > 0) {
+            if (otherTax === "cpc") break; // both CPC, no cross-mapping
+            const firstHsCode = hsMappings[0].code;
+            const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+            mappedNodeId = mapped?.nodeId ?? null;
+            break;
+          }
+        }
+      }
+
+      // Cross-pane sync: scroll to and select the mapped node
+      if (mappedNodeId) {
+        const otherRef = treeRefs[otherTax];
+        setTimeout(() => {
+          const tree = otherRef.current;
+          if (tree) {
+            const targetNode = tree.get(mappedNodeId!);
+            if (targetNode) {
+              targetNode.openParents();
+              tree.scrollTo(targetNode.id);
+              targetNode.select();
+            }
+          }
+        }, 50);
       }
     },
     [leftTaxonomy, rightTaxonomy, data, getLookup, treeRefs]
@@ -451,20 +521,72 @@ function App() {
               <p className="code">{selectedNode.code}</p>
               <p className="name">{selectedNode.name}</p>
             </div>
-            {mappings.map((m) => (
-              <div className="comparison-item mapped-item" key={m.taxonomy}>
-                <h4>{TAXONOMY_INFO[m.taxonomy].label}</h4>
-                <p className="code">{m.code}</p>
-                <p className="name">{m.description}</p>
-              </div>
-            ))}
+
+            {/* HS-family mappings (single best match per taxonomy) */}
+            {mappings
+              .filter((m) => m.taxonomy !== "cpc")
+              .map((m) => (
+                <div className="comparison-item mapped-item" key={m.taxonomy}>
+                  <h4>{TAXONOMY_INFO[m.taxonomy].label}</h4>
+                  <p className="code">{m.code}</p>
+                  <p className="name">{m.description}</p>
+                </div>
+              ))}
+
+            {/* CPC concordance: show all matches when source is HS-family */}
+            {HS_FAMILY.includes(selectedFrom) && (() => {
+              const hsBase = getHsBase(selectedNode.code, selectedFrom);
+              if (!hsBase) return null;
+              const allCpc = data.concordance.hsToCpc[hsBase];
+              if (!allCpc || allCpc.length === 0) return null;
+              const cpcLookup = getLookup("cpc");
+              return (
+                <div className="comparison-item mapped-item concordance-item">
+                  <h4>CPC (Concordance)</h4>
+                  {allCpc.map((m, i) => {
+                    const entry = cpcLookup[m.code];
+                    return (
+                      <div key={i} className="concordance-row">
+                        <span className="code">{m.code}</span>
+                        <span className="name">{entry?.description ?? "Unknown"}</span>
+                        {(m.hsPartial || m.cpcPartial) && (
+                          <span className="partial-badge">partial</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* HS concordance: show all matches when source is CPC */}
+            {selectedFrom === "cpc" && (() => {
+              const cleanCpc = stripCode(selectedNode.code);
+              const allHs = data.concordance.cpcToHs[cleanCpc];
+              if (!allHs || allHs.length === 0) return null;
+              const hsLookup = getLookup("hs");
+              return (
+                <div className="comparison-item mapped-item concordance-item">
+                  <h4>HS (Concordance Detail)</h4>
+                  {allHs.map((m, i) => {
+                    const entry = hsLookup[m.code];
+                    return (
+                      <div key={i} className="concordance-row">
+                        <span className="code">{m.code}</span>
+                        <span className="name">{entry?.description ?? "Unknown"}</span>
+                        {(m.hsPartial || m.cpcPartial) && (
+                          <span className="partial-badge">partial</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             {mappings.length === 0 && (
               <div className="comparison-item no-mapping">
-                <p className="name">
-                  {HS_FAMILY.includes(selectedFrom)
-                    ? "No HS-family mappings found at this level"
-                    : "CPC uses a different coding system \u2014 no direct HS mapping"}
-                </p>
+                <p className="name">No mappings found at this level</p>
               </div>
             )}
           </div>

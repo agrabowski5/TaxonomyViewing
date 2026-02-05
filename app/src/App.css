@@ -932,6 +932,54 @@
   text-overflow: ellipsis;
 }
 
+/* ===== Concordance multi-mapping display ===== */
+.concordance-item {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.concordance-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.concordance-row:last-child {
+  border-bottom: none;
+}
+
+.concordance-row .code {
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.concordance-row .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.partial-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--accent-hts-bg);
+  color: var(--accent-hts);
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+
 /* ===== Responsive Design ===== */
 @media (max-width: 1200px) {
   .main-content.two-pane {

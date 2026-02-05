@@ -813,13 +813,55 @@ def generate_canadian():
 # ─────────────────────────────────────────────
 def generate_concordance():
     print("\n=== Generating concordance data ===")
-    # Keep existing concordance structure but empty for now
+
+    csv_path = os.path.join(RAW_DIR, 'CPC21-HS2017.csv')
+    if not os.path.exists(csv_path):
+        print("  WARNING: CPC21-HS2017.csv not found in raw-data/. Generating empty concordance.")
+        write_json('concordance.json', {'hsToCpc': {}, 'cpcToHs': {}, 'mappingInfo': {}})
+        return
+
+    hs_to_cpc = {}
+    cpc_to_hs = {}
+
+    with open(csv_path, 'r', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            hs_dotted = row['HS 2017'].strip()
+            hs_partial = row['HS partial'].strip() == '1'
+            cpc_code = row['CPC Ver. 2.1'].strip()
+            cpc_partial = row['CPC partial'].strip() == '1'
+
+            # Strip dots from HS code to match our pure-digit lookup keys
+            hs_code = hs_dotted.replace('.', '')
+
+            entry = {
+                'hsPartial': hs_partial,
+                'cpcPartial': cpc_partial,
+            }
+
+            hs_to_cpc.setdefault(hs_code, []).append({**entry, 'code': cpc_code})
+            cpc_to_hs.setdefault(cpc_code, []).append({**entry, 'code': hs_code})
+
+    # Build mappingInfo for tree node badge display
+    mapping_info = {}
+    for hs_code, mappings in hs_to_cpc.items():
+        count = len(mappings)
+        mapping_info[f'hs-{hs_code}'] = {'count': count, 'type': '1:1' if count == 1 else '1:N'}
+    for cpc_code, mappings in cpc_to_hs.items():
+        count = len(mappings)
+        mapping_info[f'cpc-{cpc_code}'] = {'count': count, 'type': '1:1' if count == 1 else '1:N'}
+
     concordance = {
-        'hsToCpc': {},
-        'cpcToHs': {},
-        'mappingInfo': {}
+        'hsToCpc': hs_to_cpc,
+        'cpcToHs': cpc_to_hs,
+        'mappingInfo': mapping_info,
     }
     write_json('concordance.json', concordance)
+
+    hs_count = len(hs_to_cpc)
+    cpc_count = len(cpc_to_hs)
+    total = sum(len(v) for v in hs_to_cpc.values())
+    print(f"  Concordance: {total} mappings, {hs_count} HS codes, {cpc_count} CPC codes")
 
 
 if __name__ == '__main__':
