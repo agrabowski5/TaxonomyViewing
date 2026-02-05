@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useMemo } from "react";
 import { TreeApi } from "react-arborist";
 import { useData } from "./useData";
 import { TaxonomyTree } from "./TaxonomyTree";
-import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping } from "./types";
+import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping, EmissionFactorEntry } from "./types";
 import "./App.css";
 
 // Color palette for section-based coloring
@@ -257,6 +257,74 @@ function findMappedEntry(
   return null;
 }
 
+// Look up emission factor for a selected node
+function getEmissionFactor(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  emissionFactors: Record<string, EmissionFactorEntry> | null,
+  concordance: ConcordanceData,
+): EmissionFactorEntry | null {
+  if (!emissionFactors) return null;
+
+  if (HS_FAMILY.includes(taxonomy)) {
+    const hsBase = getHsBase(node.code, taxonomy);
+    if (!hsBase || hsBase.length < 6) return null;
+    return emissionFactors[hsBase] ?? null;
+  }
+
+  if (taxonomy === "cpc") {
+    const cleanCpc = stripCode(node.code);
+    for (let len = cleanCpc.length; len >= 4; len--) {
+      const prefix = cleanCpc.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        const hsCode = hsMappings[0].code;
+        if (emissionFactors[hsCode]) return emissionFactors[hsCode];
+      }
+    }
+  }
+
+  return null;
+}
+
+function EmissionFactorDisplay({ entry }: { entry: EmissionFactorEntry }) {
+  const total = entry.factor;
+  const prodPct = total > 0 ? (entry.factorWithoutMargins / total) * 100 : 0;
+  const marginPct = total > 0 ? (entry.margins / total) * 100 : 0;
+
+  return (
+    <div className="emission-factor-card">
+      <h4>Carbon Intensity</h4>
+      <div className="emission-main">
+        <span className="emission-value">{total.toFixed(3)}</span>
+        <span className="emission-unit">{entry.unit}</span>
+      </div>
+      <div className="emission-breakdown">
+        <div className="emission-bar">
+          <div
+            className="emission-bar-prod"
+            style={{ width: `${prodPct}%` }}
+            title={`Production: ${entry.factorWithoutMargins.toFixed(3)}`}
+          />
+          <div
+            className="emission-bar-margin"
+            style={{ width: `${marginPct}%` }}
+            title={`Margins: ${entry.margins.toFixed(3)}`}
+          />
+        </div>
+        <div className="emission-legend">
+          <span className="legend-prod">Production: {entry.factorWithoutMargins.toFixed(3)}</span>
+          <span className="legend-margin">Margins: {entry.margins.toFixed(3)}</span>
+        </div>
+      </div>
+      <div className="emission-naics">
+        NAICS {entry.naicsCode}: {entry.naicsDescription}
+      </div>
+      <div className="emission-source">{entry.source}</div>
+    </div>
+  );
+}
+
 function App() {
   const { data, loading, error } = useData();
   const [search, setSearch] = useState("");
@@ -339,6 +407,12 @@ function App() {
 
     return [];
   }, [selectedNode, selectedFrom, data, getLookup]);
+
+  // Compute emission factor for selected node
+  const emissionFactor = useMemo(() => {
+    if (!selectedNode || !selectedFrom || !data) return null;
+    return getEmissionFactor(selectedNode, selectedFrom, data.emissionFactors, data.concordance);
+  }, [selectedNode, selectedFrom, data]);
 
   // Handle node selection: update state + sync other pane
   const handleNodeSelect = useCallback(
@@ -630,7 +704,11 @@ function App() {
               );
             })()}
 
-            {mappings.length === 0 && (
+            {emissionFactor && (
+              <EmissionFactorDisplay entry={emissionFactor} />
+            )}
+
+            {mappings.length === 0 && !emissionFactor && (
               <div className="comparison-item no-mapping">
                 <p className="name">No mappings found at this level</p>
               </div>

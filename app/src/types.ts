@@ -32,6 +32,16 @@ export interface ConcordanceData {
   mappingInfo: Record<string, MappingInfo>;
 }
 
+export interface EmissionFactorEntry {
+  factor: number;
+  unit: string;
+  naicsCode: string;
+  naicsDescription: string;
+  factorWithoutMargins: number;
+  margins: number;
+  source: string;
+}
+
 export interface AppData {
   hsTree: TreeNode[];
   cpcTree: TreeNode[];
@@ -44,4 +54,5 @@ export interface AppData {
   htsLookup: Record<string, LookupEntry>;
   caLookup: Record<string, LookupEntry>;
   concordance: ConcordanceData;
+  emissionFactors: Record<string, EmissionFactorEntry> | null;
 }

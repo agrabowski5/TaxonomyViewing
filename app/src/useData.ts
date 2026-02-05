@@ -24,7 +24,11 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
             fetch(`${base}data/ca-lookup.json`).then((r) => r.json()),
             fetch(`${base}data/concordance.json`).then((r) => r.json()),
           ]);
-        setData({ hsTree, cpcTree, cnTree, htsTree, caTree, hsLookup, cpcLookup, cnLookup, htsLookup, caLookup, concordance });
+        // Emission factors are optional — don't block app loading if missing
+        const emissionFactors = await fetch(`${base}data/emission-factors.json`)
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null);
+        setData({ hsTree, cpcTree, cnTree, htsTree, caTree, hsLookup, cpcLookup, cnLookup, htsLookup, caLookup, concordance, emissionFactors });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load data");
       } finally {
