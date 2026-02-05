@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.venv/
+*.accdb
+raw-data/
+__pycache__/
+*.pyc
+.DS_Store
+app/.vite/
+app/test-results/
+app/playwright-report/
+app/tsconfig.tsbuildinfo
