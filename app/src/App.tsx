@@ -68,6 +68,24 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
   },
 };
 
+// Find the ancestor path (list of IDs from root to parent) for a target node in tree data
+function findPathToNode(tree: TreeNode[], targetId: string): string[] {
+  const path: string[] = [];
+  function search(nodes: TreeNode[]): boolean {
+    for (const node of nodes) {
+      if (node.id === targetId) return true;
+      if (node.children) {
+        path.push(node.id);
+        if (search(node.children)) return true;
+        path.pop();
+      }
+    }
+    return false;
+  }
+  search(tree);
+  return path;
+}
+
 // Strip dots, spaces from a code to get pure digits
 function stripCode(code: string): string {
   return code.replace(/[\.\s\-]/g, "");
@@ -149,6 +167,18 @@ function findMappedEntry(
           description: lookup[prefix].description,
           nodeId: `cn-${prefix}`,
         };
+      }
+      // CN may have 8-digit codes (prefix + "00") for subheadings without further subdivision
+      if (prefix.length === 6) {
+        const cn8 = prefix + "00";
+        if (lookup[cn8]) {
+          return {
+            taxonomy: targetTaxonomy,
+            code: cn8,
+            description: lookup[cn8].description,
+            nodeId: `cn-${cn8}`,
+          };
+        }
       }
     }
     // For HTS: lookup keys have dots (e.g., "0101.21.00")
@@ -346,23 +376,39 @@ function App() {
         }
       }
 
-      // Cross-pane sync: scroll to and select the mapped node
+      // Cross-pane sync: open ancestors level by level, then scroll to and select
       if (mappedNodeId) {
         const otherRef = treeRefs[otherTax];
+        const treeData = getTreeData(otherTax);
+        const ancestorPath = findPathToNode(treeData, mappedNodeId);
+
+        // Open each ancestor sequentially (each needs a re-render before the next is visible)
+        let delay = 50;
+        for (const ancestorId of ancestorPath) {
+          setTimeout(() => {
+            const tree = otherRef.current;
+            if (tree) {
+              const ancestor = tree.get(ancestorId);
+              if (ancestor && !ancestor.isOpen) ancestor.open();
+            }
+          }, delay);
+          delay += 80;
+        }
+
+        // After all ancestors are opened, scroll to and select the target
         setTimeout(() => {
           const tree = otherRef.current;
           if (tree) {
             const targetNode = tree.get(mappedNodeId!);
             if (targetNode) {
-              targetNode.openParents();
               tree.scrollTo(targetNode.id);
               targetNode.select();
             }
           }
-        }, 50);
+        }, delay + 100);
       }
     },
-    [leftTaxonomy, rightTaxonomy, data, getLookup, treeRefs]
+    [leftTaxonomy, rightTaxonomy, data, getLookup, treeRefs, getTreeData]
   );
 
   const leftColorMap = useMemo(

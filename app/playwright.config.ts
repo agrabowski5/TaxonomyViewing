@@ -20,10 +20,10 @@ export default defineConfig({
     },
   ],
 
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:5175',
-  //   reuseExistingServer: true,
-  //   timeout: 120 * 1000,
-  // },
+  webServer: {
+    command: 'npm run dev -- --port 5176',
+    url: 'http://localhost:5176',
+    reuseExistingServer: true,
+    timeout: 120 * 1000,
+  },
 });
