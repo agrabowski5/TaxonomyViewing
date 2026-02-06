@@ -1070,6 +1070,77 @@ def generate_unspsc_hs_fuzzy_mapping():
     print(f"  HS codes matched: {len(hs_to_unspsc)}/{len(hs_items)}")
 
 
+# ─────────────────────────────────────────────
+# 9. Taxonomy 1 (HTS goods + CPC services)
+# ─────────────────────────────────────────────
+def generate_taxonomy1():
+    """Combine HTS (goods) with CPC service sections (5-9) into a single tree."""
+    print("\n=== Generating Taxonomy 1 (HTS + CPC Services) ===")
+    import copy
+
+    # Load previously generated trees
+    with open(os.path.join(OUT_DIR, 'hts-tree.json'), 'r', encoding='utf-8') as f:
+        hts_tree = json.load(f)
+    with open(os.path.join(OUT_DIR, 'cpc-tree.json'), 'r', encoding='utf-8') as f:
+        cpc_tree = json.load(f)
+
+    # Load previously generated lookups
+    with open(os.path.join(OUT_DIR, 'hts-lookup.json'), 'r', encoding='utf-8') as f:
+        hts_lookup = json.load(f)
+    with open(os.path.join(OUT_DIR, 'cpc-lookup.json'), 'r', encoding='utf-8') as f:
+        cpc_lookup = json.load(f)
+
+    # Helper: re-prefix all node IDs in a tree
+    def reprefix_tree(nodes, old_prefix, new_prefix):
+        result = copy.deepcopy(nodes)
+        def reprefix_node(node):
+            if node['id'].startswith(old_prefix):
+                node['id'] = new_prefix + node['id'][len(old_prefix):]
+            if 'children' in node:
+                for child in node['children']:
+                    reprefix_node(child)
+        for node in result:
+            reprefix_node(node)
+        return result
+
+    # Re-prefix HTS tree: hts-* → t1-*
+    t1_hts = reprefix_tree(hts_tree, 'hts-', 't1-')
+
+    # Filter CPC to service sections (codes starting with 5-9) and re-prefix: cpc-* → t1-svc-*
+    cpc_services = [s for s in cpc_tree if s['code'] in ('5', '6', '7', '8', '9')]
+    t1_svc = reprefix_tree(cpc_services, 'cpc-', 't1-svc-')
+
+    # Combined tree
+    combined_tree = t1_hts + t1_svc
+
+    # Build combined lookup
+    combined_lookup = {}
+
+    # HTS entries: keep original keys, add origin
+    for key, entry in hts_lookup.items():
+        combined_lookup[key] = {**entry, 'origin': 'hts'}
+
+    # CPC service entries: prefix keys with SVC to avoid collisions, add origin + originalCode
+    for key, entry in cpc_lookup.items():
+        # Only include service codes (section 5-9)
+        if entry.get('section', '') in ('5', '6', '7', '8', '9'):
+            svc_key = f'SVC{key}'
+            combined_lookup[svc_key] = {
+                **entry,
+                'code': entry['code'],  # keep original code for display
+                'origin': 'cpc',
+                'originalCode': key,    # original CPC code for concordance lookups
+            }
+
+    write_json('t1-tree.json', combined_tree)
+    write_json('t1-lookup.json', combined_lookup)
+
+    hts_count = sum(1 for v in combined_lookup.values() if v.get('origin') == 'hts')
+    cpc_count = sum(1 for v in combined_lookup.values() if v.get('origin') == 'cpc')
+    print(f"  Taxonomy 1: {len(t1_hts)} HTS sections + {len(t1_svc)} CPC service sections")
+    print(f"  Lookup: {hts_count} HTS entries + {cpc_count} CPC service entries = {len(combined_lookup)} total")
+
+
 if __name__ == '__main__':
     print("Generating taxonomy data...")
     generate_hs()
@@ -1080,4 +1151,5 @@ if __name__ == '__main__':
     generate_concordance()
     generate_unspsc()
     generate_unspsc_hs_fuzzy_mapping()
+    generate_taxonomy1()
     print("\nDone!")

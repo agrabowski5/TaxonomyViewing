@@ -13,6 +13,8 @@ export interface LookupEntry {
   sectionName?: string;
   level: number;
   type: string;
+  origin?: string;
+  originalCode?: string;
 }
 
 export interface ConcordanceMapping {
@@ -65,6 +67,8 @@ export interface AppData {
   caLookup: Record<string, LookupEntry>;
   unspscTree: TreeNode[];
   unspscLookup: Record<string, LookupEntry>;
+  t1Tree: TreeNode[];
+  t1Lookup: Record<string, LookupEntry>;
   concordance: ConcordanceData;
   unspscHsMapping: FuzzyMappingData;
   emissionFactors: Record<string, EmissionFactorEntry> | null;

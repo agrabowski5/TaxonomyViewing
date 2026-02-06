@@ -31,9 +31,9 @@ function buildColorMap(tree: TreeNode[]): Record<string, string> {
   return colorMap;
 }
 
-type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc";
+type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1";
 
-const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc"];
+const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc", "t1"];
 
 const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; taxonomyClass: string; label: string }> = {
   hs: {
@@ -72,6 +72,12 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
     taxonomyClass: "unspsc",
     label: "UNSPSC",
   },
+  t1: {
+    fullName: "Taxonomy 1 (HTS Goods + CPC Services)",
+    legend: "Goods: Sections \u2192 Headings \u2192 Tariff Lines | Services: Sections \u2192 Divisions \u2192 Groups",
+    taxonomyClass: "t1",
+    label: "T1",
+  },
 };
 
 // Find the ancestor path (list of IDs from root to parent) for a target node in tree data
@@ -99,6 +105,28 @@ function stripCode(code: string): string {
 
 // HS-family taxonomies share the same base HS codes (first 6 digits)
 const HS_FAMILY: TaxonomyType[] = ["hs", "cn", "hts", "ca"];
+
+// T1 helper: detect whether a T1 node originated from HTS or CPC services
+function getT1Origin(nodeId: string, lookup: Record<string, LookupEntry>, code: string): "hts" | "cpc" | null {
+  // Check node ID prefix first
+  if (nodeId.startsWith("t1-svc-")) return "cpc";
+  if (nodeId.startsWith("t1-")) {
+    // Could be HTS — check lookup for SVC-prefixed key (CPC) vs regular (HTS)
+    const svcKey = `SVC${stripCode(code)}`;
+    if (lookup[svcKey]?.origin === "cpc") return "cpc";
+    return "hts";
+  }
+  return null;
+}
+
+// Get the original code for concordance/HS lookup from a T1 node
+function getT1OriginalCode(code: string, origin: "hts" | "cpc", lookup: Record<string, LookupEntry>): string {
+  if (origin === "cpc") {
+    const svcKey = `SVC${stripCode(code)}`;
+    return lookup[svcKey]?.originalCode ?? stripCode(code);
+  }
+  return code; // HTS codes are used as-is
+}
 
 // Extract the HS 6-digit base from any HS-family code
 function getHsBase(code: string, taxonomy: TaxonomyType): string | null {
@@ -410,12 +438,13 @@ function App() {
     ca: useRef<TreeApi<TreeNode>>(null),
     cpc: useRef<TreeApi<TreeNode>>(null),
     unspsc: useRef<TreeApi<TreeNode>>(null),
+    t1: useRef<TreeApi<TreeNode>>(null),
   };
 
   const getTreeData = useCallback((taxonomy: TaxonomyType) => {
     if (!data) return [];
     const map: Record<TaxonomyType, TreeNode[]> = {
-      hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree,
+      hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree, t1: data.t1Tree,
     };
     return map[taxonomy];
   }, [data]);
@@ -423,7 +452,7 @@ function App() {
   const getLookup = useCallback((taxonomy: TaxonomyType) => {
     if (!data) return {};
     const map: Record<TaxonomyType, Record<string, LookupEntry>> = {
-      hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup,
+      hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup, t1: data.t1Lookup,
     };
     return map[taxonomy];
   }, [data]);
@@ -443,6 +472,17 @@ function App() {
   const mappings = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return [];
 
+    // Helper: find T1 mapping entry from an HS base code (for other taxonomies mapping TO T1)
+    const findT1Entry = (hsBase: string): MappedEntry | null => {
+      const t1Lookup = getLookup("t1");
+      // T1's HTS portion uses same lookup keys as HTS
+      const htsEntry = findMappedEntry(hsBase, "hts", t1Lookup, data.concordance);
+      if (htsEntry) {
+        return { ...htsEntry, taxonomy: "t1", nodeId: htsEntry.nodeId ? htsEntry.nodeId.replace("hts-", "t1-") : null };
+      }
+      return null;
+    };
+
     // Case 1: Source is an HS-family taxonomy
     if (HS_FAMILY.includes(selectedFrom)) {
       const hsBase = getHsBase(selectedNode.code, selectedFrom);
@@ -453,6 +493,9 @@ function App() {
         if (tax === "unspsc") {
           const fuzzyEntries = findFuzzyMappedEntries(hsBase, selectedFrom, "unspsc", data.unspscHsMapping, getLookup("unspsc"));
           results.push(...fuzzyEntries);
+        } else if (tax === "t1") {
+          const entry = findT1Entry(hsBase);
+          if (entry) results.push(entry);
         } else {
           const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
           if (entry) results.push(entry);
@@ -475,6 +518,9 @@ function App() {
             if (tax === "unspsc") {
               const fuzzyEntries = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
               results.push(...fuzzyEntries);
+            } else if (tax === "t1") {
+              const entry = findT1Entry(firstHsCode);
+              if (entry) results.push(entry);
             } else {
               const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
               if (entry) results.push(entry);
@@ -496,10 +542,64 @@ function App() {
 
       for (const tax of ALL_TAXONOMIES) {
         if (tax === "unspsc" || tax === "hs") continue;
-        const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
-        if (entry) results.push(entry);
+        if (tax === "t1") {
+          const entry = findT1Entry(firstHsCode);
+          if (entry) results.push(entry);
+        } else {
+          const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+          if (entry) results.push(entry);
+        }
       }
       return results;
+    }
+
+    // Case 4: Source is T1 — detect origin (HTS or CPC) and delegate
+    if (selectedFrom === "t1") {
+      const t1Lookup = getLookup("t1");
+      const origin = getT1Origin(selectedNode.id, t1Lookup, selectedNode.code);
+      if (!origin) return [];
+
+      if (origin === "hts") {
+        // HTS-origin: same as HS-family mapping
+        const hsBase = getHsBase(selectedNode.code, "hts");
+        if (!hsBase) return [];
+        const results: MappedEntry[] = [];
+        for (const tax of ALL_TAXONOMIES) {
+          if (tax === "t1") continue;
+          if (tax === "unspsc") {
+            const fuzzyEntries = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+            results.push(...fuzzyEntries);
+          } else {
+            const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
+            if (entry) results.push(entry);
+          }
+        }
+        return results;
+      }
+
+      if (origin === "cpc") {
+        // CPC-origin: use concordance reverse lookup
+        const originalCode = getT1OriginalCode(selectedNode.code, "cpc", t1Lookup);
+        for (let len = originalCode.length; len >= 4; len--) {
+          const prefix = originalCode.substring(0, len);
+          const hsMappings = data.concordance.cpcToHs[prefix];
+          if (hsMappings && hsMappings.length > 0) {
+            const firstHsCode = hsMappings[0].code;
+            const results: MappedEntry[] = [];
+            for (const tax of ALL_TAXONOMIES) {
+              if (tax === "t1") continue;
+              if (tax === "unspsc") {
+                const fuzzyEntries = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+                results.push(...fuzzyEntries);
+              } else {
+                const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+                if (entry) results.push(entry);
+              }
+            }
+            return results;
+          }
+        }
+      }
     }
 
     return [];
@@ -524,20 +624,27 @@ function App() {
 
       let mappedNodeId: string | null = null;
 
+      // Helper: find T1 node ID from an HS base code
+      const findT1NodeId = (hsBase: string): string | null => {
+        const t1Lookup = getLookup("t1");
+        const htsEntry = findMappedEntry(hsBase, "hts", t1Lookup, data.concordance);
+        return htsEntry?.nodeId ? htsEntry.nodeId.replace("hts-", "t1-") : null;
+      };
+
       if (HS_FAMILY.includes(sourceTax)) {
-        // HS-family source: use hsBase prefix matching + concordance for CPC + fuzzy for UNSPSC
         const hsBase = getHsBase(node.code, sourceTax);
         if (hsBase) {
           if (otherTax === "unspsc") {
             const fuzzy = findFuzzyMappedEntries(hsBase, sourceTax, "unspsc", data.unspscHsMapping, getLookup("unspsc"));
             mappedNodeId = fuzzy[0]?.nodeId ?? null;
+          } else if (otherTax === "t1") {
+            mappedNodeId = findT1NodeId(hsBase);
           } else {
             const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
             mappedNodeId = mapped?.nodeId ?? null;
           }
         }
       } else if (sourceTax === "cpc") {
-        // CPC source: use concordance reverse lookup to find HS code, then map
         const cleanCpc = stripCode(node.code);
         for (let len = cleanCpc.length; len >= 4; len--) {
           const prefix = cleanCpc.substring(0, len);
@@ -548,6 +655,8 @@ function App() {
             if (otherTax === "unspsc") {
               const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
               mappedNodeId = fuzzy[0]?.nodeId ?? null;
+            } else if (otherTax === "t1") {
+              mappedNodeId = findT1NodeId(firstHsCode);
             } else {
               const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
               mappedNodeId = mapped?.nodeId ?? null;
@@ -556,7 +665,6 @@ function App() {
           }
         }
       } else if (sourceTax === "unspsc") {
-        // UNSPSC source: fuzzy map to HS, then chain to target
         const cleanCode = stripCode(node.code);
         const hsEntries = findFuzzyMappedEntries(cleanCode, "unspsc", "hs", data.unspscHsMapping, getLookup("hs"));
         if (hsEntries.length > 0) {
@@ -565,9 +673,48 @@ function App() {
             mappedNodeId = `hs-${firstHsCode}`;
           } else if (otherTax === "unspsc") {
             // both UNSPSC, no cross-mapping
+          } else if (otherTax === "t1") {
+            mappedNodeId = findT1NodeId(firstHsCode);
           } else {
             const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
             mappedNodeId = mapped?.nodeId ?? null;
+          }
+        }
+      } else if (sourceTax === "t1") {
+        // T1 source: detect origin and delegate
+        const t1Lookup = getLookup("t1");
+        const origin = getT1Origin(node.id, t1Lookup, node.code);
+        if (origin === "hts") {
+          const hsBase = getHsBase(node.code, "hts");
+          if (hsBase) {
+            if (otherTax === "unspsc") {
+              const fuzzy = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+              mappedNodeId = fuzzy[0]?.nodeId ?? null;
+            } else if (otherTax === "t1") {
+              // both T1, no cross-mapping
+            } else {
+              const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+              mappedNodeId = mapped?.nodeId ?? null;
+            }
+          }
+        } else if (origin === "cpc") {
+          const originalCode = getT1OriginalCode(node.code, "cpc", t1Lookup);
+          for (let len = originalCode.length; len >= 4; len--) {
+            const prefix = originalCode.substring(0, len);
+            const hsMappings = data.concordance.cpcToHs[prefix];
+            if (hsMappings && hsMappings.length > 0) {
+              const firstHsCode = hsMappings[0].code;
+              if (otherTax === "unspsc") {
+                const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+                mappedNodeId = fuzzy[0]?.nodeId ?? null;
+              } else if (otherTax === "t1") {
+                // both T1
+              } else {
+                const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+                mappedNodeId = mapped?.nodeId ?? null;
+              }
+              break;
+            }
           }
         }
       }
@@ -642,6 +789,7 @@ function App() {
       <option value="hts">HTS - Harmonized Tariff Schedule (US)</option>
       <option value="ca">Canadian Customs Tariff</option>
       <option value="unspsc">UNSPSC - Products &amp; Services Code</option>
+      <option value="t1">T1 - HTS Goods + CPC Services</option>
     </>
   );
 

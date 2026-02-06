@@ -339,6 +339,11 @@
   color: #3730a3;
 }
 
+.taxonomy-label.t1 {
+  background: #ccfbf1;
+  color: #134e4a;
+}
+
 /* ===== Detail Panel ===== */
 .detail-column {
   background: var(--surface);
