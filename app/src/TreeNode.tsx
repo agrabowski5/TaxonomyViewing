@@ -7,10 +7,18 @@ interface Props extends NodeRendererProps<TNode> {
   colorMap?: Record<string, string>;
 }
 
+function countDescendants(n: TNode): number {
+  if (!n.children) return 0;
+  let count = n.children.length;
+  for (const child of n.children) count += countDescendants(child);
+  return count;
+}
+
 export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap }: Props) {
   const data = node.data;
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
+  const descendantCount = !node.isLeaf ? countDescendants(data) : 0;
 
   return (
     <div
@@ -43,6 +51,11 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
       <span className="node-name" title={data.name}>
         {data.name}
       </span>
+      {descendantCount > 0 && (
+        <span className="descendant-count" title={`${descendantCount} items underneath`}>
+          {descendantCount.toLocaleString()}
+        </span>
+      )}
       {info && (
         <span
           className={`mapping-badge ${info.type === "1:1" ? "mapping-one" : "mapping-many"}`}
