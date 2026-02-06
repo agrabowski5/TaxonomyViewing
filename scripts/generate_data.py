@@ -1,6 +1,6 @@
 """
-Generate tree and lookup JSON files for all 5 taxonomies:
-  HS (international), CPC, CN (EU), HTS (US), Canadian Customs Tariff
+Generate tree and lookup JSON files for all 6 taxonomies:
+  HS (international), CPC, CN (EU), HTS (US), Canadian Customs Tariff, UNSPSC
 
 Reads raw data from ../raw-data/ and writes JSON to ../app/public/data/
 """
@@ -864,6 +864,212 @@ def generate_concordance():
     print(f"  Concordance: {total} mappings, {hs_count} HS codes, {cpc_count} CPC codes")
 
 
+# ─────────────────────────────────────────────
+# 7. UNSPSC (United Nations Standard Products and Services Code)
+# ─────────────────────────────────────────────
+def generate_unspsc():
+    print("\n=== Generating UNSPSC data ===")
+
+    # CSV columns: Segment, Segment Name, Family, Family Name, Class, Class Name, Commodity, Commodity Name
+    # Each row is a commodity-level entry with parent hierarchy info
+    segments = {}  # code -> name
+    families = {}
+    classes = {}
+    commodities = {}
+
+    with open(os.path.join(RAW_DIR, 'unspsc-codes.csv'), 'r', encoding='latin-1') as f:
+        reader = csv.reader(f)
+        next(reader)  # skip header
+        for row in reader:
+            if len(row) < 8:
+                continue
+            seg_code = row[0].strip()
+            seg_name = row[1].strip()
+            fam_code = row[2].strip()
+            fam_name = row[3].strip()
+            cls_code = row[4].strip()
+            cls_name = row[5].strip()
+            com_code = row[6].strip()
+            com_name = row[7].strip()
+
+            # Strip trailing zeros to get short codes for each level
+            # Segment: first 2 digits, Family: first 4, Class: first 6, Commodity: all 8
+            if seg_code and seg_name:
+                segments[seg_code[:2]] = seg_name
+            if fam_code and fam_name:
+                families[fam_code[:4]] = fam_name
+            if cls_code and cls_name:
+                classes[cls_code[:6]] = cls_name
+            if com_code and com_name:
+                commodities[com_code[:8]] = com_name
+
+    level_names = {2: 'segment', 4: 'family', 6: 'class', 8: 'commodity'}
+
+    # Build tree top-down
+    tree = []
+    nodes_by_code = {}
+
+    # Add segments (2-digit)
+    for code in sorted(segments):
+        node = {'id': f'unspsc-{code}', 'code': code, 'name': segments[code], 'type': 'segment', 'children': []}
+        tree.append(node)
+        nodes_by_code[code] = node
+
+    # Add families (4-digit)
+    for code in sorted(families):
+        parent_code = code[:2]
+        node = {'id': f'unspsc-{code}', 'code': code, 'name': families[code], 'type': 'family', 'children': []}
+        nodes_by_code[code] = node
+        if parent_code in nodes_by_code:
+            nodes_by_code[parent_code]['children'].append(node)
+
+    # Add classes (6-digit)
+    for code in sorted(classes):
+        parent_code = code[:4]
+        node = {'id': f'unspsc-{code}', 'code': code, 'name': classes[code], 'type': 'class', 'children': []}
+        nodes_by_code[code] = node
+        if parent_code in nodes_by_code:
+            nodes_by_code[parent_code]['children'].append(node)
+
+    # Add commodities (8-digit) - leaf nodes, no children
+    for code in sorted(commodities):
+        parent_code = code[:6]
+        node = {'id': f'unspsc-{code}', 'code': code, 'name': commodities[code], 'type': 'commodity'}
+        nodes_by_code[code] = node
+        if parent_code in nodes_by_code:
+            nodes_by_code[parent_code]['children'].append(node)
+
+    # Clean empty children
+    def clean_tree(nodes):
+        for node in nodes:
+            if 'children' in node:
+                if len(node['children']) == 0:
+                    del node['children']
+                else:
+                    clean_tree(node['children'])
+
+    clean_tree(tree)
+
+    # Build lookup
+    all_codes = {}
+    all_codes.update({c: (segments[c], 'segment') for c in segments})
+    all_codes.update({c: (families[c], 'family') for c in families})
+    all_codes.update({c: (classes[c], 'class') for c in classes})
+    all_codes.update({c: (commodities[c], 'commodity') for c in commodities})
+
+    lookup = {}
+    for code, (name, type_name) in all_codes.items():
+        seg_code = code[:2]
+        seg_name = segments.get(seg_code, '')
+        lookup[code] = {
+            'code': code,
+            'description': name,
+            'section': seg_code,
+            'sectionName': seg_name,
+            'level': len(code),
+            'type': type_name,
+        }
+
+    write_json('unspsc-tree.json', tree)
+    write_json('unspsc-lookup.json', lookup)
+    print(f"  UNSPSC: {len(segments)} segments, {len(families)} families, {len(classes)} classes, {len(commodities)} commodities")
+    print(f"  Total: {len(all_codes)} codes")
+
+
+# ─────────────────────────────────────────────
+# 8. UNSPSC ↔ HS Fuzzy Text Mapping
+# ─────────────────────────────────────────────
+def generate_unspsc_hs_fuzzy_mapping():
+    print("\n=== Generating UNSPSC-HS fuzzy text mapping ===")
+
+    # Load HS lookup (already generated)
+    with open(os.path.join(OUT_DIR, 'hs-lookup.json'), 'r', encoding='utf-8') as f:
+        hs_lookup = json.load(f)
+
+    # Load UNSPSC lookup (already generated)
+    with open(os.path.join(OUT_DIR, 'unspsc-lookup.json'), 'r', encoding='utf-8') as f:
+        unspsc_lookup = json.load(f)
+
+    # Get HS 6-digit subheadings and UNSPSC 8-digit commodities
+    hs_items = {code: entry['description'] for code, entry in hs_lookup.items() if len(code) == 6}
+    unspsc_items = {code: entry['description'] for code, entry in unspsc_lookup.items() if len(code) == 8}
+
+    print(f"  HS subheadings: {len(hs_items)}, UNSPSC commodities: {len(unspsc_items)}")
+
+    STOP_WORDS = {
+        'a', 'an', 'and', 'or', 'the', 'of', 'for', 'to', 'in', 'on', 'with',
+        'by', 'from', 'not', 'nor', 'but', 'at', 'as', 'is', 'are', 'was',
+        'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+        'other', 'than', 'its', 'it', 'their', 'this', 'that', 'these', 'those',
+        'such', 'including', 'whether', 'also', 'etc', 'nes', 'nesoi',
+    }
+
+    def preprocess(text):
+        text = text.lower()
+        text = re.sub(r'[^\w\s]', ' ', text)
+        words = text.split()
+        return set(w for w in words if w not in STOP_WORDS and len(w) > 2)
+
+    def jaccard(set1, set2):
+        if not set1 or not set2:
+            return 0.0
+        intersection = len(set1 & set2)
+        union = len(set1 | set2)
+        return intersection / union if union > 0 else 0.0
+
+    THRESHOLD = 0.3
+    TOP_N = 3
+
+    # Precompute HS word sets
+    hs_word_sets = {code: preprocess(desc) for code, desc in hs_items.items()}
+
+    unspsc_to_hs = {}
+    hs_to_unspsc = {}
+    count = 0
+
+    for i, (unspsc_code, unspsc_desc) in enumerate(unspsc_items.items()):
+        if i % 5000 == 0:
+            print(f"    Processing {i}/{len(unspsc_items)} commodities...")
+
+        unspsc_words = preprocess(unspsc_desc)
+        if not unspsc_words:
+            continue
+
+        matches = []
+        for hs_code, hs_words in hs_word_sets.items():
+            sim = jaccard(unspsc_words, hs_words)
+            if sim >= THRESHOLD:
+                matches.append({'code': hs_code, 'similarity': round(sim, 3)})
+
+        if matches:
+            matches.sort(key=lambda x: x['similarity'], reverse=True)
+            top = matches[:TOP_N]
+            unspsc_to_hs[unspsc_code] = top
+            count += len(top)
+
+            for m in top:
+                if m['code'] not in hs_to_unspsc:
+                    hs_to_unspsc[m['code']] = []
+                hs_to_unspsc[m['code']].append({
+                    'code': unspsc_code,
+                    'similarity': m['similarity'],
+                })
+
+    # Sort reverse mappings by similarity
+    for hs_code in hs_to_unspsc:
+        hs_to_unspsc[hs_code].sort(key=lambda x: x['similarity'], reverse=True)
+
+    fuzzy_mapping = {
+        'unspscToHs': unspsc_to_hs,
+        'hsToUnspsc': hs_to_unspsc,
+    }
+
+    write_json('unspsc-hs-mapping.json', fuzzy_mapping)
+    print(f"  Fuzzy mapping: {count} total matches")
+    print(f"  UNSPSC codes matched: {len(unspsc_to_hs)}/{len(unspsc_items)} ({100*len(unspsc_to_hs)/len(unspsc_items):.1f}%)")
+    print(f"  HS codes matched: {len(hs_to_unspsc)}/{len(hs_items)}")
+
+
 if __name__ == '__main__':
     print("Generating taxonomy data...")
     generate_hs()
@@ -872,4 +1078,6 @@ if __name__ == '__main__':
     generate_hts()
     generate_canadian()
     generate_concordance()
+    generate_unspsc()
+    generate_unspsc_hs_fuzzy_mapping()
     print("\nDone!")

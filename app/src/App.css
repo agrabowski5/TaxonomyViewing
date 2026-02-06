@@ -334,6 +334,11 @@
   color: #9f1239;
 }
 
+.taxonomy-label.unspsc {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
 /* ===== Detail Panel ===== */
 .detail-column {
   background: var(--surface);
@@ -978,6 +983,22 @@
   text-transform: uppercase;
   letter-spacing: 0.3px;
   font-weight: 600;
+}
+
+.fuzzy-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #e0e7ff;
+  color: #3730a3;
+  flex-shrink: 0;
+  font-weight: 600;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+}
+
+.fuzzy-item {
+  border-left-color: #6366f1 !important;
+  background: #eef2ff;
 }
 
 /* ===== Emission Factor Card ===== */

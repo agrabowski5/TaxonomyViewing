@@ -32,6 +32,16 @@ export interface ConcordanceData {
   mappingInfo: Record<string, MappingInfo>;
 }
 
+export interface FuzzyMapping {
+  code: string;
+  similarity: number;
+}
+
+export interface FuzzyMappingData {
+  unspscToHs: Record<string, FuzzyMapping[]>;
+  hsToUnspsc: Record<string, FuzzyMapping[]>;
+}
+
 export interface EmissionFactorEntry {
   factor: number;
   unit: string;
@@ -53,6 +63,9 @@ export interface AppData {
   cnLookup: Record<string, LookupEntry>;
   htsLookup: Record<string, LookupEntry>;
   caLookup: Record<string, LookupEntry>;
+  unspscTree: TreeNode[];
+  unspscLookup: Record<string, LookupEntry>;
   concordance: ConcordanceData;
+  unspscHsMapping: FuzzyMappingData;
   emissionFactors: Record<string, EmissionFactorEntry> | null;
 }

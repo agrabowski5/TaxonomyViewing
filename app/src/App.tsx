@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useMemo } from "react";
 import { TreeApi } from "react-arborist";
 import { useData } from "./useData";
 import { TaxonomyTree } from "./TaxonomyTree";
-import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping, EmissionFactorEntry } from "./types";
+import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, FuzzyMappingData } from "./types";
 import "./App.css";
 
 // Color palette for section-based coloring
@@ -31,9 +31,9 @@ function buildColorMap(tree: TreeNode[]): Record<string, string> {
   return colorMap;
 }
 
-type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc";
+type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc";
 
-const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca"];
+const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc"];
 
 const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; taxonomyClass: string; label: string }> = {
   hs: {
@@ -65,6 +65,12 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
     legend: "Sections \u2192 Chapters \u2192 Headings \u2192 Subheadings \u2192 Items",
     taxonomyClass: "ca",
     label: "CA",
+  },
+  unspsc: {
+    fullName: "UN Standard Products and Services Code",
+    legend: "Segments \u2192 Families \u2192 Classes \u2192 Commodities",
+    taxonomyClass: "unspsc",
+    label: "UNSPSC",
   },
 };
 
@@ -109,6 +115,8 @@ interface MappedEntry {
   code: string;
   description: string;
   nodeId: string | null;
+  similarity?: number;
+  fuzzy?: boolean;
 }
 
 // Find the best matching entry in a target taxonomy for a given HS base code
@@ -257,6 +265,68 @@ function findMappedEntry(
   return null;
 }
 
+// Find fuzzy-matched entries between UNSPSC and HS
+function findFuzzyMappedEntries(
+  sourceCode: string,
+  sourceTaxonomy: TaxonomyType,
+  targetTaxonomy: TaxonomyType,
+  fuzzyMapping: FuzzyMappingData,
+  targetLookup: Record<string, LookupEntry>,
+): MappedEntry[] {
+  if (sourceTaxonomy === "unspsc" && (targetTaxonomy === "hs" || HS_FAMILY.includes(targetTaxonomy))) {
+    // UNSPSC → HS: try progressively shorter codes (8→6→4 digits)
+    for (let len = sourceCode.length; len >= 4; len -= 2) {
+      const prefix = sourceCode.substring(0, len);
+      const matches = fuzzyMapping.unspscToHs[prefix];
+      if (matches && matches.length > 0) {
+        const results: MappedEntry[] = [];
+        for (const m of matches) {
+          const entry = targetLookup[m.code];
+          if (entry) {
+            results.push({
+              taxonomy: targetTaxonomy,
+              code: m.code,
+              description: entry.description,
+              nodeId: `hs-${m.code}`,
+              similarity: m.similarity,
+              fuzzy: true,
+            });
+          }
+        }
+        return results;
+      }
+    }
+  }
+
+  if (HS_FAMILY.includes(sourceTaxonomy) && targetTaxonomy === "unspsc") {
+    // HS → UNSPSC: try progressively shorter HS codes
+    const clean = stripCode(sourceCode);
+    for (let len = Math.min(6, clean.length); len >= 4; len -= 2) {
+      const prefix = clean.substring(0, len);
+      const matches = fuzzyMapping.hsToUnspsc[prefix];
+      if (matches && matches.length > 0) {
+        const results: MappedEntry[] = [];
+        for (const m of matches.slice(0, 5)) {
+          const entry = targetLookup[m.code];
+          if (entry) {
+            results.push({
+              taxonomy: "unspsc" as TaxonomyType,
+              code: m.code,
+              description: entry.description,
+              nodeId: `unspsc-${m.code}`,
+              similarity: m.similarity,
+              fuzzy: true,
+            });
+          }
+        }
+        return results;
+      }
+    }
+  }
+
+  return [];
+}
+
 // Look up emission factor for a selected node
 function getEmissionFactor(
   node: TreeNode,
@@ -339,12 +409,13 @@ function App() {
     hts: useRef<TreeApi<TreeNode>>(null),
     ca: useRef<TreeApi<TreeNode>>(null),
     cpc: useRef<TreeApi<TreeNode>>(null),
+    unspsc: useRef<TreeApi<TreeNode>>(null),
   };
 
   const getTreeData = useCallback((taxonomy: TaxonomyType) => {
     if (!data) return [];
     const map: Record<TaxonomyType, TreeNode[]> = {
-      hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree,
+      hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree,
     };
     return map[taxonomy];
   }, [data]);
@@ -352,7 +423,7 @@ function App() {
   const getLookup = useCallback((taxonomy: TaxonomyType) => {
     if (!data) return {};
     const map: Record<TaxonomyType, Record<string, LookupEntry>> = {
-      hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup,
+      hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup,
     };
     return map[taxonomy];
   }, [data]);
@@ -379,8 +450,13 @@ function App() {
       const results: MappedEntry[] = [];
       for (const tax of ALL_TAXONOMIES) {
         if (tax === selectedFrom) continue;
-        const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
-        if (entry) results.push(entry);
+        if (tax === "unspsc") {
+          const fuzzyEntries = findFuzzyMappedEntries(hsBase, selectedFrom, "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+          results.push(...fuzzyEntries);
+        } else {
+          const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
+          if (entry) results.push(entry);
+        }
       }
       return results;
     }
@@ -388,7 +464,6 @@ function App() {
     // Case 2: Source is CPC - use concordance reverse lookup
     if (selectedFrom === "cpc") {
       const cleanCpc = stripCode(selectedNode.code);
-      // Try exact code, then progressively shorter
       for (let len = cleanCpc.length; len >= 4; len--) {
         const prefix = cleanCpc.substring(0, len);
         const hsMappings = data.concordance.cpcToHs[prefix];
@@ -397,12 +472,34 @@ function App() {
           const results: MappedEntry[] = [];
           for (const tax of ALL_TAXONOMIES) {
             if (tax === "cpc") continue;
-            const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
-            if (entry) results.push(entry);
+            if (tax === "unspsc") {
+              const fuzzyEntries = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+              results.push(...fuzzyEntries);
+            } else {
+              const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+              if (entry) results.push(entry);
+            }
           }
           return results;
         }
       }
+    }
+
+    // Case 3: Source is UNSPSC - use fuzzy mapping to find HS, then chain
+    if (selectedFrom === "unspsc") {
+      const cleanCode = stripCode(selectedNode.code);
+      const hsEntries = findFuzzyMappedEntries(cleanCode, "unspsc", "hs", data.unspscHsMapping, getLookup("hs"));
+      if (hsEntries.length === 0) return [];
+
+      const results: MappedEntry[] = [...hsEntries];
+      const firstHsCode = hsEntries[0].code;
+
+      for (const tax of ALL_TAXONOMIES) {
+        if (tax === "unspsc" || tax === "hs") continue;
+        const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+        if (entry) results.push(entry);
+      }
+      return results;
     }
 
     return [];
@@ -428,11 +525,16 @@ function App() {
       let mappedNodeId: string | null = null;
 
       if (HS_FAMILY.includes(sourceTax)) {
-        // HS-family source: use hsBase prefix matching + concordance for CPC
+        // HS-family source: use hsBase prefix matching + concordance for CPC + fuzzy for UNSPSC
         const hsBase = getHsBase(node.code, sourceTax);
         if (hsBase) {
-          const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
-          mappedNodeId = mapped?.nodeId ?? null;
+          if (otherTax === "unspsc") {
+            const fuzzy = findFuzzyMappedEntries(hsBase, sourceTax, "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+            mappedNodeId = fuzzy[0]?.nodeId ?? null;
+          } else {
+            const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+            mappedNodeId = mapped?.nodeId ?? null;
+          }
         }
       } else if (sourceTax === "cpc") {
         // CPC source: use concordance reverse lookup to find HS code, then map
@@ -441,11 +543,31 @@ function App() {
           const prefix = cleanCpc.substring(0, len);
           const hsMappings = data.concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
-            if (otherTax === "cpc") break; // both CPC, no cross-mapping
+            if (otherTax === "cpc") break;
             const firstHsCode = hsMappings[0].code;
+            if (otherTax === "unspsc") {
+              const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+              mappedNodeId = fuzzy[0]?.nodeId ?? null;
+            } else {
+              const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+              mappedNodeId = mapped?.nodeId ?? null;
+            }
+            break;
+          }
+        }
+      } else if (sourceTax === "unspsc") {
+        // UNSPSC source: fuzzy map to HS, then chain to target
+        const cleanCode = stripCode(node.code);
+        const hsEntries = findFuzzyMappedEntries(cleanCode, "unspsc", "hs", data.unspscHsMapping, getLookup("hs"));
+        if (hsEntries.length > 0) {
+          const firstHsCode = hsEntries[0].code;
+          if (otherTax === "hs") {
+            mappedNodeId = `hs-${firstHsCode}`;
+          } else if (otherTax === "unspsc") {
+            // both UNSPSC, no cross-mapping
+          } else {
             const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
             mappedNodeId = mapped?.nodeId ?? null;
-            break;
           }
         }
       }
@@ -519,6 +641,7 @@ function App() {
       <option value="cn">CN - Combined Nomenclature (EU)</option>
       <option value="hts">HTS - Harmonized Tariff Schedule (US)</option>
       <option value="ca">Canadian Customs Tariff</option>
+      <option value="unspsc">UNSPSC - Products &amp; Services Code</option>
     </>
   );
 
@@ -528,7 +651,7 @@ function App() {
         <div className="header-text">
           <h1>Taxonomy Explorer</h1>
           <p className="subtitle">
-            Compare HS, CPC, CN, HTS &amp; Canadian tariff classifications
+            Compare HS, CPC, CN, HTS, Canadian &amp; UNSPSC classifications
           </p>
         </div>
         <div className="search-bar">
@@ -642,9 +765,9 @@ function App() {
               <p className="name">{selectedNode.name}</p>
             </div>
 
-            {/* HS-family mappings (single best match per taxonomy) */}
+            {/* HS-family mappings (single best match per taxonomy, excluding CPC and fuzzy) */}
             {mappings
-              .filter((m) => m.taxonomy !== "cpc")
+              .filter((m) => m.taxonomy !== "cpc" && !m.fuzzy)
               .map((m) => (
                 <div className="comparison-item mapped-item" key={m.taxonomy}>
                   <h4>{TAXONOMY_INFO[m.taxonomy].label}</h4>
@@ -700,6 +823,26 @@ function App() {
                       </div>
                     );
                   })}
+                </div>
+              );
+            })()}
+
+            {/* UNSPSC fuzzy matches */}
+            {(() => {
+              const fuzzyMatches = mappings.filter((m) => m.fuzzy);
+              if (fuzzyMatches.length === 0) return null;
+              return (
+                <div className="comparison-item mapped-item fuzzy-item">
+                  <h4>UNSPSC (Fuzzy Text Match)</h4>
+                  {fuzzyMatches.map((m, i) => (
+                    <div key={i} className="concordance-row">
+                      <span className="code">{m.code}</span>
+                      <span className="name">{m.description}</span>
+                      <span className="fuzzy-badge" title={`Similarity: ${((m.similarity ?? 0) * 100).toFixed(1)}%`}>
+                        ~{((m.similarity ?? 0) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  ))}
                 </div>
               );
             })()}
