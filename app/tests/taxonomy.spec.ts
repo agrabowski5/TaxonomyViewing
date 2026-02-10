@@ -71,7 +71,7 @@ test.describe('Taxonomy Explorer - Two Pane Interface', () => {
     await expect(searchInput).toHaveValue('');
   });
 
-  test('all 5 taxonomy options are available', async ({ page }) => {
+  test('all 8 taxonomy options are available', async ({ page }) => {
     const leftSelector = page.locator('.left-pane .taxonomy-selector');
     const options = await leftSelector.locator('option').allTextContents();
     expect(options.some(opt => opt.includes('HS'))).toBe(true);
@@ -79,6 +79,9 @@ test.describe('Taxonomy Explorer - Two Pane Interface', () => {
     expect(options.some(opt => opt.includes('CN'))).toBe(true);
     expect(options.some(opt => opt.includes('HTS'))).toBe(true);
     expect(options.some(opt => opt.includes('Canadian'))).toBe(true);
+    expect(options.some(opt => opt.includes('UNSPSC'))).toBe(true);
+    expect(options.some(opt => opt.includes('T1'))).toBe(true);
+    expect(options.some(opt => opt.includes('T2'))).toBe(true);
   });
 
   test('comparison panel appears when node is selected', async ({ page }) => {
@@ -199,6 +202,169 @@ test.describe('Cross-pane sync', () => {
 
     // They should be different (CPC section 0 vs CN section I)
     expect(firstNodeBefore).not.toBe(firstNodeAfter);
+  });
+});
+
+test.describe('Search Filtering', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+  });
+
+  test('search filters tree to show only matching nodes', async ({ page }) => {
+    const searchInput = page.locator('.search-bar input');
+    const leftPane = page.locator('.left-pane');
+
+    // Initially the first section should be visible (e.g., "Live Animals" for HS)
+    await expect(leftPane.locator('.tree-node').first()).toBeVisible();
+
+    // Search for something specific
+    await searchInput.fill('horses');
+    // Wait for debounce (200ms) + render
+    await page.waitForTimeout(500);
+
+    // Matching nodes should be visible
+    const nodeNames = await leftPane.locator('.tree-node .node-name').allTextContents();
+    const hasMatch = nodeNames.some(name => name.toLowerCase().includes('horses'));
+    expect(hasMatch).toBe(true);
+
+    // Non-matching top-level sections should NOT be visible
+    // HS section "Vegetable Products" should not appear for "horses"
+    const hasVegetable = nodeNames.some(name => name.toLowerCase().includes('vegetable products'));
+    expect(hasVegetable).toBe(false);
+  });
+
+  test('clearing search restores full tree', async ({ page }) => {
+    const searchInput = page.locator('.search-bar input');
+    const leftPane = page.locator('.left-pane');
+
+    // Get the first visible node name before search (should be Section I)
+    const initialFirstName = await leftPane.locator('.tree-node .node-name').first().textContent();
+
+    // Search to filter
+    await searchInput.fill('horses');
+    await page.waitForTimeout(500);
+
+    // Clear search via X button
+    const clearBtn = page.locator('.search-bar .clear-btn');
+    await clearBtn.click();
+    await page.waitForTimeout(500);
+
+    // Tree should be restored - first node should be a top-level section again
+    const restoredFirstName = await leftPane.locator('.tree-node .node-name').first().textContent();
+    expect(restoredFirstName).toBe(initialFirstName);
+
+    // Multiple sections should be visible (not just the horses-related ones)
+    const nodeNames = await leftPane.locator('.tree-node .node-name').allTextContents();
+    // HS has 21 sections; in collapsed state, we should see multiple diverse sections
+    const hasVegetable = nodeNames.some(name => name.toLowerCase().includes('vegetable'));
+    const hasChemical = nodeNames.some(name => name.toLowerCase().includes('chemical'));
+    expect(hasVegetable || hasChemical).toBe(true);
+  });
+
+  test('search filters both panes simultaneously', async ({ page }) => {
+    const searchInput = page.locator('.search-bar input');
+    const leftPane = page.locator('.left-pane');
+    const rightPane = page.locator('.right-pane');
+
+    await searchInput.fill('horses');
+    await page.waitForTimeout(500);
+
+    // Left pane (HS) should show horse-related content
+    const leftNames = await leftPane.locator('.tree-node .node-name').allTextContents();
+    expect(leftNames.some(name => name.toLowerCase().includes('horses'))).toBe(true);
+
+    // Right pane (CPC) should also show horse-related content
+    const rightNames = await rightPane.locator('.tree-node .node-name').allTextContents();
+    expect(rightNames.some(name => name.toLowerCase().includes('horses'))).toBe(true);
+  });
+
+  test('search with no matches shows empty tree', async ({ page }) => {
+    const searchInput = page.locator('.search-bar input');
+    const leftPane = page.locator('.left-pane');
+
+    await searchInput.fill('xyznonexistent12345');
+    await page.waitForTimeout(500);
+
+    const count = await leftPane.locator('.tree-node').count();
+    expect(count).toBe(0);
+  });
+
+  test('search by code works', async ({ page }) => {
+    const searchInput = page.locator('.search-bar input');
+    const leftPane = page.locator('.left-pane');
+
+    await searchInput.fill('0101');
+    await page.waitForTimeout(500);
+
+    const count = await leftPane.locator('.tree-node').count();
+    expect(count).toBeGreaterThan(0);
+
+    // Check that a node with code 0101 is visible
+    const nodeCodes = await leftPane.locator('.tree-node .node-type-badge').allTextContents();
+    const hasCodeMatch = nodeCodes.some(code => code.includes('0101'));
+    expect(hasCodeMatch).toBe(true);
+  });
+
+  test('tree is interactive after clearing search (no stuck state)', async ({ page }) => {
+    const searchInput = page.locator('.search-bar input');
+    const leftPane = page.locator('.left-pane');
+
+    // Search and clear
+    await searchInput.fill('horses');
+    await page.waitForTimeout(500);
+    await page.locator('.search-bar .clear-btn').click();
+    await page.waitForTimeout(500);
+
+    // After clearing, tree should be in clean collapsed state
+    // The first node should be a top-level section (not expanded)
+    const firstNode = leftPane.locator('.tree-node').first();
+    await expect(firstNode).toBeVisible();
+
+    // Try expanding first section
+    const firstToggle = leftPane.locator('.tree-node .toggle-icon').first();
+    await firstToggle.click();
+    await page.waitForTimeout(300);
+
+    // Should see children now (chapter codes like "01", "02")
+    const codes = await leftPane.locator('.tree-node .node-type-badge').allTextContents();
+    const hasChapter = codes.some(code => /^\d{2}$/.test(code.trim()));
+    expect(hasChapter).toBe(true);
+  });
+
+  test('repeated search-clear cycles work correctly', async ({ page }) => {
+    const searchInput = page.locator('.search-bar input');
+    const leftPane = page.locator('.left-pane');
+    const clearBtn = page.locator('.search-bar .clear-btn');
+
+    // Cycle 1: search for horses
+    await searchInput.fill('horses');
+    await page.waitForTimeout(500);
+    let names = await leftPane.locator('.tree-node .node-name').allTextContents();
+    expect(names.some(n => n.toLowerCase().includes('horses'))).toBe(true);
+    // Non-matching sections should be gone
+    expect(names.some(n => n.toLowerCase().includes('vegetable products'))).toBe(false);
+
+    // Clear
+    await clearBtn.click();
+    await page.waitForTimeout(500);
+
+    // Cycle 2: search for something different
+    await searchInput.fill('dairy');
+    await page.waitForTimeout(500);
+    names = await leftPane.locator('.tree-node .node-name').allTextContents();
+    expect(names.some(n => n.toLowerCase().includes('dairy'))).toBe(true);
+    // Previous search results should not persist
+    expect(names.some(n => n.toLowerCase().includes('horses'))).toBe(false);
+
+    // Clear
+    await clearBtn.click();
+    await page.waitForTimeout(500);
+
+    // Cycle 3: verify full tree is restored (vegetable sections visible)
+    names = await leftPane.locator('.tree-node .node-name').allTextContents();
+    const hasDiverseSections = names.some(n => n.toLowerCase().includes('vegetable')) ||
+                               names.some(n => n.toLowerCase().includes('mineral'));
+    expect(hasDiverseSections).toBe(true);
   });
 });
 

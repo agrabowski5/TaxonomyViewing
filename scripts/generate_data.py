@@ -1141,6 +1141,187 @@ def generate_taxonomy1():
     print(f"  Lookup: {hts_count} HTS entries + {cpc_count} CPC service entries = {len(combined_lookup)} total")
 
 
+# ─────────────────────────────────────────────
+# 10. Taxonomy 2 (CPC backbone + HTS detail)
+# ─────────────────────────────────────────────
+def generate_taxonomy2():
+    """Build T2: full CPC tree as backbone, with HTS tariff-line detail nested
+    under CPC goods leaf nodes (sections 0-4) via the CPC↔HS concordance."""
+    print("\n=== Generating Taxonomy 2 (CPC backbone + HTS detail) ===")
+    import copy
+
+    # Load previously generated data
+    with open(os.path.join(OUT_DIR, 'cpc-tree.json'), 'r', encoding='utf-8') as f:
+        cpc_tree = json.load(f)
+    with open(os.path.join(OUT_DIR, 'cpc-lookup.json'), 'r', encoding='utf-8') as f:
+        cpc_lookup = json.load(f)
+    with open(os.path.join(OUT_DIR, 'hts-tree.json'), 'r', encoding='utf-8') as f:
+        hts_tree = json.load(f)
+    with open(os.path.join(OUT_DIR, 'hts-lookup.json'), 'r', encoding='utf-8') as f:
+        hts_lookup = json.load(f)
+    with open(os.path.join(OUT_DIR, 'concordance.json'), 'r', encoding='utf-8') as f:
+        concordance = json.load(f)
+
+    cpc_to_hs = concordance['cpcToHs']
+
+    # Build HTS index: clean_code → node (with children) for all HTS nodes
+    hts_index = {}
+    def index_hts(nodes):
+        for n in nodes:
+            clean = n['code'].replace('.', '').replace(' ', '')
+            if clean:
+                hts_index[clean] = n
+            if 'children' in n:
+                index_hts(n['children'])
+    index_hts(hts_tree)
+
+    def extract_hts_for_hs(hs_code):
+        """Extract HTS node(s) matching a 6-digit HS code. Returns list of deep-copied nodes."""
+        # Case 1: Direct 6-digit subheading node exists
+        if hs_code in hts_index:
+            return [copy.deepcopy(hts_index[hs_code])]
+        # Case 2: 8-digit +00 node (HS maps to single HTS tariff line)
+        code_00 = hs_code + '00'
+        if code_00 in hts_index:
+            return [copy.deepcopy(hts_index[code_00])]
+        # Case 3: Collect 8-digit HTS nodes whose code starts with this HS prefix
+        matches = []
+        for clean_code, node in hts_index.items():
+            if clean_code.startswith(hs_code) and len(clean_code) == 8:
+                matches.append(copy.deepcopy(node))
+        if matches:
+            return matches
+        # Case 4: Try 10-digit nodes
+        for clean_code, node in hts_index.items():
+            if clean_code.startswith(hs_code) and len(clean_code) == 10:
+                matches.append(copy.deepcopy(node))
+        return matches
+
+    # Re-prefix helper (same pattern as T1)
+    def reprefix_tree(nodes, old_prefix, new_prefix):
+        result = copy.deepcopy(nodes)
+        def reprefix_node(node):
+            if node['id'].startswith(old_prefix):
+                node['id'] = new_prefix + node['id'][len(old_prefix):]
+            if 'children' in node:
+                for child in node['children']:
+                    reprefix_node(child)
+        for node in result:
+            reprefix_node(node)
+        return result
+
+    def reprefix_node_inplace(node, old_prefix, new_prefix):
+        if node['id'].startswith(old_prefix):
+            node['id'] = new_prefix + node['id'][len(old_prefix):]
+        if 'children' in node:
+            for child in node['children']:
+                reprefix_node_inplace(child, old_prefix, new_prefix)
+
+    # Deep copy full CPC tree, re-prefix cpc-* → t2-*
+    t2_tree = reprefix_tree(cpc_tree, 'cpc-', 't2-')
+
+    # Track used IDs to handle duplicates (some HS codes map to multiple CPC parents)
+    used_ids = set()
+
+    def make_unique_ids(node):
+        """Ensure node and all descendants have unique IDs, appending -dN for dupes."""
+        if node['id'] in used_ids:
+            n = 2
+            while f"{node['id']}-d{n}" in used_ids:
+                n += 1
+            node['id'] = f"{node['id']}-d{n}"
+        used_ids.add(node['id'])
+        if 'children' in node:
+            for child in node['children']:
+                make_unique_ids(child)
+
+    # Walk the T2 tree to collect all CPC backbone IDs first
+    def collect_ids(nodes):
+        for n in nodes:
+            used_ids.add(n['id'])
+            if 'children' in n:
+                collect_ids(n['children'])
+    collect_ids(t2_tree)
+
+    # Determine which top-level sections are goods (codes 0-4)
+    goods_section_codes = {'0', '1', '2', '3', '4'}
+
+    hts_nodes_added = 0
+
+    def attach_hts_detail(nodes, in_goods_section=False):
+        nonlocal hts_nodes_added
+        for node in nodes:
+            # Determine if we're inside a goods section
+            original_cpc_code = node['id'].replace('t2-', '')
+            is_goods = in_goods_section or (len(original_cpc_code) == 1 and original_cpc_code in goods_section_codes)
+
+            if 'children' in node:
+                # Non-leaf: recurse
+                attach_hts_detail(node['children'], is_goods)
+            elif is_goods:
+                # Leaf in goods section: try to attach HTS detail
+                hs_mappings = cpc_to_hs.get(original_cpc_code, [])
+                if hs_mappings:
+                    hts_children = []
+                    for mapping in hs_mappings:
+                        hs_code = mapping['code']
+                        extracted = extract_hts_for_hs(hs_code)
+                        for ext_node in extracted:
+                            reprefix_node_inplace(ext_node, 'hts-', 't2-hts-')
+                            make_unique_ids(ext_node)
+                            hts_children.append(ext_node)
+                            hts_nodes_added += 1
+                    if hts_children:
+                        node['children'] = hts_children
+
+    attach_hts_detail(t2_tree)
+
+    # Build combined lookup
+    combined_lookup = {}
+
+    # CPC backbone entries: keep original keys, add origin
+    for key, entry in cpc_lookup.items():
+        combined_lookup[key] = {**entry, 'origin': 'cpc'}
+
+    # HTS detail entries: walk T2 tree to find all t2-hts-* nodes
+    def add_hts_to_lookup(nodes, section_code='', section_name=''):
+        for node in nodes:
+            if node['id'].startswith('t2-hts-'):
+                clean_code = node['code'].replace('.', '').replace(' ', '')
+                hts_key = f'HTS{clean_code}'
+                # For duplicate nodes (e.g. t2-hts-010121-d2), use the base code
+                if hts_key not in combined_lookup:
+                    combined_lookup[hts_key] = {
+                        'code': node['code'],
+                        'description': node['name'],
+                        'section': section_code,
+                        'sectionName': section_name,
+                        'level': len(clean_code),
+                        'type': node.get('type', 'detail'),
+                        'origin': 'hts',
+                        'originalCode': clean_code,
+                    }
+            else:
+                # CPC backbone node - track section context
+                cpc_code = node['id'].replace('t2-', '')
+                if len(cpc_code) == 1:
+                    section_code = cpc_code
+                    section_name = node['name']
+            if 'children' in node:
+                add_hts_to_lookup(node['children'], section_code, section_name)
+
+    add_hts_to_lookup(t2_tree)
+
+    write_json('t2-tree.json', t2_tree)
+    write_json('t2-lookup.json', combined_lookup)
+
+    cpc_count = sum(1 for v in combined_lookup.values() if v.get('origin') == 'cpc')
+    hts_count = sum(1 for v in combined_lookup.values() if v.get('origin') == 'hts')
+    print(f"  Taxonomy 2: CPC backbone ({cpc_count} entries) + HTS detail ({hts_count} entries)")
+    print(f"  HTS nodes attached to CPC leaves: {hts_nodes_added}")
+    print(f"  Total lookup entries: {len(combined_lookup)}")
+
+
 if __name__ == '__main__':
     print("Generating taxonomy data...")
     generate_hs()
@@ -1152,4 +1333,5 @@ if __name__ == '__main__':
     generate_unspsc()
     generate_unspsc_hs_fuzzy_mapping()
     generate_taxonomy1()
+    generate_taxonomy2()
     print("\nDone!")

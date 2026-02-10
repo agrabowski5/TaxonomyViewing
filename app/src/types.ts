@@ -54,6 +54,13 @@ export interface EmissionFactorEntry {
   source: string;
 }
 
+export interface ExiobaseFactorEntry {
+  factor: number;
+  unit: string;
+  sectors: string[];
+  source: string;
+}
+
 export interface AppData {
   hsTree: TreeNode[];
   cpcTree: TreeNode[];
@@ -69,7 +76,10 @@ export interface AppData {
   unspscLookup: Record<string, LookupEntry>;
   t1Tree: TreeNode[];
   t1Lookup: Record<string, LookupEntry>;
+  t2Tree: TreeNode[];
+  t2Lookup: Record<string, LookupEntry>;
   concordance: ConcordanceData;
   unspscHsMapping: FuzzyMappingData;
   emissionFactors: Record<string, EmissionFactorEntry> | null;
+  exiobaseFactors: Record<string, ExiobaseFactorEntry> | null;
 }

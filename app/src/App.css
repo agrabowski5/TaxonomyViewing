@@ -1103,6 +1103,40 @@
   opacity: 0.7;
 }
 
+/* Exiobase emission factor card */
+.exiobase-card {
+  border-color: #0284c7;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+}
+
+.exiobase-card h4 {
+  color: #0369a1;
+}
+
+.exiobase-card .emission-value {
+  color: #0284c7;
+}
+
+.exiobase-card .emission-source {
+  color: #0369a1;
+}
+
+.exiobase-sectors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.exiobase-sector-tag {
+  font-size: 10px;
+  background: #bae6fd;
+  color: #0c4a6e;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
 /* ===== Responsive Design ===== */
 @media (max-width: 1200px) {
   .main-content.two-pane {

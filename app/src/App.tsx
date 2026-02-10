@@ -1,8 +1,8 @@
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { TreeApi } from "react-arborist";
 import { useData } from "./useData";
 import { TaxonomyTree } from "./TaxonomyTree";
-import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, FuzzyMappingData } from "./types";
+import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData } from "./types";
 import "./App.css";
 
 // Color palette for section-based coloring
@@ -31,9 +31,9 @@ function buildColorMap(tree: TreeNode[]): Record<string, string> {
   return colorMap;
 }
 
-type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1";
+type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2";
 
-const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc", "t1"];
+const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc", "t1", "t2"];
 
 const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; taxonomyClass: string; label: string }> = {
   hs: {
@@ -77,6 +77,12 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
     legend: "Goods: Sections \u2192 Headings \u2192 Tariff Lines | Services: Sections \u2192 Divisions \u2192 Groups",
     taxonomyClass: "t1",
     label: "T1",
+  },
+  t2: {
+    fullName: "Taxonomy 2 (CPC Backbone + HTS Detail)",
+    legend: "CPC Sections \u2192 Divisions \u2192 Groups \u2192 Classes \u2192 Subclasses \u2192 HTS Tariff Lines",
+    taxonomyClass: "t2",
+    label: "T2",
   },
 };
 
@@ -126,6 +132,13 @@ function getT1OriginalCode(code: string, origin: "hts" | "cpc", lookup: Record<s
     return lookup[svcKey]?.originalCode ?? stripCode(code);
   }
   return code; // HTS codes are used as-is
+}
+
+// T2 helper: detect whether a T2 node originated from CPC backbone or HTS detail
+function getT2Origin(nodeId: string): "cpc" | "hts" | null {
+  if (nodeId.startsWith("t2-hts-")) return "hts";
+  if (nodeId.startsWith("t2-")) return "cpc";
+  return null;
 }
 
 // Extract the HS 6-digit base from any HS-family code
@@ -382,6 +395,87 @@ function getEmissionFactor(
     }
   }
 
+  if (taxonomy === "t2") {
+    const origin = getT2Origin(node.id);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 6) return emissionFactors[hsBase] ?? null;
+    } else if (origin === "cpc") {
+      const cleanCpc = stripCode(node.code);
+      for (let len = cleanCpc.length; len >= 4; len--) {
+        const prefix = cleanCpc.substring(0, len);
+        const hsMappings = concordance.cpcToHs[prefix];
+        if (hsMappings && hsMappings.length > 0) {
+          const hsCode = hsMappings[0].code;
+          if (emissionFactors[hsCode]) return emissionFactors[hsCode];
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// Look up Exiobase emission factor for a selected node (keyed by HS 2-digit chapter)
+function getExiobaseFactor(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  exiobaseFactors: Record<string, ExiobaseFactorEntry> | null,
+  concordance: ConcordanceData,
+): ExiobaseFactorEntry | null {
+  if (!exiobaseFactors) return null;
+
+  if (HS_FAMILY.includes(taxonomy)) {
+    const hsBase = getHsBase(node.code, taxonomy);
+    if (!hsBase || hsBase.length < 2) return null;
+    const chapter = hsBase.substring(0, 2);
+    return exiobaseFactors[chapter] ?? null;
+  }
+
+  if (taxonomy === "cpc") {
+    const cleanCpc = stripCode(node.code);
+    for (let len = cleanCpc.length; len >= 4; len--) {
+      const prefix = cleanCpc.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        const chapter = hsMappings[0].code.substring(0, 2);
+        if (exiobaseFactors[chapter]) return exiobaseFactors[chapter];
+      }
+    }
+  }
+
+  if (taxonomy === "t1") {
+    const origin = getT1Origin(node.id, {} as Record<string, LookupEntry>, node.code);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 2) {
+        const chapter = hsBase.substring(0, 2);
+        return exiobaseFactors[chapter] ?? null;
+      }
+    }
+  }
+
+  if (taxonomy === "t2") {
+    const origin = getT2Origin(node.id);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 2) {
+        const chapter = hsBase.substring(0, 2);
+        return exiobaseFactors[chapter] ?? null;
+      }
+    } else if (origin === "cpc") {
+      const cleanCpc = stripCode(node.code);
+      for (let len = cleanCpc.length; len >= 4; len--) {
+        const prefix = cleanCpc.substring(0, len);
+        const hsMappings = concordance.cpcToHs[prefix];
+        if (hsMappings && hsMappings.length > 0) {
+          const chapter = hsMappings[0].code.substring(0, 2);
+          if (exiobaseFactors[chapter]) return exiobaseFactors[chapter];
+        }
+      }
+    }
+  }
+
   return null;
 }
 
@@ -423,6 +517,56 @@ function EmissionFactorDisplay({ entry }: { entry: EmissionFactorEntry }) {
   );
 }
 
+function ExiobaseFactorDisplay({ entry }: { entry: ExiobaseFactorEntry }) {
+  return (
+    <div className="emission-factor-card exiobase-card">
+      <h4>Carbon Intensity (EXIOBASE)</h4>
+      <div className="emission-main">
+        <span className="emission-value">{entry.factor.toFixed(3)}</span>
+        <span className="emission-unit">{entry.unit}</span>
+      </div>
+      <div className="exiobase-sectors">
+        {entry.sectors.map((s, i) => (
+          <span key={i} className="exiobase-sector-tag">{s}</span>
+        ))}
+      </div>
+      <div className="emission-source">{entry.source}</div>
+    </div>
+  );
+}
+
+// Filter tree data to only include nodes matching a search term (and their ancestors)
+function filterTreeData(tree: TreeNode[], term: string): TreeNode[] {
+  if (!term.trim()) return tree;
+  const lower = term.trim().toLowerCase();
+
+  function nodeMatches(node: TreeNode): boolean {
+    return (
+      node.code.toLowerCase().includes(lower) ||
+      node.name.toLowerCase().includes(lower)
+    );
+  }
+
+  function filterNodes(nodes: TreeNode[]): TreeNode[] {
+    const result: TreeNode[] = [];
+    for (const node of nodes) {
+      if (nodeMatches(node)) {
+        // Node matches: include it with all its children
+        result.push(node);
+      } else if (node.children) {
+        // Node doesn't match: check if any descendants match
+        const filteredChildren = filterNodes(node.children);
+        if (filteredChildren.length > 0) {
+          result.push({ ...node, children: filteredChildren });
+        }
+      }
+    }
+    return result;
+  }
+
+  return filterNodes(tree);
+}
+
 function App() {
   const { data, loading, error } = useData();
   const [search, setSearch] = useState("");
@@ -430,6 +574,13 @@ function App() {
   const [rightTaxonomy, setRightTaxonomy] = useState<TaxonomyType>("cpc");
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<TaxonomyType | null>(null);
+
+  // Debounced search for performance with large trees
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const treeRefs: Record<TaxonomyType, React.RefObject<TreeApi<TreeNode> | null>> = {
     hs: useRef<TreeApi<TreeNode>>(null),
@@ -439,12 +590,13 @@ function App() {
     cpc: useRef<TreeApi<TreeNode>>(null),
     unspsc: useRef<TreeApi<TreeNode>>(null),
     t1: useRef<TreeApi<TreeNode>>(null),
+    t2: useRef<TreeApi<TreeNode>>(null),
   };
 
   const getTreeData = useCallback((taxonomy: TaxonomyType) => {
     if (!data) return [];
     const map: Record<TaxonomyType, TreeNode[]> = {
-      hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree, t1: data.t1Tree,
+      hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree, t1: data.t1Tree, t2: data.t2Tree,
     };
     return map[taxonomy];
   }, [data]);
@@ -452,20 +604,21 @@ function App() {
   const getLookup = useCallback((taxonomy: TaxonomyType) => {
     if (!data) return {};
     const map: Record<TaxonomyType, Record<string, LookupEntry>> = {
-      hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup, t1: data.t1Lookup,
+      hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup, t1: data.t1Lookup, t2: data.t2Lookup,
     };
     return map[taxonomy];
   }, [data]);
 
-  const searchMatch = useCallback(
-    (node: { data: TreeNode }, term: string) => {
-      const lower = term.toLowerCase();
-      return (
-        node.data.code.toLowerCase().includes(lower) ||
-        node.data.name.toLowerCase().includes(lower)
-      );
-    },
-    []
+  // Compute filtered tree data for each pane
+  const isSearching = debouncedSearch.trim().length > 0;
+
+  const leftTreeData = useMemo(
+    () => filterTreeData(getTreeData(leftTaxonomy), debouncedSearch),
+    [data, leftTaxonomy, debouncedSearch, getTreeData]
+  );
+  const rightTreeData = useMemo(
+    () => filterTreeData(getTreeData(rightTaxonomy), debouncedSearch),
+    [data, rightTaxonomy, debouncedSearch, getTreeData]
   );
 
   // Compute mappings from selected node to all other taxonomies
@@ -483,6 +636,45 @@ function App() {
       return null;
     };
 
+    // Helper: find T2 mapping entry from an HS base code (for other taxonomies mapping TO T2)
+    const findT2Entry = (hsBase: string): MappedEntry | null => {
+      const t2Lookup = getLookup("t2");
+      // T2's HTS detail nodes use HTS{code} keys
+      const htsKey = `HTS${hsBase}`;
+      if (t2Lookup[htsKey]) {
+        return {
+          taxonomy: "t2",
+          code: t2Lookup[htsKey].code,
+          description: t2Lookup[htsKey].description,
+          nodeId: `t2-hts-${hsBase}`,
+        };
+      }
+      // Try 8-digit +00 fallback
+      const htsKey00 = `HTS${hsBase}00`;
+      if (t2Lookup[htsKey00]) {
+        return {
+          taxonomy: "t2",
+          code: t2Lookup[htsKey00].code,
+          description: t2Lookup[htsKey00].description,
+          nodeId: `t2-hts-${hsBase}00`,
+        };
+      }
+      // Fallback: try CPC backbone via concordance
+      const cpcMappings = data.concordance.hsToCpc[hsBase];
+      if (cpcMappings && cpcMappings.length > 0) {
+        const cpcCode = cpcMappings[0].code;
+        if (t2Lookup[cpcCode]) {
+          return {
+            taxonomy: "t2",
+            code: cpcCode,
+            description: t2Lookup[cpcCode].description,
+            nodeId: `t2-${cpcCode}`,
+          };
+        }
+      }
+      return null;
+    };
+
     // Case 1: Source is an HS-family taxonomy
     if (HS_FAMILY.includes(selectedFrom)) {
       const hsBase = getHsBase(selectedNode.code, selectedFrom);
@@ -495,6 +687,9 @@ function App() {
           results.push(...fuzzyEntries);
         } else if (tax === "t1") {
           const entry = findT1Entry(hsBase);
+          if (entry) results.push(entry);
+        } else if (tax === "t2") {
+          const entry = findT2Entry(hsBase);
           if (entry) results.push(entry);
         } else {
           const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
@@ -521,6 +716,22 @@ function App() {
             } else if (tax === "t1") {
               const entry = findT1Entry(firstHsCode);
               if (entry) results.push(entry);
+            } else if (tax === "t2") {
+              // T2: try HTS detail first, then CPC backbone
+              const htsEntry = findT2Entry(firstHsCode);
+              if (htsEntry) results.push(htsEntry);
+              else {
+                // Direct CPC backbone match
+                const t2Lookup = getLookup("t2");
+                if (t2Lookup[prefix]) {
+                  results.push({
+                    taxonomy: "t2",
+                    code: prefix,
+                    description: t2Lookup[prefix].description,
+                    nodeId: `t2-${prefix}`,
+                  });
+                }
+              }
             } else {
               const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
               if (entry) results.push(entry);
@@ -544,6 +755,9 @@ function App() {
         if (tax === "unspsc" || tax === "hs") continue;
         if (tax === "t1") {
           const entry = findT1Entry(firstHsCode);
+          if (entry) results.push(entry);
+        } else if (tax === "t2") {
+          const entry = findT2Entry(firstHsCode);
           if (entry) results.push(entry);
         } else {
           const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
@@ -569,6 +783,9 @@ function App() {
           if (tax === "unspsc") {
             const fuzzyEntries = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
             results.push(...fuzzyEntries);
+          } else if (tax === "t2") {
+            const entry = findT2Entry(hsBase);
+            if (entry) results.push(entry);
           } else {
             const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
             if (entry) results.push(entry);
@@ -591,6 +808,63 @@ function App() {
               if (tax === "unspsc") {
                 const fuzzyEntries = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
                 results.push(...fuzzyEntries);
+              } else if (tax === "t2") {
+                const entry = findT2Entry(firstHsCode);
+                if (entry) results.push(entry);
+              } else {
+                const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+                if (entry) results.push(entry);
+              }
+            }
+            return results;
+          }
+        }
+      }
+    }
+
+    // Case 5: Source is T2 — detect origin (CPC backbone or HTS detail) and delegate
+    if (selectedFrom === "t2") {
+      const origin = getT2Origin(selectedNode.id);
+      if (!origin) return [];
+
+      if (origin === "hts") {
+        // HTS detail node: use HS-family matching
+        const hsBase = getHsBase(selectedNode.code, "hts");
+        if (!hsBase) return [];
+        const results: MappedEntry[] = [];
+        for (const tax of ALL_TAXONOMIES) {
+          if (tax === "t2") continue;
+          if (tax === "unspsc") {
+            const fuzzyEntries = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+            results.push(...fuzzyEntries);
+          } else if (tax === "t1") {
+            const entry = findT1Entry(hsBase);
+            if (entry) results.push(entry);
+          } else {
+            const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
+            if (entry) results.push(entry);
+          }
+        }
+        return results;
+      }
+
+      if (origin === "cpc") {
+        // CPC backbone node: use concordance reverse lookup
+        const cleanCpc = stripCode(selectedNode.code);
+        for (let len = cleanCpc.length; len >= 4; len--) {
+          const prefix = cleanCpc.substring(0, len);
+          const hsMappings = data.concordance.cpcToHs[prefix];
+          if (hsMappings && hsMappings.length > 0) {
+            const firstHsCode = hsMappings[0].code;
+            const results: MappedEntry[] = [];
+            for (const tax of ALL_TAXONOMIES) {
+              if (tax === "t2") continue;
+              if (tax === "unspsc") {
+                const fuzzyEntries = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+                results.push(...fuzzyEntries);
+              } else if (tax === "t1") {
+                const entry = findT1Entry(firstHsCode);
+                if (entry) results.push(entry);
               } else {
                 const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
                 if (entry) results.push(entry);
@@ -609,6 +883,11 @@ function App() {
   const emissionFactor = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return null;
     return getEmissionFactor(selectedNode, selectedFrom, data.emissionFactors, data.concordance);
+  }, [selectedNode, selectedFrom, data]);
+
+  const exiobaseFactor = useMemo(() => {
+    if (!selectedNode || !selectedFrom || !data) return null;
+    return getExiobaseFactor(selectedNode, selectedFrom, data.exiobaseFactors, data.concordance);
   }, [selectedNode, selectedFrom, data]);
 
   // Handle node selection: update state + sync other pane
@@ -631,6 +910,23 @@ function App() {
         return htsEntry?.nodeId ? htsEntry.nodeId.replace("hts-", "t1-") : null;
       };
 
+      // Helper: find T2 node ID from an HS base code (try HTS detail, then CPC backbone)
+      const findT2NodeId = (hsBase: string): string | null => {
+        const t2Lookup = getLookup("t2");
+        // Try HTS detail node first
+        const htsKey = `HTS${hsBase}`;
+        if (t2Lookup[htsKey]) return `t2-hts-${hsBase}`;
+        const htsKey00 = `HTS${hsBase}00`;
+        if (t2Lookup[htsKey00]) return `t2-hts-${hsBase}00`;
+        // Fallback: CPC backbone via concordance
+        const cpcMappings = data.concordance.hsToCpc[hsBase];
+        if (cpcMappings && cpcMappings.length > 0) {
+          const cpcCode = cpcMappings[0].code;
+          if (t2Lookup[cpcCode]) return `t2-${cpcCode}`;
+        }
+        return null;
+      };
+
       if (HS_FAMILY.includes(sourceTax)) {
         const hsBase = getHsBase(node.code, sourceTax);
         if (hsBase) {
@@ -639,6 +935,8 @@ function App() {
             mappedNodeId = fuzzy[0]?.nodeId ?? null;
           } else if (otherTax === "t1") {
             mappedNodeId = findT1NodeId(hsBase);
+          } else if (otherTax === "t2") {
+            mappedNodeId = findT2NodeId(hsBase);
           } else {
             const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
             mappedNodeId = mapped?.nodeId ?? null;
@@ -657,6 +955,14 @@ function App() {
               mappedNodeId = fuzzy[0]?.nodeId ?? null;
             } else if (otherTax === "t1") {
               mappedNodeId = findT1NodeId(firstHsCode);
+            } else if (otherTax === "t2") {
+              // T2: prefer CPC backbone (direct match), else HTS detail
+              const t2Lookup = getLookup("t2");
+              if (t2Lookup[prefix]) {
+                mappedNodeId = `t2-${prefix}`;
+              } else {
+                mappedNodeId = findT2NodeId(firstHsCode);
+              }
             } else {
               const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
               mappedNodeId = mapped?.nodeId ?? null;
@@ -675,6 +981,8 @@ function App() {
             // both UNSPSC, no cross-mapping
           } else if (otherTax === "t1") {
             mappedNodeId = findT1NodeId(firstHsCode);
+          } else if (otherTax === "t2") {
+            mappedNodeId = findT2NodeId(firstHsCode);
           } else {
             const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
             mappedNodeId = mapped?.nodeId ?? null;
@@ -692,6 +1000,8 @@ function App() {
               mappedNodeId = fuzzy[0]?.nodeId ?? null;
             } else if (otherTax === "t1") {
               // both T1, no cross-mapping
+            } else if (otherTax === "t2") {
+              mappedNodeId = findT2NodeId(hsBase);
             } else {
               const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
               mappedNodeId = mapped?.nodeId ?? null;
@@ -709,6 +1019,50 @@ function App() {
                 mappedNodeId = fuzzy[0]?.nodeId ?? null;
               } else if (otherTax === "t1") {
                 // both T1
+              } else if (otherTax === "t2") {
+                mappedNodeId = findT2NodeId(firstHsCode);
+              } else {
+                const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+                mappedNodeId = mapped?.nodeId ?? null;
+              }
+              break;
+            }
+          }
+        }
+      } else if (sourceTax === "t2") {
+        // T2 source: detect origin and delegate
+        const origin = getT2Origin(node.id);
+        if (origin === "hts") {
+          // HTS detail node: use HS-family matching
+          const hsBase = getHsBase(node.code, "hts");
+          if (hsBase) {
+            if (otherTax === "unspsc") {
+              const fuzzy = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+              mappedNodeId = fuzzy[0]?.nodeId ?? null;
+            } else if (otherTax === "t1") {
+              mappedNodeId = findT1NodeId(hsBase);
+            } else if (otherTax === "t2") {
+              // both T2, no cross-mapping
+            } else {
+              const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+              mappedNodeId = mapped?.nodeId ?? null;
+            }
+          }
+        } else if (origin === "cpc") {
+          // CPC backbone node: use concordance reverse lookup
+          const cleanCpc = stripCode(node.code);
+          for (let len = cleanCpc.length; len >= 4; len--) {
+            const prefix = cleanCpc.substring(0, len);
+            const hsMappings = data.concordance.cpcToHs[prefix];
+            if (hsMappings && hsMappings.length > 0) {
+              const firstHsCode = hsMappings[0].code;
+              if (otherTax === "unspsc") {
+                const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+                mappedNodeId = fuzzy[0]?.nodeId ?? null;
+              } else if (otherTax === "t1") {
+                mappedNodeId = findT1NodeId(firstHsCode);
+              } else if (otherTax === "t2") {
+                // both T2
               } else {
                 const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
                 mappedNodeId = mapped?.nodeId ?? null;
@@ -790,6 +1144,7 @@ function App() {
       <option value="ca">Canadian Customs Tariff</option>
       <option value="unspsc">UNSPSC - Products &amp; Services Code</option>
       <option value="t1">T1 - HTS Goods + CPC Services</option>
+      <option value="t2">T2 - CPC Backbone + HTS Detail</option>
     </>
   );
 
@@ -848,11 +1203,10 @@ function App() {
             <p className="legend">{TAXONOMY_INFO[leftTaxonomy].legend}</p>
           </div>
           <TaxonomyTree
-            key={leftTaxonomy}
+            key={`${leftTaxonomy}-${debouncedSearch}`}
             ref={treeRefs[leftTaxonomy]}
-            data={getTreeData(leftTaxonomy)}
-            searchTerm={search}
-            searchMatch={searchMatch}
+            data={leftTreeData}
+            openByDefault={isSearching}
             mappingInfo={mappingInfo}
             onNodeSelect={(node) => handleNodeSelect("left", node)}
             label={TAXONOMY_INFO[leftTaxonomy].label}
@@ -880,11 +1234,10 @@ function App() {
             <p className="legend">{TAXONOMY_INFO[rightTaxonomy].legend}</p>
           </div>
           <TaxonomyTree
-            key={rightTaxonomy}
+            key={`${rightTaxonomy}-${debouncedSearch}`}
             ref={treeRefs[rightTaxonomy]}
-            data={getTreeData(rightTaxonomy)}
-            searchTerm={search}
-            searchMatch={searchMatch}
+            data={rightTreeData}
+            openByDefault={isSearching}
             mappingInfo={mappingInfo}
             onNodeSelect={(node) => handleNodeSelect("right", node)}
             label={TAXONOMY_INFO[rightTaxonomy].label}
@@ -999,7 +1352,11 @@ function App() {
               <EmissionFactorDisplay entry={emissionFactor} />
             )}
 
-            {mappings.length === 0 && !emissionFactor && (
+            {exiobaseFactor && (
+              <ExiobaseFactorDisplay entry={exiobaseFactor} />
+            )}
+
+            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && (
               <div className="comparison-item no-mapping">
                 <p className="name">No mappings found at this level</p>
               </div>

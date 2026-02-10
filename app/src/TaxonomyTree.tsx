@@ -6,8 +6,7 @@ import type { TreeNode, MappingInfo } from "./types";
 
 interface Props {
   data: TreeNode[];
-  searchTerm: string;
-  searchMatch: (node: { data: TreeNode }, term: string) => boolean;
+  openByDefault?: boolean;
   mappingInfo: Record<string, MappingInfo>;
   onNodeSelect: (node: TreeNode) => void;
   label: string;
@@ -21,8 +20,7 @@ interface Props {
 export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function TaxonomyTree(
   {
     data,
-    searchTerm,
-    searchMatch,
+    openByDefault = false,
     mappingInfo,
     onNodeSelect,
     label,
@@ -48,9 +46,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
         <Tree<TreeNode>
           ref={ref as React.Ref<TreeApi<TreeNode> | undefined>}
           initialData={data}
-          searchTerm={searchTerm}
-          searchMatch={searchMatch}
-          openByDefault={false}
+          openByDefault={openByDefault}
           width={container.width}
           height={container.height}
           rowHeight={32}
