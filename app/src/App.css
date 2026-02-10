@@ -352,6 +352,11 @@
   color: #134e4a;
 }
 
+.taxonomy-label.t2 {
+  background: #fce7f3;
+  color: #9f1239;
+}
+
 /* ===== Detail Panel ===== */
 .detail-column {
   background: var(--surface);
@@ -1135,6 +1140,147 @@
   padding: 1px 6px;
   border-radius: 8px;
   white-space: nowrap;
+}
+
+/* ===== ecoinvent Toggle ===== */
+.ecoinvent-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+
+.ecoinvent-toggle:hover {
+  border-color: #f59e0b;
+  color: var(--text);
+}
+
+.ecoinvent-toggle.active {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.ecoinvent-toggle-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.15s;
+}
+
+.ecoinvent-toggle.active .ecoinvent-toggle-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 4px #f59e0b;
+}
+
+/* ===== ecoinvent Coverage Dot (Tree Node) ===== */
+.ecoinvent-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  box-shadow: 0 0 3px rgba(245, 158, 11, 0.5);
+}
+
+/* ===== ecoinvent Card (Comparison Panel) ===== */
+.ecoinvent-card {
+  flex: 1;
+  min-width: 280px;
+  padding: 12px;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border-radius: 6px;
+  border-left: 4px solid #f59e0b;
+}
+
+.ecoinvent-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ecoinvent-section {
+  margin-bottom: 8px;
+}
+
+.ecoinvent-section:last-child {
+  margin-bottom: 0;
+}
+
+.ecoinvent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ecoinvent-label {
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.ecoinvent-type {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.ecoinvent-type.type-one {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.ecoinvent-type.type-many {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ecoinvent-count {
+  font-size: 10px;
+  color: #92400e;
+}
+
+.ecoinvent-products {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ecoinvent-product {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #78350f;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.ecoinvent-more {
+  font-size: 10px;
+  color: #b45309;
+  font-style: italic;
+  padding: 2px 4px;
 }
 
 /* ===== Responsive Design ===== */

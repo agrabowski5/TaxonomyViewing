@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useMemo, useEffect } from "react"
 import { TreeApi } from "react-arborist";
 import { useData } from "./useData";
 import { TaxonomyTree } from "./TaxonomyTree";
-import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData } from "./types";
+import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping } from "./types";
 import "./App.css";
 
 // Color palette for section-based coloring
@@ -535,6 +535,190 @@ function ExiobaseFactorDisplay({ entry }: { entry: ExiobaseFactorEntry }) {
   );
 }
 
+// Look up ecoinvent mapping for a selected node
+function getEcoinventInfo(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  ecoinventMapping: EcoinventMapping | null,
+  concordance: ConcordanceData,
+): { cpc: EcoinventCodeMapping | null; hs: EcoinventCodeMapping | null; cpcCode: string | null; hsCode: string | null } {
+  if (!ecoinventMapping) return { cpc: null, hs: null, cpcCode: null, hsCode: null };
+
+  const clean = stripCode(node.code);
+
+  // Direct CPC lookup (for CPC, T2-CPC backbone)
+  if (taxonomy === "cpc") {
+    const cpcMatch = ecoinventMapping.cpc[clean] ?? null;
+    // Chain to HS via concordance
+    let hsMatch: EcoinventCodeMapping | null = null;
+    let hsCode: string | null = null;
+    for (let len = clean.length; len >= 4; len--) {
+      const prefix = clean.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        hsCode = hsMappings[0].code;
+        hsMatch = ecoinventMapping.hs[hsCode] ?? null;
+        break;
+      }
+    }
+    return { cpc: cpcMatch, hs: hsMatch, cpcCode: cpcMatch ? clean : null, hsCode };
+  }
+
+  // HS-family: direct HS lookup + chain to CPC via concordance
+  if (HS_FAMILY.includes(taxonomy)) {
+    const hsBase = getHsBase(node.code, taxonomy);
+    if (!hsBase) return { cpc: null, hs: null, cpcCode: null, hsCode: null };
+    // Try progressively shorter HS prefixes
+    let hsMatch: EcoinventCodeMapping | null = null;
+    let matchedHsCode: string | null = null;
+    for (let len = Math.min(6, hsBase.length); len >= 2; len -= 2) {
+      const prefix = hsBase.substring(0, len);
+      if (ecoinventMapping.hs[prefix]) {
+        hsMatch = ecoinventMapping.hs[prefix];
+        matchedHsCode = prefix;
+        break;
+      }
+    }
+    // Chain to CPC
+    let cpcMatch: EcoinventCodeMapping | null = null;
+    let cpcCode: string | null = null;
+    for (let len = Math.min(6, hsBase.length); len >= 4; len -= 2) {
+      const prefix = hsBase.substring(0, len);
+      const cpcMappings = concordance.hsToCpc[prefix];
+      if (cpcMappings && cpcMappings.length > 0) {
+        cpcCode = cpcMappings[0].code;
+        cpcMatch = ecoinventMapping.cpc[cpcCode] ?? null;
+        break;
+      }
+    }
+    return { cpc: cpcMatch, hs: hsMatch, cpcCode, hsCode: matchedHsCode };
+  }
+
+  // T1: detect origin
+  if (taxonomy === "t1") {
+    const origin = getT1Origin(node.id, {} as Record<string, LookupEntry>, node.code);
+    if (origin === "hts") {
+      return getEcoinventInfo(node, "hts", ecoinventMapping, concordance);
+    }
+    if (origin === "cpc") {
+      return getEcoinventInfo({ ...node, code: clean }, "cpc", ecoinventMapping, concordance);
+    }
+  }
+
+  // T2: detect origin
+  if (taxonomy === "t2") {
+    const origin = getT2Origin(node.id);
+    if (origin === "hts") {
+      return getEcoinventInfo(node, "hts", ecoinventMapping, concordance);
+    }
+    if (origin === "cpc") {
+      return getEcoinventInfo(node, "cpc", ecoinventMapping, concordance);
+    }
+  }
+
+  return { cpc: null, hs: null, cpcCode: null, hsCode: null };
+}
+
+// Compute ecoinvent coverage for tree nodes (for overlay)
+function computeEcoinventCoverage(
+  tree: TreeNode[],
+  taxonomy: TaxonomyType,
+  ecoinventMapping: EcoinventMapping | null,
+): Set<string> {
+  if (!ecoinventMapping) return new Set();
+  const covered = new Set<string>();
+  const em = ecoinventMapping;
+  const cpcAncestorSet = new Set(em.cpcAncestors);
+  const hsAncestorSet = new Set(em.hsAncestors);
+
+  function walk(nodes: TreeNode[]) {
+    for (const node of nodes) {
+      const clean = stripCode(node.code);
+      let hasCoverage = false;
+
+      if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
+        hasCoverage = !!em.cpc[clean] || cpcAncestorSet.has(clean);
+      } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
+        const hsBase = clean.substring(0, Math.min(6, clean.length));
+        hasCoverage = !!em.hs[hsBase] || hsAncestorSet.has(hsBase);
+      } else if (taxonomy === "unspsc") {
+        hasCoverage = false;
+      }
+
+      if (hasCoverage) {
+        covered.add(node.id);
+      }
+
+      if (node.children) {
+        walk(node.children);
+        // If any child is covered, parent is covered too
+        for (const child of node.children) {
+          if (covered.has(child.id)) {
+            covered.add(node.id);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  walk(tree);
+  return covered;
+}
+
+function EcoinventDisplay({ cpc, hs, cpcCode, hsCode }: {
+  cpc: EcoinventCodeMapping | null;
+  hs: EcoinventCodeMapping | null;
+  cpcCode: string | null;
+  hsCode: string | null;
+}) {
+  if (!cpc && !hs) return null;
+
+  return (
+    <div className="ecoinvent-card">
+      <h4>ecoinvent v3.10 Mapping</h4>
+      {cpc && (
+        <div className="ecoinvent-section">
+          <div className="ecoinvent-header">
+            <span className="ecoinvent-label">CPC {cpcCode}</span>
+            <span className={`ecoinvent-type ${cpc.mappingType === "1:1" ? "type-one" : "type-many"}`}>
+              {cpc.mappingType}
+            </span>
+            <span className="ecoinvent-count">{cpc.count} product{cpc.count !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="ecoinvent-products">
+            {cpc.products.slice(0, 5).map((p, i) => (
+              <span key={i} className="ecoinvent-product">{p}</span>
+            ))}
+            {cpc.products.length > 5 && (
+              <span className="ecoinvent-more">+{cpc.products.length - 5} more</span>
+            )}
+          </div>
+        </div>
+      )}
+      {hs && (
+        <div className="ecoinvent-section">
+          <div className="ecoinvent-header">
+            <span className="ecoinvent-label">HS {hsCode}</span>
+            <span className={`ecoinvent-type ${hs.mappingType === "1:1" ? "type-one" : "type-many"}`}>
+              {hs.mappingType}
+            </span>
+            <span className="ecoinvent-count">{hs.count} product{hs.count !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="ecoinvent-products">
+            {hs.products.slice(0, 5).map((p, i) => (
+              <span key={i} className="ecoinvent-product">{p}</span>
+            ))}
+            {hs.products.length > 5 && (
+              <span className="ecoinvent-more">+{hs.products.length - 5} more</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Filter tree data to only include nodes matching a search term (and their ancestors)
 function filterTreeData(tree: TreeNode[], term: string): TreeNode[] {
   if (!term.trim()) return tree;
@@ -574,6 +758,7 @@ function App() {
   const [rightTaxonomy, setRightTaxonomy] = useState<TaxonomyType>("cpc");
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<TaxonomyType | null>(null);
+  const [ecoinventOverlay, setEcoinventOverlay] = useState(false);
 
   // Debounced search for performance with large trees
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -1122,6 +1307,22 @@ function App() {
     [data]
   );
 
+  // Ecoinvent coverage sets for overlay
+  const leftEcoinventCoverage = useMemo(
+    () => ecoinventOverlay ? computeEcoinventCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data?.ecoinventMapping ?? null) : new Set<string>(),
+    [ecoinventOverlay, data, leftTaxonomy, getTreeData]
+  );
+  const rightEcoinventCoverage = useMemo(
+    () => ecoinventOverlay ? computeEcoinventCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data?.ecoinventMapping ?? null) : new Set<string>(),
+    [ecoinventOverlay, data, rightTaxonomy, getTreeData]
+  );
+
+  // Ecoinvent info for selected node
+  const ecoinventInfo = useMemo(() => {
+    if (!selectedNode || !selectedFrom || !data) return { cpc: null, hs: null, cpcCode: null, hsCode: null };
+    return getEcoinventInfo(selectedNode, selectedFrom, data.ecoinventMapping, data.concordance);
+  }, [selectedNode, selectedFrom, data]);
+
   if (loading) {
     return (
       <div className="loading">
@@ -1157,6 +1358,14 @@ function App() {
             Compare HS, CPC, CN, HTS, Canadian &amp; UNSPSC classifications
           </p>
         </div>
+        <button
+          className={`ecoinvent-toggle ${ecoinventOverlay ? "active" : ""}`}
+          onClick={() => setEcoinventOverlay(!ecoinventOverlay)}
+          title="Toggle ecoinvent coverage overlay"
+        >
+          <span className="ecoinvent-toggle-dot" />
+          ecoinvent
+        </button>
         <div className="search-bar">
           <svg
             className="search-icon"
@@ -1214,6 +1423,7 @@ function App() {
             fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
             legend={TAXONOMY_INFO[leftTaxonomy].legend}
             colorMap={leftColorMap}
+            ecoinventCoverage={ecoinventOverlay ? leftEcoinventCoverage : undefined}
           />
         </div>
 
@@ -1245,6 +1455,7 @@ function App() {
             fullName={TAXONOMY_INFO[rightTaxonomy].fullName}
             legend={TAXONOMY_INFO[rightTaxonomy].legend}
             colorMap={rightColorMap}
+            ecoinventCoverage={ecoinventOverlay ? rightEcoinventCoverage : undefined}
           />
         </div>
       </div>
@@ -1356,7 +1567,16 @@ function App() {
               <ExiobaseFactorDisplay entry={exiobaseFactor} />
             )}
 
-            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && (
+            {(ecoinventInfo.cpc || ecoinventInfo.hs) && (
+              <EcoinventDisplay
+                cpc={ecoinventInfo.cpc}
+                hs={ecoinventInfo.hs}
+                cpcCode={ecoinventInfo.cpcCode}
+                hsCode={ecoinventInfo.hsCode}
+              />
+            )}
+
+            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !ecoinventInfo.cpc && !ecoinventInfo.hs && (
               <div className="comparison-item no-mapping">
                 <p className="name">No mappings found at this level</p>
               </div>

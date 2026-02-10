@@ -5,6 +5,7 @@ interface Props extends NodeRendererProps<TNode> {
   mappingInfo?: Record<string, MappingInfo>;
   onNodeSelect?: (node: TNode) => void;
   colorMap?: Record<string, string>;
+  ecoinventCoverage?: Set<string>;
 }
 
 function countDescendants(n: TNode): number {
@@ -14,11 +15,12 @@ function countDescendants(n: TNode): number {
   return count;
 }
 
-export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap }: Props) {
+export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage }: Props) {
   const data = node.data;
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
   const descendantCount = !node.isLeaf ? countDescendants(data) : 0;
+  const hasEcoinvent = ecoinventCoverage?.has(data.id);
 
   return (
     <div
@@ -55,6 +57,9 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
         <span className="descendant-count" title={`${descendantCount} items underneath`}>
           {descendantCount.toLocaleString()}
         </span>
+      )}
+      {hasEcoinvent && (
+        <span className="ecoinvent-dot" title="ecoinvent coverage" />
       )}
       {info && (
         <span

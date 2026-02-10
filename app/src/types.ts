@@ -61,6 +61,26 @@ export interface ExiobaseFactorEntry {
   source: string;
 }
 
+export interface EcoinventCodeMapping {
+  products: string[];
+  count: number;
+  mappingType: string;
+}
+
+export interface EcoinventMapping {
+  cpc: Record<string, EcoinventCodeMapping>;
+  hs: Record<string, EcoinventCodeMapping>;
+  cpcAncestors: string[];
+  hsAncestors: string[];
+  stats: {
+    totalProducts: number;
+    productsWithCpc: number;
+    productsWithHs: number;
+    uniqueCpcCodes: number;
+    uniqueHsCodes: number;
+  };
+}
+
 export interface AppData {
   hsTree: TreeNode[];
   cpcTree: TreeNode[];
@@ -82,4 +102,5 @@ export interface AppData {
   unspscHsMapping: FuzzyMappingData;
   emissionFactors: Record<string, EmissionFactorEntry> | null;
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null;
+  ecoinventMapping: EcoinventMapping | null;
 }
