@@ -1514,6 +1514,12 @@
   fill: #92400e;
 }
 
+.about-bridge-text {
+  font-size: 9px;
+  font-weight: 600;
+  fill: #4b5563;
+}
+
 /* Legend */
 .about-legend {
   margin-bottom: 8px;

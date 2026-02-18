@@ -28,7 +28,7 @@ export function AboutSection() {
 
           <h3>Data Source Interconnections</h3>
           <div className="about-diagram-container">
-            <svg viewBox="0 0 900 620" className="about-diagram">
+            <svg viewBox="0 0 960 700" className="about-diagram">
               {/* Background regions */}
               <rect x="30" y="20" width="340" height="260" rx="12" fill="#eef2ff" stroke="#c7d2fe" strokeWidth="1.5" />
               <text x="200" y="46" textAnchor="middle" className="about-region-label">HS-Family Taxonomies</text>
@@ -36,14 +36,14 @@ export function AboutSection() {
               <rect x="30" y="310" width="340" height="130" rx="12" fill="#ecfeff" stroke="#a5f3fc" strokeWidth="1.5" />
               <text x="200" y="336" textAnchor="middle" className="about-region-label">Product Classifications</text>
 
-              <rect x="530" y="20" width="340" height="200" rx="12" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1.5" />
-              <text x="700" y="46" textAnchor="middle" className="about-region-label">Combined Taxonomies</text>
+              <rect x="530" y="20" width="400" height="200" rx="12" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1.5" />
+              <text x="730" y="46" textAnchor="middle" className="about-region-label">Combined Taxonomies</text>
 
-              <rect x="530" y="250" width="340" height="130" rx="12" fill="#fef2f2" stroke="#fca5a5" strokeWidth="1.5" />
-              <text x="700" y="276" textAnchor="middle" className="about-region-label">Environmental Data</text>
+              <rect x="530" y="250" width="400" height="210" rx="12" fill="#fef2f2" stroke="#fca5a5" strokeWidth="1.5" />
+              <text x="730" y="276" textAnchor="middle" className="about-region-label">Environmental Data</text>
 
-              <rect x="530" y="410" width="340" height="100" rx="12" fill="#f0fdf4" stroke="#86efac" strokeWidth="1.5" />
-              <text x="700" y="436" textAnchor="middle" className="about-region-label">Concordance / Mappings</text>
+              <rect x="530" y="490" width="400" height="100" rx="12" fill="#f0fdf4" stroke="#86efac" strokeWidth="1.5" />
+              <text x="730" y="516" textAnchor="middle" className="about-region-label">Concordance / Mappings</text>
 
               {/* HS (center of HS-family) */}
               <g>
@@ -102,95 +102,124 @@ export function AboutSection() {
 
               {/* Concordance CPC↔HS */}
               <g>
-                <rect x="560" y="450" width="140" height="44" rx="8" fill="#059669" />
-                <text x="630" y="470" textAnchor="middle" className="about-node-text-sm">CPC↔HS</text>
-                <text x="630" y="484" textAnchor="middle" className="about-node-text-sm">Concordance</text>
+                <rect x="560" y="530" width="140" height="44" rx="8" fill="#059669" />
+                <text x="630" y="550" textAnchor="middle" className="about-node-text-sm">CPC↔HS</text>
+                <text x="630" y="564" textAnchor="middle" className="about-node-text-sm">Concordance</text>
               </g>
-              <text x="630" y="507" textAnchor="middle" className="about-node-detail">5,843 mappings (UN)</text>
+              <text x="630" y="587" textAnchor="middle" className="about-node-detail">5,843 mappings (UN)</text>
 
               {/* Fuzzy UNSPSC↔HS */}
               <g>
-                <rect x="720" y="450" width="130" height="44" rx="8" fill="#7c3aed" opacity="0.8" />
-                <text x="785" y="470" textAnchor="middle" className="about-node-text-sm">UNSPSC↔HS</text>
-                <text x="785" y="484" textAnchor="middle" className="about-node-text-sm">Fuzzy Match</text>
+                <rect x="770" y="530" width="130" height="44" rx="8" fill="#7c3aed" opacity="0.8" />
+                <text x="835" y="550" textAnchor="middle" className="about-node-text-sm">UNSPSC↔HS</text>
+                <text x="835" y="564" textAnchor="middle" className="about-node-text-sm">Fuzzy Match</text>
               </g>
-              <text x="785" y="507" textAnchor="middle" className="about-node-detail">Jaccard ≥ 0.3</text>
+              <text x="835" y="587" textAnchor="middle" className="about-node-detail">Jaccard ≥ 0.3</text>
 
               {/* Concordance arrows */}
-              <path d="M 160 375 Q 400 420 560 472" fill="none" stroke="#059669" strokeWidth="2" markerEnd="url(#arrowGreen)" />
-              <path d="M 200 95 Q 400 60 560 472" fill="none" stroke="#059669" strokeWidth="2" strokeDasharray="4,4" markerEnd="url(#arrowGreen)" />
+              <path d="M 160 375 Q 400 500 560 552" fill="none" stroke="#059669" strokeWidth="2" markerEnd="url(#arrowGreen)" />
+              <path d="M 200 120 Q 400 80 560 552" fill="none" stroke="#059669" strokeWidth="2" strokeDasharray="4,4" markerEnd="url(#arrowGreen)" />
 
               {/* Fuzzy arrows */}
-              <path d="M 330 375 Q 500 440 720 472" fill="none" stroke="#7c3aed" strokeWidth="2" strokeDasharray="4,4" markerEnd="url(#arrowPurple)" />
-              <path d="M 253 95 Q 480 30 720 472" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeDasharray="4,4" markerEnd="url(#arrowPurple)" />
+              <path d="M 330 375 Q 550 510 770 552" fill="none" stroke="#7c3aed" strokeWidth="2" strokeDasharray="4,4" markerEnd="url(#arrowPurple)" />
+              <path d="M 253 95 Q 520 40 770 552" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeDasharray="4,4" markerEnd="url(#arrowPurple)" />
 
               {/* T1 (HTS Goods + CPC Services) */}
               <g>
-                <rect x="555" y="70" width="145" height="50" rx="8" fill="#d97706" />
-                <text x="627" y="100" textAnchor="middle" className="about-node-text">T1</text>
-                <text x="627" y="135" textAnchor="middle" className="about-node-detail">31,595 codes</text>
-                <text x="627" y="148" textAnchor="middle" className="about-node-source">HTS goods + CPC services</text>
+                <rect x="555" y="70" width="170" height="50" rx="8" fill="#d97706" />
+                <text x="640" y="100" textAnchor="middle" className="about-node-text">T1</text>
+                <text x="640" y="135" textAnchor="middle" className="about-node-detail">31,595 codes</text>
+                <text x="640" y="148" textAnchor="middle" className="about-node-source">HTS goods + CPC services</text>
               </g>
 
               {/* T2 (CPC Backbone + HTS Detail) */}
               <g>
-                <rect x="720" y="70" width="135" height="50" rx="8" fill="#b45309" />
-                <text x="787" y="100" textAnchor="middle" className="about-node-text">T2</text>
-                <text x="787" y="135" textAnchor="middle" className="about-node-detail">24,428 codes</text>
-                <text x="787" y="148" textAnchor="middle" className="about-node-source">CPC backbone + HTS detail</text>
+                <rect x="750" y="70" width="160" height="50" rx="8" fill="#b45309" />
+                <text x="830" y="100" textAnchor="middle" className="about-node-text">T2</text>
+                <text x="830" y="135" textAnchor="middle" className="about-node-detail">24,428 codes</text>
+                <text x="830" y="148" textAnchor="middle" className="about-node-source">CPC backbone + HTS detail</text>
               </g>
 
               {/* HTS → T1 */}
-              <path d="M 290 195 Q 430 120 555 95" fill="none" stroke="#d97706" strokeWidth="2.5" markerEnd="url(#arrowAmber)" />
-              <text x="420" y="135" textAnchor="middle" className="about-edge-label-bold">HTS sections I-XXII</text>
+              <path d="M 290 195 Q 430 130 555 95" fill="none" stroke="#d97706" strokeWidth="2.5" markerEnd="url(#arrowAmber)" />
+              <text x="418" y="142" textAnchor="middle" className="about-edge-label-bold">HTS sections I-XXII</text>
 
               {/* CPC → T1 */}
               <path d="M 107 350 Q 300 280 555 95" fill="none" stroke="#d97706" strokeWidth="2.5" markerEnd="url(#arrowAmber)" />
               <text x="300" y="300" textAnchor="middle" className="about-edge-label-bold">CPC sections 5-9</text>
 
               {/* CPC → T2 */}
-              <path d="M 160 355 Q 450 250 720 95" fill="none" stroke="#b45309" strokeWidth="2.5" markerEnd="url(#arrowAmberDark)" />
-              <text x="460" y="250" textAnchor="middle" className="about-edge-label-bold">CPC backbone</text>
+              <path d="M 160 355 Q 460 250 750 95" fill="none" stroke="#b45309" strokeWidth="2.5" markerEnd="url(#arrowAmberDark)" />
+              <text x="465" y="248" textAnchor="middle" className="about-edge-label-bold">CPC backbone</text>
 
               {/* HTS → T2 */}
-              <path d="M 290 185 Q 530 100 720 90" fill="none" stroke="#b45309" strokeWidth="2" strokeDasharray="6,3" markerEnd="url(#arrowAmberDark)" />
-              <text x="520" y="100" textAnchor="middle" className="about-edge-label">HTS detail under leaves</text>
+              <path d="M 290 185 Q 550 100 750 90" fill="none" stroke="#b45309" strokeWidth="2" strokeDasharray="6,3" markerEnd="url(#arrowAmberDark)" />
+              <text x="530" y="105" textAnchor="middle" className="about-edge-label">HTS detail under leaves</text>
 
               {/* ecoinvent */}
               <g>
-                <rect x="580" y="290" width="135" height="50" rx="8" fill="#f59e0b" />
-                <text x="647" y="320" textAnchor="middle" className="about-node-text">ecoinvent</text>
-                <text x="647" y="355" textAnchor="middle" className="about-node-detail">4,031 products</text>
-                <text x="647" y="368" textAnchor="middle" className="about-node-source">v3.10 Cut-Off</text>
+                <rect x="550" y="295" width="130" height="50" rx="8" fill="#f59e0b" />
+                <text x="615" y="325" textAnchor="middle" className="about-node-text">ecoinvent</text>
+                <text x="615" y="358" textAnchor="middle" className="about-node-detail">4,031 products</text>
+                <text x="615" y="371" textAnchor="middle" className="about-node-source">v3.10 Cut-Off</text>
               </g>
 
               {/* ecoinvent → CPC */}
-              <path d="M 580 315 Q 370 340 160 370" fill="none" stroke="#f59e0b" strokeWidth="2" markerEnd="url(#arrowAmber)" />
-              <text x="370" y="348" textAnchor="middle" className="about-edge-label">660 CPC codes</text>
+              <path d="M 550 320 Q 350 345 160 370" fill="none" stroke="#f59e0b" strokeWidth="2" markerEnd="url(#arrowAmber)" />
+              <text x="350" y="350" textAnchor="middle" className="about-edge-label">660 CPC codes</text>
 
               {/* ecoinvent → HS */}
-              <path d="M 620 290 Q 420 190 253 100" fill="none" stroke="#f59e0b" strokeWidth="2" markerEnd="url(#arrowAmber)" />
-              <text x="440" y="188" textAnchor="middle" className="about-edge-label">966 HS codes</text>
+              <path d="M 590 295 Q 400 195 253 100" fill="none" stroke="#f59e0b" strokeWidth="2" markerEnd="url(#arrowAmber)" />
+              <text x="430" y="192" textAnchor="middle" className="about-edge-label">966 HS codes</text>
 
-              {/* Emission factors */}
+              {/* EPA NAICS Emission Factors */}
               <g>
-                <rect x="735" y="290" width="120" height="50" rx="8" fill="#dc2626" opacity="0.85" />
-                <text x="795" y="320" textAnchor="middle" className="about-node-text-sm">Emission</text>
-                <text x="795" y="334" textAnchor="middle" className="about-node-text-sm">Factors</text>
+                <rect x="695" y="295" width="110" height="50" rx="8" fill="#dc2626" opacity="0.9" />
+                <text x="750" y="315" textAnchor="middle" className="about-node-text-sm">EPA NAICS</text>
+                <text x="750" y="329" textAnchor="middle" className="about-node-text-sm">Emission</text>
+                <text x="750" y="343" textAnchor="middle" className="about-node-text-sm">Factors</text>
               </g>
+              <text x="750" y="360" textAnchor="middle" className="about-node-detail">kg CO2e/USD by NAICS-6</text>
+              <text x="750" y="373" textAnchor="middle" className="about-node-source">EPA Supply Chain GHG v1.3</text>
+
+              {/* Census HTS→NAICS concordance bridge */}
+              <g>
+                <rect x="695" y="390" width="110" height="40" rx="6" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1" />
+                <text x="750" y="407" textAnchor="middle" className="about-bridge-text">HTS→NAICS</text>
+                <text x="750" y="420" textAnchor="middle" className="about-bridge-text">Concordance</text>
+              </g>
+              <text x="750" y="443" textAnchor="middle" className="about-node-detail">Census Bureau imp-code.txt</text>
+
+              {/* EPA → Census concordance → HS */}
+              <line x1="750" y1="345" x2="750" y2="390" stroke="#dc2626" strokeWidth="2" markerEnd="url(#arrowRed)" />
+              <path d="M 695 410 Q 450 350 253 108" fill="none" stroke="#dc2626" strokeWidth="2" strokeDasharray="5,3" markerEnd="url(#arrowRed)" />
+              <text x="460" y="300" textAnchor="middle" className="about-edge-label" fill="#dc2626">via HS-6 join</text>
+
+              {/* EXIOBASE */}
+              <g>
+                <rect x="820" y="295" width="100" height="50" rx="8" fill="#2563eb" opacity="0.85" />
+                <text x="870" y="316" textAnchor="middle" className="about-node-text-sm">EXIOBASE</text>
+                <text x="870" y="330" textAnchor="middle" className="about-node-text-sm">3.8.2</text>
+              </g>
+              <text x="870" y="360" textAnchor="middle" className="about-node-detail">kg CO2e by sector</text>
+              <text x="870" y="373" textAnchor="middle" className="about-node-source">ExioML (Zenodo)</text>
+
+              {/* EXIOBASE → HS chapters */}
+              <path d="M 820 320 Q 510 210 253 100" fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="5,3" markerEnd="url(#arrowExio)" />
+              <text x="530" y="218" textAnchor="middle" className="about-edge-label">HS 2-digit chapters</text>
 
               {/* Custom Taxonomy Builder */}
               <g>
-                <rect x="80" y="480" width="260" height="60" rx="12" fill="#fffbeb" stroke="#f59e0b" strokeWidth="2" strokeDasharray="6,4" />
-                <text x="210" y="507" textAnchor="middle" className="about-custom-label">Custom Taxonomy Builder</text>
-                <text x="210" y="525" textAnchor="middle" className="about-node-detail">User-defined nodes, meta-parameters,</text>
-                <text x="210" y="537" textAnchor="middle" className="about-node-detail">cross-taxonomy mappings, decision trails</text>
+                <rect x="80" y="560" width="260" height="60" rx="12" fill="#fffbeb" stroke="#f59e0b" strokeWidth="2" strokeDasharray="6,4" />
+                <text x="210" y="587" textAnchor="middle" className="about-custom-label">Custom Taxonomy Builder</text>
+                <text x="210" y="605" textAnchor="middle" className="about-node-detail">User-defined nodes, meta-parameters,</text>
+                <text x="210" y="617" textAnchor="middle" className="about-node-detail">cross-taxonomy mappings, decision trails</text>
               </g>
 
               {/* Custom ↔ all taxonomies (dashed) */}
-              <path d="M 210 480 L 200 120" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
-              <path d="M 170 480 L 107 400" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
-              <path d="M 260 480 L 270 400" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
+              <path d="M 210 560 L 200 120" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
+              <path d="M 170 560 L 107 400" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
+              <path d="M 260 560 L 270 400" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
 
               {/* Arrow markers */}
               <defs>
@@ -208,6 +237,12 @@ export function AboutSection() {
                 </marker>
                 <marker id="arrowAmberDark" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
                   <path d="M 0 0 L 8 3 L 0 6 Z" fill="#b45309" />
+                </marker>
+                <marker id="arrowRed" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#dc2626" />
+                </marker>
+                <marker id="arrowExio" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#2563eb" />
                 </marker>
               </defs>
             </svg>
@@ -235,6 +270,14 @@ export function AboutSection() {
               <div className="about-legend-item">
                 <span className="about-legend-line solid" style={{ borderColor: "#f59e0b" }}></span>
                 <span>ecoinvent product-to-code mapping</span>
+              </div>
+              <div className="about-legend-item">
+                <span className="about-legend-line dashed" style={{ borderColor: "#dc2626" }}></span>
+                <span>EPA emission factors via NAICS→HS join</span>
+              </div>
+              <div className="about-legend-item">
+                <span className="about-legend-line dashed" style={{ borderColor: "#2563eb" }}></span>
+                <span>EXIOBASE sector factors → HS chapters</span>
               </div>
               <div className="about-legend-item">
                 <span className="about-legend-line dashed" style={{ borderColor: "#d97706" }}></span>
@@ -281,6 +324,14 @@ export function AboutSection() {
               <div className="about-detail-card" style={{ borderLeftColor: "#f59e0b" }}>
                 <strong>ecoinvent v3.10</strong>
                 <p>4,031 products mapped to 660 CPC codes and 966 HS codes (from the Cut-Off Activity Overview). Provides environmental impact data as a coverage overlay.</p>
+              </div>
+              <div className="about-detail-card" style={{ borderLeftColor: "#dc2626" }}>
+                <strong>EPA NAICS Emission Factors</strong>
+                <p>Supply Chain GHG Emission Factors v1.3 (kg CO2e per 2022 USD), keyed by NAICS-6 industry code. Joined to HS-6 trade codes via the Census Bureau HTS-10→NAICS-6 concordance (imp-code.txt). Shows carbon intensity with production vs. margins breakdown.</p>
+              </div>
+              <div className="about-detail-card" style={{ borderLeftColor: "#2563eb" }}>
+                <strong>EXIOBASE 3.8.2</strong>
+                <p>Sector-level emission factors from the ExioML dataset (Zenodo). Mapped to HS 2-digit chapter codes via a manual sector-to-chapter correspondence. Shows kg CO2e by EXIOBASE product sector.</p>
               </div>
             </div>
           </div>
