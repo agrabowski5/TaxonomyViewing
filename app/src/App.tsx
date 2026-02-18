@@ -2,8 +2,18 @@ import React, { useState, useRef, useCallback, useMemo, useEffect } from "react"
 import { TreeApi } from "react-arborist";
 import { useData } from "./useData";
 import { TaxonomyTree } from "./TaxonomyTree";
-import type { TreeNode, LookupEntry, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping } from "./types";
+import { BuilderProvider, useBuilder } from "./builder/context";
+import { BuilderBanner } from "./builder/BuilderBanner";
+import { BuilderTaxonomyPanel } from "./builder/BuilderTaxonomyPanel";
+import { NodeCreationGuide } from "./builder/NodeCreationGuide";
+import { MetaParameterModal } from "./builder/MetaParameterModal";
+import { MappingsTab } from "./builder/MappingsTab";
+import { ExportPanel } from "./builder/ExportPanel";
+import { ResetDialog } from "./builder/ResetDialog";
+import { AboutSection } from "./AboutSection";
+import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping } from "./types";
 import "./App.css";
+import "./builder/builder.css";
 
 // Color palette for section-based coloring
 const SECTION_COLORS = [
@@ -30,8 +40,6 @@ function buildColorMap(tree: TreeNode[]): Record<string, string> {
   });
   return colorMap;
 }
-
-type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2";
 
 const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc", "t1", "t2"];
 
@@ -83,6 +91,12 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
     legend: "CPC Sections \u2192 Divisions \u2192 Groups \u2192 Classes \u2192 Subclasses \u2192 HTS Tariff Lines",
     taxonomyClass: "t2",
     label: "T2",
+  },
+  custom: {
+    fullName: "Custom Taxonomy (Builder)",
+    legend: "Build your own classification hierarchy",
+    taxonomyClass: "custom",
+    label: "CUSTOM",
   },
 };
 
@@ -752,6 +766,15 @@ function filterTreeData(tree: TreeNode[], term: string): TreeNode[] {
 }
 
 function App() {
+  return (
+    <BuilderProvider>
+      <AppContent />
+    </BuilderProvider>
+  );
+}
+
+function AppContent() {
+  const { state: builderState, dispatch: builderDispatch } = useBuilder();
   const { data, loading, error } = useData();
   const [search, setSearch] = useState("");
   const [leftTaxonomy, setLeftTaxonomy] = useState<TaxonomyType>("hs");
@@ -776,22 +799,25 @@ function App() {
     unspsc: useRef<TreeApi<TreeNode>>(null),
     t1: useRef<TreeApi<TreeNode>>(null),
     t2: useRef<TreeApi<TreeNode>>(null),
+    custom: useRef<TreeApi<TreeNode>>(null),
   };
 
-  const getTreeData = useCallback((taxonomy: TaxonomyType) => {
+  const getTreeData = useCallback((taxonomy: TaxonomyType): TreeNode[] => {
+    if (taxonomy === "custom") return [];
     if (!data) return [];
-    const map: Record<TaxonomyType, TreeNode[]> = {
+    const map: Record<string, TreeNode[]> = {
       hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree, t1: data.t1Tree, t2: data.t2Tree,
     };
-    return map[taxonomy];
+    return map[taxonomy] ?? [];
   }, [data]);
 
-  const getLookup = useCallback((taxonomy: TaxonomyType) => {
+  const getLookup = useCallback((taxonomy: TaxonomyType): Record<string, LookupEntry> => {
+    if (taxonomy === "custom") return {};
     if (!data) return {};
-    const map: Record<TaxonomyType, Record<string, LookupEntry>> = {
+    const map: Record<string, Record<string, LookupEntry>> = {
       hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup, t1: data.t1Lookup, t2: data.t2Lookup,
     };
-    return map[taxonomy];
+    return map[taxonomy] ?? {};
   }, [data]);
 
   // Compute filtered tree data for each pane
@@ -1346,6 +1372,9 @@ function App() {
       <option value="unspsc">UNSPSC - Products &amp; Services Code</option>
       <option value="t1">T1 - HTS Goods + CPC Services</option>
       <option value="t2">T2 - CPC Backbone + HTS Detail</option>
+      {builderState.active && (
+        <option value="custom">Custom Taxonomy (Builder)</option>
+      )}
     </>
   );
 
@@ -1365,6 +1394,22 @@ function App() {
         >
           <span className="ecoinvent-toggle-dot" />
           ecoinvent
+        </button>
+        <button
+          className={`builder-toggle ${builderState.active ? "active" : ""}`}
+          onClick={() => {
+            if (builderState.active) {
+              builderDispatch({ type: "TOGGLE_RESET_DIALOG" });
+            } else {
+              builderDispatch({
+                type: "ENTER_BUILDER",
+                savedAppState: { leftTaxonomy, rightTaxonomy },
+              });
+            }
+          }}
+          title="Toggle Custom Taxonomy Builder mode"
+        >
+          ⚗ Build Custom
         </button>
         <div className="search-bar">
           <svg
@@ -1392,7 +1437,10 @@ function App() {
             </button>
           )}
         </div>
+        <AboutSection />
       </header>
+
+      <BuilderBanner />
 
       <div className="main-content two-pane">
         {/* Left Pane */}
@@ -1407,24 +1455,30 @@ function App() {
               {taxonomyOptions}
             </select>
           </div>
-          <div className="pane-info">
-            <p className="full-name">{TAXONOMY_INFO[leftTaxonomy].fullName}</p>
-            <p className="legend">{TAXONOMY_INFO[leftTaxonomy].legend}</p>
-          </div>
-          <TaxonomyTree
-            key={`${leftTaxonomy}-${debouncedSearch}`}
-            ref={treeRefs[leftTaxonomy]}
-            data={leftTreeData}
-            openByDefault={isSearching}
-            mappingInfo={mappingInfo}
-            onNodeSelect={(node) => handleNodeSelect("left", node)}
-            label={TAXONOMY_INFO[leftTaxonomy].label}
-            taxonomyClass={TAXONOMY_INFO[leftTaxonomy].taxonomyClass}
-            fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
-            legend={TAXONOMY_INFO[leftTaxonomy].legend}
-            colorMap={leftColorMap}
-            ecoinventCoverage={ecoinventOverlay ? leftEcoinventCoverage : undefined}
-          />
+          {leftTaxonomy === "custom" ? (
+            <BuilderTaxonomyPanel />
+          ) : (
+            <>
+              <div className="pane-info">
+                <p className="full-name">{TAXONOMY_INFO[leftTaxonomy].fullName}</p>
+                <p className="legend">{TAXONOMY_INFO[leftTaxonomy].legend}</p>
+              </div>
+              <TaxonomyTree
+                key={`${leftTaxonomy}-${debouncedSearch}`}
+                ref={treeRefs[leftTaxonomy]}
+                data={leftTreeData}
+                openByDefault={isSearching}
+                mappingInfo={mappingInfo}
+                onNodeSelect={(node) => handleNodeSelect("left", node)}
+                label={TAXONOMY_INFO[leftTaxonomy].label}
+                taxonomyClass={TAXONOMY_INFO[leftTaxonomy].taxonomyClass}
+                fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
+                legend={TAXONOMY_INFO[leftTaxonomy].legend}
+                colorMap={leftColorMap}
+                ecoinventCoverage={ecoinventOverlay ? leftEcoinventCoverage : undefined}
+              />
+            </>
+          )}
         </div>
 
         {/* Right Pane */}
@@ -1439,24 +1493,30 @@ function App() {
               {taxonomyOptions}
             </select>
           </div>
-          <div className="pane-info">
-            <p className="full-name">{TAXONOMY_INFO[rightTaxonomy].fullName}</p>
-            <p className="legend">{TAXONOMY_INFO[rightTaxonomy].legend}</p>
-          </div>
-          <TaxonomyTree
-            key={`${rightTaxonomy}-${debouncedSearch}`}
-            ref={treeRefs[rightTaxonomy]}
-            data={rightTreeData}
-            openByDefault={isSearching}
-            mappingInfo={mappingInfo}
-            onNodeSelect={(node) => handleNodeSelect("right", node)}
-            label={TAXONOMY_INFO[rightTaxonomy].label}
-            taxonomyClass={TAXONOMY_INFO[rightTaxonomy].taxonomyClass}
-            fullName={TAXONOMY_INFO[rightTaxonomy].fullName}
-            legend={TAXONOMY_INFO[rightTaxonomy].legend}
-            colorMap={rightColorMap}
-            ecoinventCoverage={ecoinventOverlay ? rightEcoinventCoverage : undefined}
-          />
+          {rightTaxonomy === "custom" ? (
+            <BuilderTaxonomyPanel />
+          ) : (
+            <>
+              <div className="pane-info">
+                <p className="full-name">{TAXONOMY_INFO[rightTaxonomy].fullName}</p>
+                <p className="legend">{TAXONOMY_INFO[rightTaxonomy].legend}</p>
+              </div>
+              <TaxonomyTree
+                key={`${rightTaxonomy}-${debouncedSearch}`}
+                ref={treeRefs[rightTaxonomy]}
+                data={rightTreeData}
+                openByDefault={isSearching}
+                mappingInfo={mappingInfo}
+                onNodeSelect={(node) => handleNodeSelect("right", node)}
+                label={TAXONOMY_INFO[rightTaxonomy].label}
+                taxonomyClass={TAXONOMY_INFO[rightTaxonomy].taxonomyClass}
+                fullName={TAXONOMY_INFO[rightTaxonomy].fullName}
+                legend={TAXONOMY_INFO[rightTaxonomy].legend}
+                colorMap={rightColorMap}
+                ecoinventCoverage={ecoinventOverlay ? rightEcoinventCoverage : undefined}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -1581,8 +1641,61 @@ function App() {
                 <p className="name">No mappings found at this level</p>
               </div>
             )}
+
+            {/* Builder: Map-to-custom action */}
+            {builderState.active && selectedFrom && selectedFrom !== "custom" && selectedNode && (
+              <MappingsTab
+                mode="map-action"
+                sourceNode={selectedNode}
+                sourceTaxonomy={selectedFrom}
+              />
+            )}
           </div>
         </div>
+      )}
+
+      {/* Builder: Show custom node mappings when a custom node is selected */}
+      {builderState.active && builderState.selectedCustomNodeId && (
+        <div className="comparison-panel">
+          <h3>
+            Custom Node Mappings
+          </h3>
+          <div className="comparison-content">
+            <MappingsTab
+              mode="display"
+              selectedCustomNodeId={builderState.selectedCustomNodeId}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Builder overlays */}
+      {builderState.active && (
+        <NodeCreationGuide />
+      )}
+      {builderState.showMetaModal && (
+        <MetaParameterModal />
+      )}
+      {builderState.showExportPanel && (
+        <ExportPanel />
+      )}
+      {builderState.showResetDialog && (
+        <ResetDialog
+          onKeep={() => {
+            builderDispatch({ type: "EXIT_BUILDER" });
+            if (builderState.savedAppState) {
+              setLeftTaxonomy(builderState.savedAppState.leftTaxonomy);
+              setRightTaxonomy(builderState.savedAppState.rightTaxonomy);
+            }
+          }}
+          onClear={() => {
+            builderDispatch({ type: "EXIT_BUILDER" });
+            if (builderState.savedAppState) {
+              setLeftTaxonomy(builderState.savedAppState.leftTaxonomy);
+              setRightTaxonomy(builderState.savedAppState.rightTaxonomy);
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -1337,3 +1337,265 @@
   }
 }
 
+/* ===== About Section ===== */
+.about-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: white;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.about-toggle:hover {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--accent-hs);
+}
+
+.about-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 300;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 40px 20px;
+}
+
+.about-panel {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 960px;
+  animation: aboutSlideIn 0.25s ease;
+}
+
+@keyframes aboutSlideIn {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.about-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.about-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--text);
+}
+
+.about-close {
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  line-height: 1;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.about-close:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.about-body {
+  padding: 28px 32px 32px;
+}
+
+.about-intro {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 28px;
+}
+
+.about-body h3 {
+  font-size: 1.1rem;
+  color: var(--text);
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+}
+
+.about-body h4 {
+  font-size: 0.95rem;
+  color: var(--text);
+  margin: 24px 0 12px;
+}
+
+/* Diagram */
+.about-diagram-container {
+  background: #fafbfc;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+}
+
+.about-diagram {
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.about-region-label {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.about-node-text {
+  font-size: 14px;
+  font-weight: 700;
+  fill: white;
+}
+
+.about-node-text-sm {
+  font-size: 11px;
+  font-weight: 700;
+  fill: white;
+}
+
+.about-node-detail {
+  font-size: 9.5px;
+  fill: #6b7280;
+}
+
+.about-node-source {
+  font-size: 8.5px;
+  fill: #9ca3af;
+  font-style: italic;
+}
+
+.about-edge-label {
+  font-size: 8.5px;
+  fill: #6b7280;
+  font-style: italic;
+}
+
+.about-edge-label-bold {
+  font-size: 9px;
+  fill: #92400e;
+  font-weight: 600;
+}
+
+.about-custom-label {
+  font-size: 13px;
+  font-weight: 700;
+  fill: #92400e;
+}
+
+/* Legend */
+.about-legend {
+  margin-bottom: 8px;
+}
+
+.about-legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.about-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.about-legend-line {
+  width: 32px;
+  height: 0;
+  flex-shrink: 0;
+}
+
+.about-legend-line.solid {
+  border-top: 3px solid;
+}
+
+.about-legend-line.dashed {
+  border-top: 3px dashed;
+}
+
+/* Detail Cards */
+.about-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.about-detail-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 4px solid;
+  border-radius: 8px;
+  background: white;
+}
+
+.about-detail-card strong {
+  font-size: 0.85rem;
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.about-detail-card p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Responsive About */
+@media (max-width: 768px) {
+  .about-overlay {
+    padding: 20px 10px;
+  }
+
+  .about-body {
+    padding: 20px 16px 24px;
+  }
+
+  .about-header {
+    padding: 16px;
+  }
+
+  .about-legend-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .about-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
