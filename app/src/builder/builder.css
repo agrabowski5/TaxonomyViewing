@@ -109,8 +109,7 @@
 }
 
 .builder-add-node-btn,
-.builder-add-child-btn,
-.builder-manage-registry-btn {
+.builder-add-child-btn {
   padding: 4px 12px;
   border: 1px solid #d97706;
   border-radius: 6px;
@@ -123,18 +122,12 @@
 }
 
 .builder-add-node-btn:hover,
-.builder-add-child-btn:hover,
-.builder-manage-registry-btn:hover {
+.builder-add-child-btn:hover {
   background: #fef3c7;
 }
 
 .builder-add-child-btn {
   border-color: #f59e0b;
-}
-
-.builder-manage-registry-btn {
-  margin-left: auto;
-  border-color: #92400e;
 }
 
 /* Empty State */
@@ -173,12 +166,25 @@
   flex-shrink: 0;
 }
 
+/* Teal badge for meta-parameter annotations */
 .builder-param-badge {
   font-size: 0.65rem;
   padding: 1px 6px;
   border-radius: 10px;
-  background: #fef3c7;
-  color: #92400e;
+  background: #ccfbf1;
+  color: #0f766e;
+  margin-left: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Purple badge for governance-flagged nodes */
+.builder-governance-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #ede9fe;
+  color: #6d28d9;
   margin-left: 4px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -203,7 +209,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: 380px;
+  width: 320px;
   height: 100vh;
   background: var(--surface);
   border-left: 2px solid #f59e0b;
@@ -310,6 +316,21 @@
   margin-bottom: 16px;
 }
 
+.wizard-helper-text {
+  font-size: 0.8rem;
+  color: #0f766e;
+  background: #f0fdfa;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccfbf1;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.wizard-definition-input {
+  margin-bottom: 12px;
+}
+
 .wizard-buttons {
   display: flex;
   gap: 8px;
@@ -405,6 +426,80 @@
 
 .wizard-action-btn:hover {
   background: #b45309;
+}
+
+.wizard-action-btn:disabled {
+  background: #d4d4d8;
+  cursor: not-allowed;
+}
+
+.wizard-action-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Wizard meta-parameter form */
+.wizard-meta-form {
+  margin-top: 8px;
+}
+
+.wizard-meta-dimensions-label {
+  font-size: 0.8rem;
+  color: #92400e;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.wizard-meta-entry {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+
+.wizard-meta-entry select {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.wizard-meta-entry select:focus {
+  outline: none;
+  border-color: #0d9488;
+}
+
+.wizard-meta-entry input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.wizard-meta-entry input:focus {
+  outline: none;
+  border-color: #0d9488;
+}
+
+.wizard-meta-add-btn {
+  padding: 4px 12px;
+  border: 1px dashed #0d9488;
+  border-radius: 6px;
+  background: #f0fdfa;
+  color: #0f766e;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 4px;
+}
+
+.wizard-meta-add-btn:hover {
+  background: #ccfbf1;
+  border-style: solid;
 }
 
 /* ============================
@@ -521,8 +616,8 @@
   gap: 4px;
   padding: 3px 8px;
   border-radius: 12px;
-  background: #fef3c7;
-  color: #92400e;
+  background: #ccfbf1;
+  color: #0f766e;
   font-size: 0.75rem;
 }
 
@@ -541,7 +636,55 @@
 }
 
 /* ============================
-   Meta-Parameter Modal
+   Universal Meta-Parameter Layer
+   ============================ */
+
+.builder-meta-layer {
+  padding: 10px 16px;
+  background: #f0fdfa;
+  border-top: 2px solid #0d9488;
+  flex-shrink: 0;
+}
+
+.builder-meta-layer-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f766e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.builder-meta-layer-subtitle {
+  font-size: 0.7rem;
+  color: #115e59;
+  margin-bottom: 6px;
+  opacity: 0.8;
+}
+
+.builder-meta-layer-dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.builder-meta-layer-dim {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0f766e;
+  padding: 2px 8px;
+  background: #ccfbf1;
+  border-radius: 10px;
+}
+
+.builder-meta-layer-sep {
+  color: #0d9488;
+  font-size: 0.7rem;
+}
+
+/* ============================
+   Modal Overlay (shared)
    ============================ */
 
 .builder-modal-overlay {
@@ -609,88 +752,6 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-
-/* Registry Table */
-.builder-registry-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.builder-registry-table th {
-  text-align: left;
-  padding: 8px 12px;
-  border-bottom: 2px solid var(--border);
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.builder-registry-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-
-.builder-registry-table tr.inactive td {
-  opacity: 0.4;
-}
-
-.builder-registry-toggle {
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: white;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.builder-registry-toggle:hover {
-  background: var(--bg);
-}
-
-/* Add parameter row */
-.builder-registry-add {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.builder-registry-add input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.85rem;
-}
-
-.builder-registry-add input:focus {
-  outline: none;
-  border-color: #f59e0b;
-}
-
-.builder-registry-add-btn {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 6px;
-  background: #d97706;
-  color: white;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.builder-registry-add-btn:hover {
-  background: #b45309;
-}
-
-.builder-registry-add-btn:disabled {
-  background: #d4d4d8;
-  cursor: not-allowed;
 }
 
 /* ============================
@@ -954,4 +1015,14 @@
 .wizard-governance-note textarea:focus {
   outline: none;
   border-color: #f59e0b;
+}
+
+/* ============================
+   Panel Compression
+   When the guide sidebar is open, compress the app content
+   ============================ */
+
+.app-content-compressed {
+  margin-right: 320px;
+  transition: margin-right 0.3s ease;
 }

@@ -6,7 +6,7 @@ import { BuilderProvider, useBuilder } from "./builder/context";
 import { BuilderBanner } from "./builder/BuilderBanner";
 import { BuilderTaxonomyPanel } from "./builder/BuilderTaxonomyPanel";
 import { NodeCreationGuide } from "./builder/NodeCreationGuide";
-import { MetaParameterModal } from "./builder/MetaParameterModal";
+
 import { MappingsTab } from "./builder/MappingsTab";
 import { ExportPanel } from "./builder/ExportPanel";
 import { ResetDialog } from "./builder/ResetDialog";
@@ -1379,7 +1379,7 @@ function AppContent() {
   );
 
   return (
-    <div className="app">
+    <div className={`app ${builderState.active && builderState.guideSidebarOpen ? "app-content-compressed" : ""}`}>
       <header className="app-header">
         <div className="header-text">
           <h1>Taxonomy Explorer</h1>
@@ -1672,9 +1672,6 @@ function AppContent() {
       {/* Builder overlays */}
       {builderState.active && (
         <NodeCreationGuide />
-      )}
-      {builderState.showMetaModal && (
-        <MetaParameterModal />
       )}
       {builderState.showExportPanel && (
         <ExportPanel />

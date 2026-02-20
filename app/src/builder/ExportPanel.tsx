@@ -1,5 +1,13 @@
 import { useBuilder } from "./context";
-import type { CustomNode } from "./types";
+import type { CustomNode, MetaDimension } from "./types";
+
+const DIMENSION_LABELS: Record<MetaDimension, string> = {
+  geography: "Geography",
+  time: "Time",
+  jurisdiction: "Jurisdiction",
+  production_standard: "Production standard",
+  grade: "Grade",
+};
 
 function countNodes(tree: CustomNode[]): number {
   let count = tree.length;
@@ -18,11 +26,11 @@ function countMappings(tree: CustomNode[]): number {
   return count;
 }
 
-function flattenToCSV(tree: CustomNode[], parentCode: string, registryMap: Record<string, string>): string[][] {
+function flattenToCSV(tree: CustomNode[], parentCode: string): string[][] {
   const rows: string[][] = [];
   for (const node of tree) {
     const metaParams = node.metaParameters
-      .map((p) => `${registryMap[p.registryId] ?? p.registryId}=${p.value}`)
+      .map((p) => `${DIMENSION_LABELS[p.dimension]}=${p.value}`)
       .join("; ");
     const mappedCodes = node.mappingLinks
       .map((l) => `${l.sourceTaxonomy}:${l.sourceCode}`)
@@ -43,10 +51,11 @@ function flattenToCSV(tree: CustomNode[], parentCode: string, registryMap: Recor
       node.notes,
       node.siblingDisambiguation,
       trail,
+      node.governanceFlagged ? "yes" : "",
     ]);
 
     if (node.children.length > 0) {
-      rows.push(...flattenToCSV(node.children, node.code, registryMap));
+      rows.push(...flattenToCSV(node.children, node.code));
     }
   }
   return rows;
@@ -69,11 +78,11 @@ export function ExportPanel() {
 
   const handleExportJSON = () => {
     const exportData = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       rootName: state.rootName,
       tree: state.customTree,
-      metaParameterRegistry: state.metaParameterRegistry,
+      metaDimensions: ["geography", "time", "jurisdiction", "production_standard", "grade"],
       totalNodes: countNodes(state.customTree),
       totalMappings: countMappings(state.customTree),
     };
@@ -82,16 +91,12 @@ export function ExportPanel() {
   };
 
   const handleExportCSV = () => {
-    const registryMap: Record<string, string> = {};
-    for (const p of state.metaParameterRegistry) {
-      registryMap[p.id] = p.name;
-    }
-
     const headers = [
-      "id", "code", "name", "parent_code", "definition", "type",
-      "meta_parameters", "mapped_codes", "notes", "sibling_disambiguation", "decision_trail",
+      "id", "code", "name", "parent_code", "definitional_rule", "type",
+      "meta_parameters", "mapped_standard_nodes", "notes", "sibling_disambiguation",
+      "wizard_path", "governance_flagged",
     ];
-    const rows = flattenToCSV(state.customTree, "", registryMap);
+    const rows = flattenToCSV(state.customTree, "");
 
     const escapeCSV = (val: string) => {
       if (val.includes(",") || val.includes('"') || val.includes("\n")) {
@@ -125,7 +130,7 @@ export function ExportPanel() {
         <div className="builder-modal-body builder-export-body">
           <p>
             Export your custom taxonomy with all nodes ({countNodes(state.customTree)}),
-            meta-parameters, mappings ({countMappings(state.customTree)}), and decision rationales.
+            meta-parameter annotations, mappings ({countMappings(state.customTree)}), and decision trails.
           </p>
 
           <div className="builder-export-buttons">

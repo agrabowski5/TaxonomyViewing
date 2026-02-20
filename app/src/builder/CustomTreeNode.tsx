@@ -32,6 +32,7 @@ export function CustomTreeNode({ node, style, onNodeSelect, customTree }: Props)
   const descendantCount = !node.isLeaf ? countDescendants(data) : 0;
   const paramCount = customData?.metaParameters.length ?? 0;
   const linkCount = customData?.mappingLinks.length ?? 0;
+  const isGovernanceFlagged = customData?.governanceFlagged ?? false;
 
   return (
     <div
@@ -71,6 +72,11 @@ export function CustomTreeNode({ node, style, onNodeSelect, customTree }: Props)
       {descendantCount > 0 && (
         <span className="descendant-count" title={`${descendantCount} items underneath`}>
           {descendantCount.toLocaleString()}
+        </span>
+      )}
+      {isGovernanceFlagged && (
+        <span className="builder-governance-badge" title="Pending governance review">
+          governance
         </span>
       )}
       {paramCount > 0 && (

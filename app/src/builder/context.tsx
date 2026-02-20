@@ -25,28 +25,22 @@ export function BuilderProvider({ children }: { children: React.ReactNode }) {
         active: false,
         showResetDialog: false,
         showExportPanel: false,
-        showMetaModal: false,
       };
     }
     return initial;
   });
 
-  // Auto-save to localStorage when custom tree or registry changes (debounced)
+  // Auto-save to localStorage when custom tree changes (debounced)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevTreeRef = useRef(state.customTree);
-  const prevRegistryRef = useRef(state.metaParameterRegistry);
 
   useEffect(() => {
-    if (
-      state.customTree === prevTreeRef.current &&
-      state.metaParameterRegistry === prevRegistryRef.current
-    ) {
+    if (state.customTree === prevTreeRef.current) {
       return;
     }
     prevTreeRef.current = state.customTree;
-    prevRegistryRef.current = state.metaParameterRegistry;
 
-    if (state.customTree.length === 0 && state.metaParameterRegistry === INITIAL_STATE.metaParameterRegistry) {
+    if (state.customTree.length === 0) {
       return;
     }
 
@@ -59,7 +53,7 @@ export function BuilderProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [state.customTree, state.metaParameterRegistry, state]);
+  }, [state.customTree, state]);
 
   return (
     <BuilderContext.Provider value={{ state, dispatch }}>

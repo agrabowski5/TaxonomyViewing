@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { Tree, TreeApi } from "react-arborist";
+import { Tree } from "react-arborist";
 import { useContainerSize } from "../useContainerSize";
 import { useBuilder } from "./context";
 import { CustomTreeNode } from "./CustomTreeNode";
+import { MetaParameterLayer } from "./MetaParameterModal";
 import type { TreeNode } from "../types";
 import type { CustomNode } from "./types";
 
@@ -75,12 +76,6 @@ export function BuilderTaxonomyPanel() {
             + Add Child
           </button>
         )}
-        <button
-          className="builder-manage-registry-btn"
-          onClick={() => dispatch({ type: "TOGGLE_META_MODAL" })}
-        >
-          Manage Registry
-        </button>
       </div>
       <div className="tree-container" ref={container.ref}>
         {state.customTree.length === 0 ? (
@@ -94,7 +89,7 @@ export function BuilderTaxonomyPanel() {
           <Tree<TreeNode>
             initialData={treeData}
             width={container.width}
-            height={container.height}
+            height={container.height - 72}
             rowHeight={32}
             indent={20}
             openByDefault
@@ -112,6 +107,7 @@ export function BuilderTaxonomyPanel() {
           </Tree>
         )}
       </div>
+      <MetaParameterLayer />
     </div>
   );
 }

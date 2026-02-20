@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { useBuilder } from "./context";
-import type { CustomNode, DecisionStep } from "./types";
+import type { CustomNode, DecisionStep, MetaDimension } from "./types";
 
 interface Props {
   parentNodeId: string | null;
+  prefilledDefinition?: string;
   decisionTrail: DecisionStep[];
   onComplete: () => void;
   onCancel: () => void;
 }
+
+const META_DIMENSIONS: { key: MetaDimension; label: string }[] = [
+  { key: "geography", label: "Geography" },
+  { key: "time", label: "Time" },
+  { key: "jurisdiction", label: "Jurisdiction" },
+  { key: "production_standard", label: "Production standard" },
+  { key: "grade", label: "Grade" },
+];
 
 function findNodeInTree(tree: CustomNode[], id: string): CustomNode | null {
   for (const n of tree) {
@@ -26,34 +35,32 @@ function getSiblings(tree: CustomNode[], parentId: string | null): CustomNode[] 
   return parent?.children ?? [];
 }
 
-export function NodeCreationForm({ parentNodeId, decisionTrail, onComplete, onCancel }: Props) {
+export function NodeCreationForm({ parentNodeId, prefilledDefinition, decisionTrail, onComplete, onCancel }: Props) {
   const { state, dispatch } = useBuilder();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [definition, setDefinition] = useState("");
+  const [definition, setDefinition] = useState(prefilledDefinition ?? "");
   const [nodeType, setNodeType] = useState<"leaf" | "internal">("leaf");
   const [notes, setNotes] = useState("");
   const [siblingDisambiguation, setSiblingDisambiguation] = useState("");
-  const [selectedMetaParams, setSelectedMetaParams] = useState<Array<{ registryId: string; value: string }>>([]);
+  const [metaParams, setMetaParams] = useState<Array<{ dimension: MetaDimension; value: string }>>([]);
 
   const siblings = getSiblings(state.customTree, parentNodeId);
   const hasSiblings = siblings.length > 0;
-  const activeRegistry = state.metaParameterRegistry.filter((p) => p.active);
 
   const canSave = name.trim() && definition.trim() && (!hasSiblings || siblingDisambiguation.trim());
 
   const handleAddMetaParam = () => {
-    if (selectedMetaParams.length >= 3) return;
-    setSelectedMetaParams([...selectedMetaParams, { registryId: "", value: "" }]);
+    setMetaParams([...metaParams, { dimension: "geography", value: "" }]);
   };
 
   const handleRemoveMetaParam = (index: number) => {
-    setSelectedMetaParams(selectedMetaParams.filter((_, i) => i !== index));
+    setMetaParams(metaParams.filter((_, i) => i !== index));
   };
 
-  const handleUpdateMetaParam = (index: number, field: "registryId" | "value", val: string) => {
-    setSelectedMetaParams(
-      selectedMetaParams.map((p, i) => (i === index ? { ...p, [field]: val } : p))
+  const handleUpdateMetaParam = (index: number, field: "dimension" | "value", val: string) => {
+    setMetaParams(
+      metaParams.map((p, i) => (i === index ? { ...p, [field]: val } : p))
     );
   };
 
@@ -67,12 +74,13 @@ export function NodeCreationForm({ parentNodeId, decisionTrail, onComplete, onCa
       type: nodeType,
       parentId: parentNodeId,
       notes: notes.trim(),
-      metaParameters: selectedMetaParams
-        .filter((p) => p.registryId)
+      governanceFlagged: false,
+      metaParameters: metaParams
+        .filter((p) => p.value.trim())
         .map((p) => ({
           id: crypto.randomUUID(),
-          registryId: p.registryId,
-          value: p.value,
+          dimension: p.dimension,
+          value: p.value.trim(),
         })),
       mappingLinks: [],
       siblingDisambiguation: siblingDisambiguation.trim(),
@@ -124,13 +132,13 @@ export function NodeCreationForm({ parentNodeId, decisionTrail, onComplete, onCa
 
       <div className="builder-form-group">
         <label>
-          Definitional Rule <span className="required">*</span>
+          One-Sentence Definitional Name / Rule <span className="required">*</span>
         </label>
         <textarea
           className="builder-form-textarea"
           value={definition}
           onChange={(e) => setDefinition(e.target.value)}
-          placeholder="A clear, reusable rule that defines what belongs in this category..."
+          placeholder="A clear, reusable definitional name a different analyst could apply consistently..."
         />
       </div>
 
@@ -173,21 +181,23 @@ export function NodeCreationForm({ parentNodeId, decisionTrail, onComplete, onCa
         </div>
       )}
 
-      {/* Meta-parameters */}
+      {/* Meta-parameters (universal dimensions) */}
       <div className="builder-form-group">
-        <label>Meta-Parameters (max 3)</label>
-        {selectedMetaParams.map((p, i) => (
+        <label>Meta-Parameter Annotations</label>
+        <div className="wizard-helper-text" style={{ marginBottom: 6 }}>
+          Geography · Time · Jurisdiction · Production standard · Grade
+        </div>
+        {metaParams.map((p, i) => (
           <div key={i} style={{ display: "flex", gap: 6, marginBottom: 4, alignItems: "center" }}>
             <select
               className="builder-form-select"
               style={{ flex: 1 }}
-              value={p.registryId}
-              onChange={(e) => handleUpdateMetaParam(i, "registryId", e.target.value)}
+              value={p.dimension}
+              onChange={(e) => handleUpdateMetaParam(i, "dimension", e.target.value)}
             >
-              <option value="">Select parameter...</option>
-              {activeRegistry.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
+              {META_DIMENSIONS.map((d) => (
+                <option key={d.key} value={d.key}>
+                  {d.label}
                 </option>
               ))}
             </select>
@@ -204,15 +214,13 @@ export function NodeCreationForm({ parentNodeId, decisionTrail, onComplete, onCa
             </button>
           </div>
         ))}
-        {selectedMetaParams.length < 3 && (
-          <button
-            className="builder-add-node-btn"
-            onClick={handleAddMetaParam}
-            style={{ marginTop: 4, fontSize: "0.75rem" }}
-          >
-            + Add Parameter
-          </button>
-        )}
+        <button
+          className="builder-add-node-btn"
+          onClick={handleAddMetaParam}
+          style={{ marginTop: 4, fontSize: "0.75rem" }}
+        >
+          + Add Meta-Parameter
+        </button>
       </div>
 
       <div className="builder-form-actions">

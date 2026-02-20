@@ -1,16 +1,5 @@
 import type { BuilderState, BuilderAction, CustomNode, WizardState } from "./types";
 
-const DEFAULT_REGISTRY = [
-  { id: "reg-grade", name: "Grade", description: "Quality or purity grade", active: true },
-  { id: "reg-origin", name: "Origin", description: "Country or region of origin", active: true },
-  { id: "reg-certification", name: "Certification", description: "Certification or standard applied", active: true },
-  { id: "reg-vintage", name: "Vintage", description: "Year or vintage of production", active: true },
-  { id: "reg-regulatory-status", name: "Regulatory Status", description: "Regulatory classification or approval status", active: true },
-  { id: "reg-production-standard", name: "Production Standard", description: "Manufacturing or production standard used", active: true },
-  { id: "reg-geographic-origin", name: "Geographic Origin", description: "Specific geographic indication", active: true },
-  { id: "reg-time-period", name: "Time Period", description: "Temporal scope or validity period", active: true },
-];
-
 const INITIAL_WIZARD: WizardState = {
   active: false,
   currentStep: "step1",
@@ -23,7 +12,6 @@ export const INITIAL_STATE: BuilderState = {
   active: false,
   customTree: [],
   rootName: "My Custom Taxonomy",
-  metaParameterRegistry: DEFAULT_REGISTRY,
   wizard: INITIAL_WIZARD,
   selectedCustomNodeId: null,
   guideSidebarOpen: true,
@@ -31,7 +19,6 @@ export const INITIAL_STATE: BuilderState = {
   savedAppState: null,
   showResetDialog: false,
   showExportPanel: false,
-  showMetaModal: false,
 };
 
 function addNodeToTree(tree: CustomNode[], parentId: string | null, node: CustomNode): CustomNode[] {
@@ -100,7 +87,6 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         wizard: INITIAL_WIZARD,
         showResetDialog: false,
         showExportPanel: false,
-        showMetaModal: false,
       };
 
     case "SET_ROOT_NAME":
@@ -150,7 +136,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
 
     case "ADD_META_PARAM": {
       const node = findNodeInTree(state.customTree, action.nodeId);
-      if (!node || node.metaParameters.length >= 3) return state;
+      if (!node) return state;
       return {
         ...state,
         customTree: updateNodeInTree(state.customTree, action.nodeId, {
@@ -169,20 +155,6 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         }),
       };
     }
-
-    case "ADD_REGISTRY_PARAM":
-      return {
-        ...state,
-        metaParameterRegistry: [...state.metaParameterRegistry, action.def],
-      };
-
-    case "UPDATE_REGISTRY_PARAM":
-      return {
-        ...state,
-        metaParameterRegistry: state.metaParameterRegistry.map((d) =>
-          d.id === action.id ? { ...d, ...action.updates } : d
-        ),
-      };
 
     case "WIZARD_START":
       return {
@@ -242,15 +214,11 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
     case "TOGGLE_EXPORT_PANEL":
       return { ...state, showExportPanel: !state.showExportPanel };
 
-    case "TOGGLE_META_MODAL":
-      return { ...state, showMetaModal: !state.showMetaModal };
-
     case "LOAD_STATE":
       return {
         ...action.state,
         showResetDialog: false,
         showExportPanel: false,
-        showMetaModal: false,
       };
 
     case "MARK_SAVED":

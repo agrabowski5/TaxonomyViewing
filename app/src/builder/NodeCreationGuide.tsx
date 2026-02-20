@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useBuilder } from "./context";
 import { NodeCreationForm } from "./NodeCreationForm";
-import type { WizardStepId } from "./types";
+import type { WizardStepId, MetaDimension } from "./types";
 
 interface StepConfig {
   label: string;
@@ -10,71 +10,59 @@ interface StepConfig {
   noNext: WizardStepId;
   yesLabel?: string;
   noLabel?: string;
+  helperText?: string;
 }
 
 const STEPS: Record<string, StepConfig> = {
   step1: {
-    label: "Step 1",
-    question: "Does an existing node's definitional rule unambiguously apply to this item?",
+    label: "Step 1 — Direct Match",
+    question:
+      "Does an existing node's definitional name cover this item at the level of specificity required for it to be economically useful?",
     yesNext: "action_select_existing",
     noNext: "step2",
   },
   step2: {
-    label: "Step 2",
-    question: "Can the item be fully represented as a fixed composition of existing nodes?",
+    label: "Step 2 — Compositional Match",
+    question:
+      "Can the item be fully represented as a composition of existing nodes?",
     yesNext: "action_create_composition",
     noNext: "step3",
   },
   step3: {
-    label: "Step 3",
-    question: "Does any existing node partially cover this item's function (resembles it but differs in some respect)?",
+    label: "Step 3 — Partial Coverage",
+    question:
+      "Does any existing node partially cover this item's function (resembles it but differs)?",
     yesNext: "step4",
     noNext: "step6",
+    noLabel: "No (functionally novel)",
   },
   step4: {
-    label: "Step 4",
-    question: "Is the difference from the closest node continuous or ordinal (e.g., purity, grade, intensity, age)?",
+    label: "Step 4 — Continuous or Ordinal Difference",
+    question:
+      "Is the difference from the closest node continuous (e.g., purity, grade, intensity)?",
     yesNext: "step5",
     noNext: "step6",
-    yesLabel: "Yes (continuous/ordinal)",
     noLabel: "No (categorically discrete)",
   },
   step5: {
-    label: "Step 5",
-    question: "Is the primary distinguishing characteristic contextual — defined by geography, time, regulatory regime, production standard, or certification — rather than by what the item is or does?",
-    yesNext: "step7",
+    label: "Step 5 — Meta-Parameter Capture",
+    question:
+      "Is this distinction fully expressible using the meta-parameter dimensions?",
+    yesNext: "action_attach_meta",
     noNext: "step6",
-    yesLabel: "Yes (contextual)",
-    noLabel: "No (functional difference)",
+    helperText: "Geography \u00b7 Time \u00b7 Jurisdiction \u00b7 Production standard \u00b7 Grade",
   },
   step6: {
-    label: "Step 6",
-    question: "Can you state a clear, reusable definitional rule for this item that remains valid if applied uniformly, without forcing redefinition of sibling nodes?",
-    yesNext: "step9",
+    label: "Step 6 — Rule Articulation",
+    question:
+      "Can you write a one-sentence definitional name a different analyst could apply consistently to any new item?",
+    yesNext: "step7",
     noNext: "action_flag_governance",
   },
   step7: {
-    label: "Step 7",
-    question: "Does the distinguishing characteristic map to a pre-declared parameter in the meta-parameter registry? (Registry: grade, origin, certification, vintage, regulatory_status, production_standard, geographic_origin, time_period)",
-    yesNext: "step8",
-    noNext: "step6",
-  },
-  step8: {
-    label: "Step 8",
-    question: "Is this parameter meaningful and applicable to ALL instances of the target node, not just this specific item?",
-    yesNext: "step8a",
-    noNext: "step6",
-    noLabel: "No (node needs splitting)",
-  },
-  step8a: {
-    label: "Step 8a",
-    question: "Does the target node already carry the maximum permitted number of meta-parameters? (Default max: 3)",
-    yesNext: "action_flag_overparameterized",
-    noNext: "action_attach_meta",
-  },
-  step9: {
-    label: "Step 9",
-    question: "Does an existing node partially but not fully cover this item (i.e., the item is a proper functional subset of an existing node)?",
+    label: "Step 7 — Node vs. Sub-Node",
+    question:
+      "Does an existing node partially but not fully cover this item (item is a functional subset)?",
     yesNext: "action_create_subnode",
     noNext: "action_create_peer",
   },
@@ -83,51 +71,62 @@ const STEPS: Record<string, StepConfig> = {
 interface ActionConfig {
   title: string;
   description: string;
-  showForm: boolean;
+  actionType: "form" | "meta" | "governance" | "select";
 }
 
 const ACTIONS: Record<string, ActionConfig> = {
   action_select_existing: {
     title: "Select Existing Node",
-    description: "Use the node-picker on the other panel to select and use the existing node that applies.",
-    showForm: false,
+    description:
+      "Use the node picker on the other taxonomy panel to select the existing node that applies. Link it to the custom taxonomy.",
+    actionType: "select",
   },
   action_create_composition: {
     title: "Create Composition Node",
-    description: "Create a new Composition node that links to the selected component nodes from existing taxonomies.",
-    showForm: true,
-  },
-  action_flag_governance: {
-    title: "Flag for Governance Review",
-    description: "This item cannot be definitionally distinguished without risk of inconsistency. Save a note and flag for governance review.",
-    showForm: false,
-  },
-  action_flag_overparameterized: {
-    title: "Over-Parameterized Node",
-    description: "The target node already carries the maximum number of meta-parameters (3). This requires governance review before proceeding.",
-    showForm: false,
+    description:
+      "Select multiple existing nodes to compose. Create a composition node linking them.",
+    actionType: "form",
   },
   action_attach_meta: {
     title: "Attach Meta-Parameter",
-    description: "Attach the identified meta-parameter to the existing node to distinguish this variant.",
-    showForm: false,
+    description:
+      "Record which meta-parameter dimensions apply and their values. Attach to the existing node.",
+    actionType: "meta",
+  },
+  action_flag_governance: {
+    title: "Pending Governance Review",
+    description:
+      "This item cannot be definitionally distinguished without risk of inconsistency. Save a note documenting the ambiguity.",
+    actionType: "governance",
   },
   action_create_subnode: {
     title: "Create Sub-Node",
-    description: "Create a new node under the selected parent node to capture this more specific classification.",
-    showForm: true,
+    description:
+      "Select the parent node. Create a new sub-node under it to capture this more specific classification.",
+    actionType: "form",
   },
   action_create_peer: {
     title: "Create Peer / Top-Level Node",
-    description: "Create a new node at the same level or as a top-level entry in your custom taxonomy.",
-    showForm: true,
+    description:
+      "Create a new node at the same level or as a top-level entry in your custom taxonomy.",
+    actionType: "form",
   },
 };
+
+const META_DIMENSIONS: { key: MetaDimension; label: string }[] = [
+  { key: "geography", label: "Geography" },
+  { key: "time", label: "Time" },
+  { key: "jurisdiction", label: "Jurisdiction" },
+  { key: "production_standard", label: "Production standard" },
+  { key: "grade", label: "Grade" },
+];
 
 export function NodeCreationGuide() {
   const { state, dispatch } = useBuilder();
   const [showForm, setShowForm] = useState(false);
   const [governanceNote, setGovernanceNote] = useState("");
+  const [metaEntries, setMetaEntries] = useState<Array<{ dimension: MetaDimension; value: string }>>([]);
+  const [definitionDraft, setDefinitionDraft] = useState("");
 
   if (!state.guideSidebarOpen) return null;
 
@@ -140,6 +139,12 @@ export function NodeCreationGuide() {
   const handleAnswer = (answer: "yes" | "no") => {
     if (!stepConfig) return;
     const nextStep = answer === "yes" ? stepConfig.yesNext : stepConfig.noNext;
+
+    // If answering Yes on Step 6, capture the definition draft
+    if (currentStep === "step6" && answer === "yes") {
+      // definition will be pre-filled in the form
+    }
+
     dispatch({
       type: "WIZARD_ANSWER",
       stepId: currentStep,
@@ -154,14 +159,68 @@ export function NodeCreationGuide() {
   };
 
   const handleActionClick = () => {
-    if (actionConfig?.showForm) {
+    if (actionConfig?.actionType === "form") {
       setShowForm(true);
     }
   };
 
   const handleFormComplete = () => {
     setShowForm(false);
+    setDefinitionDraft("");
     dispatch({ type: "WIZARD_RESET" });
+  };
+
+  const handleMetaAdd = () => {
+    setMetaEntries([...metaEntries, { dimension: "geography", value: "" }]);
+  };
+
+  const handleMetaSave = () => {
+    if (!state.selectedCustomNodeId) return;
+    for (const entry of metaEntries) {
+      if (entry.value.trim()) {
+        dispatch({
+          type: "ADD_META_PARAM",
+          nodeId: state.selectedCustomNodeId,
+          param: {
+            id: crypto.randomUUID(),
+            dimension: entry.dimension,
+            value: entry.value.trim(),
+          },
+        });
+      }
+    }
+    setMetaEntries([]);
+    dispatch({ type: "WIZARD_RESET" });
+  };
+
+  const handleGovernanceSave = () => {
+    if (!governanceNote.trim()) return;
+    // Create a governance-flagged node with the note
+    const id = `custom-${crypto.randomUUID()}`;
+    dispatch({
+      type: "ADD_NODE",
+      node: {
+        id,
+        code: `GOV-${Date.now().toString(36).toUpperCase()}`,
+        name: "Pending Governance Review",
+        definition: "",
+        type: "leaf",
+        parentId: wizard.parentNodeId,
+        notes: governanceNote.trim(),
+        governanceFlagged: true,
+        metaParameters: [],
+        mappingLinks: [],
+        siblingDisambiguation: "",
+        decisionTrail: wizard.history.map((h, i) => ({
+          stepNumber: i + 1,
+          question: STEPS[h.stepId]?.question ?? h.stepId,
+          answer: h.answer ?? "yes",
+        })),
+        children: [],
+        createdAt: new Date().toISOString(),
+      },
+    });
+    setGovernanceNote("");
   };
 
   return (
@@ -191,6 +250,7 @@ export function NodeCreationGuide() {
         ) : showForm ? (
           <NodeCreationForm
             parentNodeId={wizard.parentNodeId}
+            prefilledDefinition={definitionDraft}
             decisionTrail={wizard.history.map((h, i) => ({
               stepNumber: i + 1,
               question: STEPS[h.stepId]?.question ?? h.stepId,
@@ -209,7 +269,6 @@ export function NodeCreationGuide() {
                     <button
                       className="wizard-breadcrumb"
                       onClick={() => {
-                        // Go back to this step by repeatedly dispatching WIZARD_BACK
                         const stepsToGoBack = wizard.history.length - i;
                         for (let j = 0; j < stepsToGoBack; j++) {
                           dispatch({ type: "WIZARD_BACK" });
@@ -218,9 +277,9 @@ export function NodeCreationGuide() {
                       }}
                     >
                       {STEPS[entry.stepId]?.label ?? entry.stepId}
-                      {entry.answer ? ` → ${entry.answer === "yes" ? "Yes" : "No"}` : ""}
+                      {entry.answer ? ` \u2192 ${entry.answer === "yes" ? "Yes" : "No"}` : ""}
                     </button>
-                    <span className="wizard-breadcrumb-arrow"> → </span>
+                    <span className="wizard-breadcrumb-arrow"> \u2192 </span>
                   </span>
                 ))}
                 <span className="wizard-breadcrumb-current">
@@ -235,45 +294,123 @@ export function NodeCreationGuide() {
                 <div className="wizard-action-title">{actionConfig.title}</div>
                 <div className="wizard-action-description">{actionConfig.description}</div>
 
+                {/* Governance flag action */}
                 {currentStep === "action_flag_governance" && (
                   <div className="wizard-governance-note">
                     <textarea
-                      placeholder="Add a note explaining why this item is difficult to classify..."
+                      placeholder="Document the ambiguity — why can't this item be definitionally distinguished?"
                       value={governanceNote}
                       onChange={(e) => setGovernanceNote(e.target.value)}
                     />
+                    <button
+                      className="wizard-action-btn"
+                      onClick={handleGovernanceSave}
+                      disabled={!governanceNote.trim()}
+                      style={{ marginTop: 8 }}
+                    >
+                      Save &amp; Flag for Review
+                    </button>
                   </div>
                 )}
 
-                {actionConfig.showForm && (
+                {/* Meta-parameter attach action */}
+                {currentStep === "action_attach_meta" && (
+                  <div className="wizard-meta-form">
+                    <div className="wizard-meta-dimensions-label">
+                      Select dimensions and enter values:
+                    </div>
+                    {metaEntries.map((entry, i) => (
+                      <div key={i} className="wizard-meta-entry">
+                        <select
+                          value={entry.dimension}
+                          onChange={(e) => {
+                            const updated = [...metaEntries];
+                            updated[i] = { ...entry, dimension: e.target.value as MetaDimension };
+                            setMetaEntries(updated);
+                          }}
+                        >
+                          {META_DIMENSIONS.map((d) => (
+                            <option key={d.key} value={d.key}>{d.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Value"
+                          value={entry.value}
+                          onChange={(e) => {
+                            const updated = [...metaEntries];
+                            updated[i] = { ...entry, value: e.target.value };
+                            setMetaEntries(updated);
+                          }}
+                        />
+                        <button
+                          className="builder-meta-tag-remove"
+                          onClick={() => setMetaEntries(metaEntries.filter((_, j) => j !== i))}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button className="wizard-meta-add-btn" onClick={handleMetaAdd}>
+                      + Add Dimension
+                    </button>
+                    <button
+                      className="wizard-action-btn"
+                      onClick={handleMetaSave}
+                      disabled={metaEntries.length === 0 || !metaEntries.some((e) => e.value.trim())}
+                      style={{ marginTop: 8 }}
+                    >
+                      Attach Parameters
+                    </button>
+                  </div>
+                )}
+
+                {/* Node creation actions */}
+                {actionConfig.actionType === "form" && (
                   <button className="wizard-action-btn" onClick={handleActionClick}>
                     Create Node
                   </button>
                 )}
 
-                <button
-                  className="wizard-btn-back"
-                  onClick={handleBack}
-                  style={{ marginTop: 12 }}
-                >
-                  ← Back
-                </button>
-                <button
-                  className="wizard-btn-back"
-                  onClick={() => {
-                    dispatch({ type: "WIZARD_RESET" });
-                    setGovernanceNote("");
-                    setShowForm(false);
-                  }}
-                  style={{ marginTop: 8 }}
-                >
-                  Start Over
-                </button>
+                <div className="wizard-action-nav">
+                  <button className="wizard-btn-back" onClick={handleBack}>
+                    \u2190 Back
+                  </button>
+                  <button
+                    className="wizard-btn-back"
+                    onClick={() => {
+                      dispatch({ type: "WIZARD_RESET" });
+                      setGovernanceNote("");
+                      setMetaEntries([]);
+                      setShowForm(false);
+                      setDefinitionDraft("");
+                    }}
+                  >
+                    Start Over
+                  </button>
+                </div>
               </div>
             ) : stepConfig ? (
               <div className="wizard-step">
                 <div className="wizard-step-number">{stepConfig.label}</div>
                 <div className="wizard-question">{stepConfig.question}</div>
+                {stepConfig.helperText && (
+                  <div className="wizard-helper-text">{stepConfig.helperText}</div>
+                )}
+
+                {/* For Step 6, show a definition input before Yes/No */}
+                {currentStep === "step6" && (
+                  <div className="wizard-definition-input">
+                    <input
+                      type="text"
+                      placeholder="Write your one-sentence definitional name here..."
+                      value={definitionDraft}
+                      onChange={(e) => setDefinitionDraft(e.target.value)}
+                      className="builder-form-input"
+                    />
+                  </div>
+                )}
+
                 <div className="wizard-buttons">
                   <button className="wizard-btn-yes" onClick={() => handleAnswer("yes")}>
                     {stepConfig.yesLabel ?? "Yes"}
@@ -284,7 +421,7 @@ export function NodeCreationGuide() {
                 </div>
                 {wizard.history.length > 0 && (
                   <button className="wizard-btn-back" onClick={handleBack}>
-                    ← Back
+                    \u2190 Back
                   </button>
                 )}
               </div>
