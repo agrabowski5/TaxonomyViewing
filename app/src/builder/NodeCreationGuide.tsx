@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useBuilder } from "./context";
 import { NodeCreationForm } from "./NodeCreationForm";
-import type { WizardStepId, MetaDimension } from "./types";
+import { MetaParameterValueInput } from "./MetaParameterValueInput";
+import type { WizardStepId, MetaDimension, CustomNode } from "./types";
 
 interface StepConfig {
   label: string;
@@ -15,21 +16,21 @@ interface StepConfig {
 
 const STEPS: Record<string, StepConfig> = {
   step1: {
-    label: "Step 1 — Direct Match",
+    label: "Step 1 \u2014 Direct Match",
     question:
       "Does an existing node's definitional name cover this item at the level of specificity required for it to be economically useful?",
     yesNext: "action_select_existing",
     noNext: "step2",
   },
   step2: {
-    label: "Step 2 — Compositional Match",
+    label: "Step 2 \u2014 Compositional Match",
     question:
       "Can the item be fully represented as a composition of existing nodes?",
     yesNext: "action_create_composition",
     noNext: "step3",
   },
   step3: {
-    label: "Step 3 — Partial Coverage",
+    label: "Step 3 \u2014 Partial Coverage",
     question:
       "Does any existing node partially cover this item's function (resembles it but differs)?",
     yesNext: "step4",
@@ -37,7 +38,7 @@ const STEPS: Record<string, StepConfig> = {
     noLabel: "No (functionally novel)",
   },
   step4: {
-    label: "Step 4 — Continuous or Ordinal Difference",
+    label: "Step 4 \u2014 Continuous or Ordinal Difference",
     question:
       "Is the difference from the closest node continuous (e.g., purity, grade, intensity)?",
     yesNext: "step5",
@@ -45,7 +46,7 @@ const STEPS: Record<string, StepConfig> = {
     noLabel: "No (categorically discrete)",
   },
   step5: {
-    label: "Step 5 — Meta-Parameter Capture",
+    label: "Step 5 \u2014 Meta-Parameter Capture",
     question:
       "Is this distinction fully expressible using the meta-parameter dimensions?",
     yesNext: "action_attach_meta",
@@ -53,14 +54,14 @@ const STEPS: Record<string, StepConfig> = {
     helperText: "Geography \u00b7 Time \u00b7 Jurisdiction \u00b7 Production standard \u00b7 Grade",
   },
   step6: {
-    label: "Step 6 — Rule Articulation",
+    label: "Step 6 \u2014 Rule Articulation",
     question:
       "Can you write a one-sentence definitional name a different analyst could apply consistently to any new item?",
     yesNext: "step7",
     noNext: "action_flag_governance",
   },
   step7: {
-    label: "Step 7 — Node vs. Sub-Node",
+    label: "Step 7 \u2014 Node vs. Sub-Node",
     question:
       "Does an existing node partially but not fully cover this item (item is a functional subset)?",
     yesNext: "action_create_subnode",
@@ -121,6 +122,153 @@ const META_DIMENSIONS: { key: MetaDimension; label: string }[] = [
   { key: "grade", label: "Grade" },
 ];
 
+function findNodeInTree(tree: CustomNode[], id: string): CustomNode | null {
+  for (const n of tree) {
+    if (n.id === id) return n;
+    if (n.children.length > 0) {
+      const found = findNodeInTree(n.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/** Editor panel for a selected custom node (shown when wizard is inactive) */
+function SelectedNodeEditor() {
+  const { state, dispatch } = useBuilder();
+  const [newMetaDimension, setNewMetaDimension] = useState<MetaDimension>("geography");
+  const [newMetaValue, setNewMetaValue] = useState("");
+
+  if (!state.selectedCustomNodeId) return null;
+  const node = findNodeInTree(state.customTree, state.selectedCustomNodeId);
+  if (!node) return null;
+
+  const handleFieldChange = (field: "name" | "code" | "definition", value: string) => {
+    dispatch({ type: "INLINE_EDIT_NODE", id: node.id, field, value });
+  };
+
+  const handleNotesChange = (value: string) => {
+    dispatch({ type: "UPDATE_NODE", id: node.id, updates: { notes: value } });
+  };
+
+  const handleAddMeta = () => {
+    if (!newMetaValue.trim()) return;
+    dispatch({
+      type: "ADD_META_PARAM",
+      nodeId: node.id,
+      param: {
+        id: crypto.randomUUID(),
+        dimension: newMetaDimension,
+        value: newMetaValue.trim(),
+      },
+    });
+    setNewMetaValue("");
+  };
+
+  const handleDeleteNode = () => {
+    dispatch({ type: "DELETE_NODE", id: node.id });
+  };
+
+  return (
+    <div className="selected-node-editor">
+      <h4>Edit Node</h4>
+
+      <div className="builder-form-group">
+        <label>Name</label>
+        <input
+          className="builder-form-input"
+          type="text"
+          value={node.name}
+          onChange={(e) => handleFieldChange("name", e.target.value)}
+        />
+      </div>
+
+      <div className="builder-form-group">
+        <label>Code</label>
+        <input
+          className="builder-form-input"
+          type="text"
+          value={node.code}
+          onChange={(e) => handleFieldChange("code", e.target.value)}
+        />
+      </div>
+
+      <div className="builder-form-group">
+        <label>Definition</label>
+        <textarea
+          className="builder-form-textarea"
+          value={node.definition}
+          onChange={(e) => handleFieldChange("definition", e.target.value)}
+        />
+      </div>
+
+      <div className="builder-form-group">
+        <label>Notes</label>
+        <textarea
+          className="builder-form-textarea"
+          value={node.notes}
+          onChange={(e) => handleNotesChange(e.target.value)}
+          placeholder="Additional context or reasoning..."
+        />
+      </div>
+
+      {/* Meta-parameters */}
+      <div className="builder-form-group">
+        <label>Meta-Parameters</label>
+        {node.metaParameters.length > 0 && (
+          <div className="builder-meta-tags" style={{ marginBottom: 6 }}>
+            {node.metaParameters.map((mp) => (
+              <span key={mp.id} className="builder-meta-tag">
+                {mp.dimension}: {mp.value}
+                <button
+                  className="builder-meta-tag-remove"
+                  onClick={() => dispatch({ type: "REMOVE_META_PARAM", nodeId: node.id, paramId: mp.id })}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <select
+            className="builder-form-select"
+            style={{ flex: 1 }}
+            value={newMetaDimension}
+            onChange={(e) => setNewMetaDimension(e.target.value as MetaDimension)}
+          >
+            {META_DIMENSIONS.map((d) => (
+              <option key={d.key} value={d.key}>{d.label}</option>
+            ))}
+          </select>
+          <MetaParameterValueInput
+            dimension={newMetaDimension}
+            value={newMetaValue}
+            onChange={setNewMetaValue}
+            className="builder-form-input"
+            style={{ flex: 1 }}
+          />
+          <button
+            className="builder-add-node-btn"
+            onClick={handleAddMeta}
+            disabled={!newMetaValue.trim()}
+            style={{ fontSize: "0.75rem", whiteSpace: "nowrap" }}
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      <button
+        className="builder-delete-node-btn"
+        onClick={handleDeleteNode}
+      >
+        Delete Node
+      </button>
+    </div>
+  );
+}
+
 export function NodeCreationGuide() {
   const { state, dispatch } = useBuilder();
   const [showForm, setShowForm] = useState(false);
@@ -166,12 +314,6 @@ export function NodeCreationGuide() {
   const handleAnswer = (answer: "yes" | "no") => {
     if (!stepConfig) return;
     const nextStep = answer === "yes" ? stepConfig.yesNext : stepConfig.noNext;
-
-    // If answering Yes on Step 6, capture the definition draft
-    if (currentStep === "step6" && answer === "yes") {
-      // definition will be pre-filled in the form
-    }
-
     dispatch({
       type: "WIZARD_ANSWER",
       stepId: currentStep,
@@ -222,7 +364,6 @@ export function NodeCreationGuide() {
 
   const handleGovernanceSave = () => {
     if (!governanceNote.trim()) return;
-    // Create a governance-flagged node with the note
     const id = `custom-${crypto.randomUUID()}`;
     dispatch({
       type: "ADD_NODE",
@@ -245,6 +386,7 @@ export function NodeCreationGuide() {
         })),
         children: [],
         createdAt: new Date().toISOString(),
+        modificationStatus: "added" as const,
       },
     });
     setGovernanceNote("");
@@ -264,16 +406,22 @@ export function NodeCreationGuide() {
 
       <div className="builder-guide-content">
         {!wizard.active ? (
-          <div className="wizard-inactive">
-            <p>Use this guided wizard to determine the best way to classify a new item in your custom taxonomy.</p>
-            <p>Click "Add Node" in the taxonomy panel or start the wizard below.</p>
-            <button
-              className="wizard-start-btn"
-              onClick={() => dispatch({ type: "WIZARD_START", parentNodeId: state.selectedCustomNodeId })}
-            >
-              Start Wizard
-            </button>
-          </div>
+          <>
+            {/* When wizard is inactive, show selected node editor or start prompt */}
+            {state.selectedCustomNodeId ? (
+              <SelectedNodeEditor />
+            ) : (
+              <div className="wizard-inactive">
+                <p>Select a node in the tree to edit it, or start the wizard to create a new node.</p>
+                <button
+                  className="wizard-start-btn"
+                  onClick={() => dispatch({ type: "WIZARD_START", parentNodeId: state.selectedCustomNodeId })}
+                >
+                  Start Wizard
+                </button>
+              </div>
+            )}
+          </>
         ) : showForm ? (
           <NodeCreationForm
             parentNodeId={wizard.parentNodeId}
@@ -360,13 +508,12 @@ export function NodeCreationGuide() {
                             <option key={d.key} value={d.key}>{d.label}</option>
                           ))}
                         </select>
-                        <input
-                          type="text"
-                          placeholder="Value"
+                        <MetaParameterValueInput
+                          dimension={entry.dimension}
                           value={entry.value}
-                          onChange={(e) => {
+                          onChange={(val) => {
                             const updated = [...metaEntries];
-                            updated[i] = { ...entry, value: e.target.value };
+                            updated[i] = { ...entry, value: val };
                             setMetaEntries(updated);
                           }}
                         />

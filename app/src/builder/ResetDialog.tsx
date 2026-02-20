@@ -26,7 +26,7 @@ export function ResetDialog({ onKeep, onClear }: Props) {
     <div className="builder-modal-overlay" onClick={handleCancel}>
       <div className="builder-modal" onClick={(e) => e.stopPropagation()}>
         <div className="builder-modal-header">
-          <h2>Reset to Original</h2>
+          <h2>Exit Builder</h2>
           <button className="builder-modal-close" onClick={handleCancel}>
             ×
           </button>
@@ -34,24 +34,24 @@ export function ResetDialog({ onKeep, onClear }: Props) {
 
         <div className="builder-modal-body builder-reset-body">
           <p>
-            Do you want to keep your custom taxonomy saved for later, or clear it entirely?
+            Do you want to save your custom taxonomy for later, or discard it entirely?
           </p>
 
           <div className="builder-reset-options">
             <button className="builder-reset-option" onClick={handleKeep}>
               <div className="builder-reset-option-text">
-                <div className="builder-reset-option-title">Keep Saved</div>
+                <div className="builder-reset-option-title">Save &amp; Exit</div>
                 <div className="builder-reset-option-desc">
-                  Exit sandbox mode but keep your custom taxonomy in storage for later.
+                  Exit the builder but keep your custom taxonomy saved for later.
                 </div>
               </div>
             </button>
 
             <button className="builder-reset-option" onClick={handleClear}>
               <div className="builder-reset-option-text">
-                <div className="builder-reset-option-title">Clear Everything</div>
+                <div className="builder-reset-option-title">Discard &amp; Exit</div>
                 <div className="builder-reset-option-desc">
-                  Exit sandbox mode and permanently delete your custom taxonomy.
+                  Exit the builder and permanently delete your custom taxonomy.
                 </div>
               </div>
             </button>

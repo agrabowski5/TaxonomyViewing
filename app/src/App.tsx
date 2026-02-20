@@ -93,12 +93,6 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
     taxonomyClass: "t2",
     label: "T2",
   },
-  custom: {
-    fullName: "Custom Taxonomy (Builder)",
-    legend: "Build your own classification hierarchy",
-    taxonomyClass: "custom",
-    label: "CUSTOM",
-  },
 };
 
 // Find the ancestor path (list of IDs from root to parent) for a target node in tree data
@@ -801,11 +795,9 @@ function AppContent() {
     unspsc: useRef<TreeApi<TreeNode>>(null),
     t1: useRef<TreeApi<TreeNode>>(null),
     t2: useRef<TreeApi<TreeNode>>(null),
-    custom: useRef<TreeApi<TreeNode>>(null),
   };
 
   const getTreeData = useCallback((taxonomy: TaxonomyType): TreeNode[] => {
-    if (taxonomy === "custom") return [];
     if (!data) return [];
     const map: Record<string, TreeNode[]> = {
       hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree, t1: data.t1Tree, t2: data.t2Tree,
@@ -814,7 +806,6 @@ function AppContent() {
   }, [data]);
 
   const getLookup = useCallback((taxonomy: TaxonomyType): Record<string, LookupEntry> => {
-    if (taxonomy === "custom") return {};
     if (!data) return {};
     const map: Record<string, Record<string, LookupEntry>> = {
       hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup, t1: data.t1Lookup, t2: data.t2Lookup,
@@ -1374,9 +1365,6 @@ function AppContent() {
       <option value="unspsc">UNSPSC - Products &amp; Services Code</option>
       <option value="t1">T1 - HTS Goods + CPC Services</option>
       <option value="t2">T2 - CPC Backbone + HTS Detail</option>
-      {builderState.active && (
-        <option value="custom">Custom Taxonomy (Builder)</option>
-      )}
     </>
   );
 
@@ -1405,7 +1393,7 @@ function AppContent() {
             } else {
               builderDispatch({
                 type: "ENTER_BUILDER",
-                savedAppState: { leftTaxonomy, rightTaxonomy },
+                previousRightTaxonomy: rightTaxonomy,
               });
               // Show base taxonomy dialog if custom tree is empty
               if (builderState.customTree.length === 0) {
@@ -1413,9 +1401,9 @@ function AppContent() {
               }
             }
           }}
-          title="Toggle Custom Taxonomy Builder mode"
+          title={builderState.active ? "Exit Custom Taxonomy Builder" : "Build a custom taxonomy in the right pane"}
         >
-          ⚗ Build Custom
+          {builderState.active ? "Exit Builder" : "Build Custom"}
         </button>
         <div className="search-bar">
           <svg
@@ -1461,48 +1449,75 @@ function AppContent() {
               {taxonomyOptions}
             </select>
           </div>
-          {leftTaxonomy === "custom" ? (
-            <BuilderTaxonomyPanel onShowBaseTaxonomyDialog={() => setShowBaseTaxonomyDialog(true)} />
-          ) : (
-            <>
-              <div className="pane-info">
-                <p className="full-name">{TAXONOMY_INFO[leftTaxonomy].fullName}</p>
-                <p className="legend">{TAXONOMY_INFO[leftTaxonomy].legend}</p>
-              </div>
-              <TaxonomyTree
-                key={`${leftTaxonomy}-${debouncedSearch}`}
-                ref={treeRefs[leftTaxonomy]}
-                data={leftTreeData}
-                openByDefault={isSearching}
-                mappingInfo={mappingInfo}
-                onNodeSelect={(node) => handleNodeSelect("left", node)}
-                label={TAXONOMY_INFO[leftTaxonomy].label}
-                taxonomyClass={TAXONOMY_INFO[leftTaxonomy].taxonomyClass}
-                fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
-                legend={TAXONOMY_INFO[leftTaxonomy].legend}
-                colorMap={leftColorMap}
-                ecoinventCoverage={ecoinventOverlay ? leftEcoinventCoverage : undefined}
-              />
-            </>
-          )}
+          <>
+            <div className="pane-info">
+              <p className="full-name">{TAXONOMY_INFO[leftTaxonomy].fullName}</p>
+              <p className="legend">{TAXONOMY_INFO[leftTaxonomy].legend}</p>
+            </div>
+            <TaxonomyTree
+              key={`${leftTaxonomy}-${debouncedSearch}`}
+              ref={treeRefs[leftTaxonomy]}
+              data={leftTreeData}
+              openByDefault={isSearching}
+              mappingInfo={mappingInfo}
+              onNodeSelect={(node) => handleNodeSelect("left", node)}
+              label={TAXONOMY_INFO[leftTaxonomy].label}
+              taxonomyClass={TAXONOMY_INFO[leftTaxonomy].taxonomyClass}
+              fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
+              legend={TAXONOMY_INFO[leftTaxonomy].legend}
+              colorMap={leftColorMap}
+              ecoinventCoverage={ecoinventOverlay ? leftEcoinventCoverage : undefined}
+            />
+          </>
         </div>
 
         {/* Right Pane */}
         <div className="pane-wrapper right-pane">
-          <div className="pane-header">
-            <h2>Right Taxonomy</h2>
-            <select
-              className="taxonomy-selector"
-              value={rightTaxonomy}
-              onChange={(e) => setRightTaxonomy(e.target.value as TaxonomyType)}
-            >
-              {taxonomyOptions}
-            </select>
-          </div>
-          {rightTaxonomy === "custom" ? (
-            <BuilderTaxonomyPanel onShowBaseTaxonomyDialog={() => setShowBaseTaxonomyDialog(true)} />
+          {builderState.active ? (
+            <>
+              <div className="pane-header builder-pane-header">
+                <h2>Custom Taxonomy Builder</h2>
+                <div className="builder-header-actions">
+                  <button
+                    className="builder-export-btn"
+                    onClick={() => builderDispatch({ type: "TOGGLE_EXPORT_PANEL" })}
+                  >
+                    Export
+                  </button>
+                  <button
+                    className="builder-guide-toggle-btn"
+                    onClick={() => builderDispatch({ type: "TOGGLE_GUIDE_SIDEBAR" })}
+                  >
+                    {builderState.guideSidebarOpen ? "Hide Guide" : "Guide"}
+                  </button>
+                </div>
+              </div>
+              {builderState.baseTaxonomy && (
+                <div className="pane-info builder-pane-info">
+                  <p className="full-name">
+                    Base: {TAXONOMY_INFO[builderState.baseTaxonomy]?.fullName ?? builderState.baseTaxonomy}
+                  </p>
+                  <div className="builder-change-legend">
+                    <span className="legend-chip legend-original">Original</span>
+                    <span className="legend-chip legend-modified">Edited</span>
+                    <span className="legend-chip legend-added">New</span>
+                  </div>
+                </div>
+              )}
+              <BuilderTaxonomyPanel onShowBaseTaxonomyDialog={() => setShowBaseTaxonomyDialog(true)} />
+            </>
           ) : (
             <>
+              <div className="pane-header">
+                <h2>Right Taxonomy</h2>
+                <select
+                  className="taxonomy-selector"
+                  value={rightTaxonomy}
+                  onChange={(e) => setRightTaxonomy(e.target.value as TaxonomyType)}
+                >
+                  {taxonomyOptions}
+                </select>
+              </div>
               <div className="pane-info">
                 <p className="full-name">{TAXONOMY_INFO[rightTaxonomy].fullName}</p>
                 <p className="legend">{TAXONOMY_INFO[rightTaxonomy].legend}</p>
@@ -1649,7 +1664,7 @@ function AppContent() {
             )}
 
             {/* Builder: Map-to-custom action */}
-            {builderState.active && selectedFrom && selectedFrom !== "custom" && selectedNode && (
+            {builderState.active && selectedFrom && selectedNode && (
               <MappingsTab
                 mode="map-action"
                 sourceNode={selectedNode}
@@ -1692,18 +1707,14 @@ function AppContent() {
       {builderState.showResetDialog && (
         <ResetDialog
           onKeep={() => {
+            const prev = builderState.previousRightTaxonomy;
             builderDispatch({ type: "EXIT_BUILDER" });
-            if (builderState.savedAppState) {
-              setLeftTaxonomy(builderState.savedAppState.leftTaxonomy);
-              setRightTaxonomy(builderState.savedAppState.rightTaxonomy);
-            }
+            if (prev) setRightTaxonomy(prev);
           }}
           onClear={() => {
+            const prev = builderState.previousRightTaxonomy;
             builderDispatch({ type: "EXIT_BUILDER" });
-            if (builderState.savedAppState) {
-              setLeftTaxonomy(builderState.savedAppState.leftTaxonomy);
-              setRightTaxonomy(builderState.savedAppState.rightTaxonomy);
-            }
+            if (prev) setRightTaxonomy(prev);
           }}
         />
       )}

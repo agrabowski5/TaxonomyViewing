@@ -1,4 +1,4 @@
-import type { BuilderState, PersistedBuilderData, CustomNode } from "./types";
+import type { BuilderState, PersistedBuilderData, CustomNode, ModificationStatus, OriginalSnapshot } from "./types";
 
 const STORAGE_KEY = "customTaxonomy_v1";
 
@@ -20,6 +20,8 @@ function compactNode(node: CustomNode): Record<string, unknown> {
   if (node.siblingDisambiguation) compact.siblingDisambiguation = node.siblingDisambiguation;
   if (node.decisionTrail.length > 0) compact.decisionTrail = node.decisionTrail;
   if (node.sourceOrigin) compact.sourceOrigin = node.sourceOrigin;
+  if (node.modificationStatus !== "original") compact.modificationStatus = node.modificationStatus;
+  if (node.originalSnapshot) compact.originalSnapshot = node.originalSnapshot;
   compact.createdAt = node.createdAt;
 
   if (node.children.length > 0) {
@@ -49,6 +51,8 @@ function expandNode(compact: Record<string, unknown>): CustomNode {
       : [],
     createdAt: (compact.createdAt as string) ?? new Date().toISOString(),
     sourceOrigin: compact.sourceOrigin as CustomNode["sourceOrigin"],
+    modificationStatus: (compact.modificationStatus as ModificationStatus) ?? "original",
+    originalSnapshot: compact.originalSnapshot as OriginalSnapshot | undefined,
   };
 }
 
@@ -76,15 +80,14 @@ export function loadBuilderState(): BuilderState | null {
     const data: PersistedBuilderData = JSON.parse(raw);
     if (data.version !== 1) return null;
 
-    // Expand compacted nodes back to full shape
     const expandedTree = (data.state.customTree as unknown as Record<string, unknown>[]).map(expandNode);
 
     return {
       ...data.state,
       customTree: expandedTree,
-      // Ensure new fields have defaults for backwards compatibility
       baseTaxonomy: data.state.baseTaxonomy ?? null,
       quickAddActive: data.state.quickAddActive ?? false,
+      previousRightTaxonomy: data.state.previousRightTaxonomy ?? null,
     };
   } catch {
     return null;

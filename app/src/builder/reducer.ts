@@ -16,7 +16,7 @@ export const INITIAL_STATE: BuilderState = {
   selectedCustomNodeId: null,
   guideSidebarOpen: true,
   lastSavedAt: null,
-  savedAppState: null,
+  previousRightTaxonomy: null,
   showResetDialog: false,
   showExportPanel: false,
   baseTaxonomy: null,
@@ -78,7 +78,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       return {
         ...state,
         active: true,
-        savedAppState: action.savedAppState,
+        previousRightTaxonomy: action.previousRightTaxonomy,
         guideSidebarOpen: true,
       };
 
@@ -89,6 +89,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         wizard: INITIAL_WIZARD,
         showResetDialog: false,
         showExportPanel: false,
+        quickAddActive: false,
       };
 
     case "SET_ROOT_NAME":
@@ -254,6 +255,28 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         ...state,
         quickAddActive: false,
       };
+
+    case "INLINE_EDIT_NODE": {
+      const node = findNodeInTree(state.customTree, action.id);
+      if (!node) return state;
+
+      const updates: Partial<CustomNode> = { [action.field]: action.value };
+
+      // Determine modification status based on originalSnapshot comparison
+      if (node.modificationStatus !== "added" && node.originalSnapshot) {
+        const snapshot = node.originalSnapshot;
+        const newName = action.field === "name" ? action.value : node.name;
+        const newCode = action.field === "code" ? action.value : node.code;
+        const newDef = action.field === "definition" ? action.value : node.definition;
+        const isChanged = newName !== snapshot.name || newCode !== snapshot.code || newDef !== snapshot.definition;
+        updates.modificationStatus = isChanged ? "modified" : "original";
+      }
+
+      return {
+        ...state,
+        customTree: updateNodeInTree(state.customTree, action.id, updates),
+      };
+    }
 
     default:
       return state;

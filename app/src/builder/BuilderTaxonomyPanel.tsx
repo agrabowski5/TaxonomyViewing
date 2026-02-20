@@ -5,7 +5,7 @@ import { useBuilder } from "./context";
 import { CustomTreeNode } from "./CustomTreeNode";
 import { MetaParameterLayer } from "./MetaParameterModal";
 import type { TreeNode } from "../types";
-import type { CustomNode } from "./types";
+import type { CustomNode, ModificationStatus } from "./types";
 
 function customNodeToTreeNode(node: CustomNode): TreeNode {
   return {
@@ -17,6 +17,19 @@ function customNodeToTreeNode(node: CustomNode): TreeNode {
       ? node.children.map(customNodeToTreeNode)
       : undefined,
   };
+}
+
+/** Walk custom tree and collect modification status for each node */
+function buildModificationMap(nodes: CustomNode[]): Map<string, ModificationStatus> {
+  const map = new Map<string, ModificationStatus>();
+  function walk(list: CustomNode[]) {
+    for (const n of list) {
+      map.set(n.id, n.modificationStatus);
+      if (n.children.length > 0) walk(n.children);
+    }
+  }
+  walk(nodes);
+  return map;
 }
 
 interface BuilderTaxonomyPanelProps {
@@ -38,6 +51,11 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
     return [root];
   }, [state.customTree, state.rootName]);
 
+  const modificationMap = useMemo(
+    () => buildModificationMap(state.customTree),
+    [state.customTree]
+  );
+
   const handleNodeSelect = (node: TreeNode) => {
     if (node.id === "custom-root") {
       dispatch({ type: "SELECT_CUSTOM_NODE", id: null });
@@ -48,13 +66,6 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
 
   return (
     <div className="tree-panel builder-tree-panel">
-      <div className="panel-header">
-        <h2>
-          <span className="taxonomy-label custom">CUSTOM</span>
-          Custom Taxonomy (Builder)
-        </h2>
-        <div className="panel-legend">Build your own classification hierarchy</div>
-      </div>
       <div className="builder-tree-actions">
         <button
           className="builder-add-node-btn"
@@ -92,7 +103,7 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
       <div className="tree-container" ref={container.ref}>
         {state.customTree.length === 0 ? (
           <div className="builder-empty-state">
-            <div className="builder-empty-icon">✦</div>
+            <div className="builder-empty-icon">+</div>
             <h3>{state.rootName}</h3>
             <p>Your custom taxonomy is empty.</p>
             <p>Click "Add Node" or use the Node Creation Guide to get started.</p>
@@ -109,7 +120,7 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
           <Tree<TreeNode>
             initialData={treeData}
             width={container.width}
-            height={container.height - 72}
+            height={container.height - 40}
             rowHeight={32}
             indent={20}
             openByDefault={state.customTree.length < 200}
@@ -122,6 +133,7 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
                 {...props}
                 onNodeSelect={handleNodeSelect}
                 customTree={state.customTree}
+                modificationMap={modificationMap}
               />
             )}
           </Tree>

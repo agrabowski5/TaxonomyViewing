@@ -81,7 +81,7 @@ export interface EcoinventMapping {
   };
 }
 
-export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2" | "custom";
+export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2";
 
 export interface AppData {
   hsTree: TreeNode[];

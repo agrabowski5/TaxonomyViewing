@@ -16,6 +16,7 @@ export function convertTreeToCustom(
     const id = `custom-import-${counter.value++}`;
     const cleanCode = node.code.replace(/[\.\s\-]/g, "");
     const lookupEntry = lookup[cleanCode] ?? lookup[node.code];
+    const definition = lookupEntry?.description ?? node.name;
 
     const children = node.children
       ? convertTreeToCustom(node.children, taxonomy, lookup, counter, id)
@@ -25,7 +26,7 @@ export function convertTreeToCustom(
       id,
       code: node.code,
       name: node.name,
-      definition: lookupEntry?.description ?? node.name,
+      definition,
       type: (children.length > 0 ? "internal" : "leaf") as "leaf" | "internal",
       parentId,
       notes: "",
@@ -46,6 +47,12 @@ export function convertTreeToCustom(
         taxonomy,
         originalNodeId: node.id,
         originalCode: node.code,
+      },
+      modificationStatus: "original" as const,
+      originalSnapshot: {
+        code: node.code,
+        name: node.name,
+        definition,
       },
     };
   });

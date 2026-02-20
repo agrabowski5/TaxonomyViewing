@@ -33,6 +33,16 @@ export interface SourceOrigin {
   originalCode: string;
 }
 
+/** Tracks what changed relative to the base taxonomy */
+export type ModificationStatus = "original" | "modified" | "added";
+
+/** Snapshot of original values for diff highlighting */
+export interface OriginalSnapshot {
+  code: string;
+  name: string;
+  definition: string;
+}
+
 /** A single custom taxonomy node */
 export interface CustomNode {
   id: string;
@@ -50,6 +60,8 @@ export interface CustomNode {
   children: CustomNode[];
   createdAt: string;
   sourceOrigin?: SourceOrigin;
+  modificationStatus: ModificationStatus;
+  originalSnapshot?: OriginalSnapshot;
 }
 
 /** Wizard step identifiers matching the 7-step decision tree */
@@ -81,11 +93,6 @@ export interface WizardState {
   targetNodeId: string | null;
 }
 
-export interface SavedAppState {
-  leftTaxonomy: TaxonomyType;
-  rightTaxonomy: TaxonomyType;
-}
-
 export interface BuilderState {
   active: boolean;
   customTree: CustomNode[];
@@ -94,7 +101,7 @@ export interface BuilderState {
   selectedCustomNodeId: string | null;
   guideSidebarOpen: boolean;
   lastSavedAt: string | null;
-  savedAppState: SavedAppState | null;
+  previousRightTaxonomy: TaxonomyType | null;
   showResetDialog: boolean;
   showExportPanel: boolean;
   baseTaxonomy: TaxonomyType | null;
@@ -102,7 +109,7 @@ export interface BuilderState {
 }
 
 export type BuilderAction =
-  | { type: "ENTER_BUILDER"; savedAppState: SavedAppState }
+  | { type: "ENTER_BUILDER"; previousRightTaxonomy: TaxonomyType }
   | { type: "EXIT_BUILDER" }
   | { type: "SET_ROOT_NAME"; name: string }
   | { type: "ADD_NODE"; node: CustomNode }
@@ -124,7 +131,8 @@ export type BuilderAction =
   | { type: "MARK_SAVED" }
   | { type: "IMPORT_BASE_TAXONOMY"; tree: CustomNode[]; taxonomy: TaxonomyType; rootName: string }
   | { type: "QUICK_ADD_START"; parentNodeId: string | null }
-  | { type: "QUICK_ADD_CANCEL" };
+  | { type: "QUICK_ADD_CANCEL" }
+  | { type: "INLINE_EDIT_NODE"; id: string; field: "name" | "code" | "definition"; value: string };
 
 export interface PersistedBuilderData {
   version: 1;

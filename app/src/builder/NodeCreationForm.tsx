@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useBuilder } from "./context";
+import { MetaParameterValueInput } from "./MetaParameterValueInput";
 import type { CustomNode, DecisionStep, MetaDimension } from "./types";
 
 interface Props {
@@ -87,6 +88,7 @@ export function NodeCreationForm({ parentNodeId, prefilledDefinition, decisionTr
       decisionTrail,
       children: [],
       createdAt: new Date().toISOString(),
+      modificationStatus: "added" as const,
     };
 
     dispatch({ type: "ADD_NODE", node });
@@ -201,13 +203,12 @@ export function NodeCreationForm({ parentNodeId, prefilledDefinition, decisionTr
                 </option>
               ))}
             </select>
-            <input
+            <MetaParameterValueInput
+              dimension={p.dimension}
+              value={p.value}
+              onChange={(val) => handleUpdateMetaParam(i, "value", val)}
               className="builder-form-input"
               style={{ flex: 1 }}
-              type="text"
-              value={p.value}
-              onChange={(e) => handleUpdateMetaParam(i, "value", e.target.value)}
-              placeholder="Value"
             />
             <button className="builder-meta-tag-remove" onClick={() => handleRemoveMetaParam(i)}>
               ×
