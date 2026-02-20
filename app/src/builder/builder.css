@@ -98,6 +98,8 @@
 /* Builder Tree Panel */
 .builder-tree-panel {
   border-color: #f59e0b !important;
+  flex: 1;
+  min-height: 0;
 }
 
 .builder-tree-actions {
