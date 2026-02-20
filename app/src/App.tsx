@@ -778,6 +778,7 @@ function AppContent() {
   const [selectedFrom, setSelectedFrom] = useState<TaxonomyType | null>(null);
   const [ecoinventOverlay, setEcoinventOverlay] = useState(false);
   const [showBaseTaxonomyDialog, setShowBaseTaxonomyDialog] = useState(false);
+  const [mappingPanelCollapsed, setMappingPanelCollapsed] = useState(false);
 
   // Debounced search for performance with large trees
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -1543,15 +1544,23 @@ function AppContent() {
 
       {/* Mapping Panel */}
       {selectedNode && selectedFrom && (
-        <div className="comparison-panel">
-          <h3>
-            Cross-Taxonomy Mappings for{" "}
-            <span className="mapping-source-label">
-              {TAXONOMY_INFO[selectedFrom].label}
-            </span>{" "}
-            {selectedNode.code}
+        <div className={`comparison-panel ${mappingPanelCollapsed ? "collapsed" : ""}`}>
+          <h3
+            className="comparison-panel-header"
+            onClick={() => setMappingPanelCollapsed(!mappingPanelCollapsed)}
+          >
+            <span>
+              Cross-Taxonomy Mappings for{" "}
+              <span className="mapping-source-label">
+                {TAXONOMY_INFO[selectedFrom].label}
+              </span>{" "}
+              {selectedNode.code}
+            </span>
+            <button className="comparison-panel-toggle">
+              {mappingPanelCollapsed ? "+" : "\u2013"}
+            </button>
           </h3>
-          <div className="comparison-content">
+          {!mappingPanelCollapsed && <div className="comparison-content">
             <div className="comparison-item source-item">
               <h4>{TAXONOMY_INFO[selectedFrom].label}</h4>
               <p className="code">{selectedNode.code}</p>
@@ -1671,22 +1680,30 @@ function AppContent() {
                 sourceTaxonomy={selectedFrom}
               />
             )}
-          </div>
+          </div>}
         </div>
       )}
 
       {/* Builder: Show custom node mappings when a custom node is selected */}
       {builderState.active && builderState.selectedCustomNodeId && (
-        <div className="comparison-panel">
-          <h3>
-            Custom Node Mappings
+        <div className={`comparison-panel ${mappingPanelCollapsed ? "collapsed" : ""}`}>
+          <h3
+            className="comparison-panel-header"
+            onClick={() => setMappingPanelCollapsed(!mappingPanelCollapsed)}
+          >
+            <span>Custom Node Mappings</span>
+            <button className="comparison-panel-toggle">
+              {mappingPanelCollapsed ? "+" : "\u2013"}
+            </button>
           </h3>
-          <div className="comparison-content">
-            <MappingsTab
-              mode="display"
-              selectedCustomNodeId={builderState.selectedCustomNodeId}
-            />
-          </div>
+          {!mappingPanelCollapsed && (
+            <div className="comparison-content">
+              <MappingsTab
+                mode="display"
+                selectedCustomNodeId={builderState.selectedCustomNodeId}
+              />
+            </div>
+          )}
         </div>
       )}
 
