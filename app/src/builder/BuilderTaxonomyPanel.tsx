@@ -3,7 +3,6 @@ import { Tree } from "react-arborist";
 import { useContainerSize } from "../useContainerSize";
 import { useBuilder } from "./context";
 import { CustomTreeNode } from "./CustomTreeNode";
-import { MetaParameterLayer } from "./MetaParameterModal";
 import type { TreeNode } from "../types";
 import type { CustomNode, ModificationStatus } from "./types";
 
@@ -139,7 +138,6 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
           </Tree>
         )}
       </div>
-      <MetaParameterLayer />
     </div>
   );
 }
