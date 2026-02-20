@@ -128,6 +128,33 @@ export function NodeCreationGuide() {
   const [metaEntries, setMetaEntries] = useState<Array<{ dimension: MetaDimension; value: string }>>([]);
   const [definitionDraft, setDefinitionDraft] = useState("");
 
+  if (!state.guideSidebarOpen && !state.quickAddActive) return null;
+
+  // Quick Add mode: show form directly, no wizard
+  if (state.quickAddActive) {
+    return (
+      <div className="builder-guide-sidebar">
+        <div className="builder-guide-header">
+          <h3>Quick Add Node</h3>
+          <button
+            className="builder-guide-close"
+            onClick={() => dispatch({ type: "QUICK_ADD_CANCEL" })}
+          >
+            ×
+          </button>
+        </div>
+        <div className="builder-guide-content">
+          <NodeCreationForm
+            parentNodeId={state.wizard.parentNodeId}
+            decisionTrail={[]}
+            onComplete={() => dispatch({ type: "QUICK_ADD_CANCEL" })}
+            onCancel={() => dispatch({ type: "QUICK_ADD_CANCEL" })}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (!state.guideSidebarOpen) return null;
 
   const { wizard } = state;

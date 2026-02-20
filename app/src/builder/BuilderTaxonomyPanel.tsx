@@ -19,7 +19,11 @@ function customNodeToTreeNode(node: CustomNode): TreeNode {
   };
 }
 
-export function BuilderTaxonomyPanel() {
+interface BuilderTaxonomyPanelProps {
+  onShowBaseTaxonomyDialog?: () => void;
+}
+
+export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxonomyPanelProps) {
   const { state, dispatch } = useBuilder();
   const container = useContainerSize();
 
@@ -63,6 +67,14 @@ export function BuilderTaxonomyPanel() {
         >
           + Add Node
         </button>
+        <button
+          className="builder-quick-add-btn"
+          onClick={() => {
+            dispatch({ type: "QUICK_ADD_START", parentNodeId: state.selectedCustomNodeId });
+          }}
+        >
+          + Quick Add
+        </button>
         {state.selectedCustomNodeId && (
           <button
             className="builder-add-child-btn"
@@ -84,6 +96,14 @@ export function BuilderTaxonomyPanel() {
             <h3>{state.rootName}</h3>
             <p>Your custom taxonomy is empty.</p>
             <p>Click "Add Node" or use the Node Creation Guide to get started.</p>
+            {onShowBaseTaxonomyDialog && (
+              <button
+                className="builder-use-base-btn"
+                onClick={onShowBaseTaxonomyDialog}
+              >
+                Use Existing Taxonomy as Base
+              </button>
+            )}
           </div>
         ) : (
           <Tree<TreeNode>
@@ -92,7 +112,7 @@ export function BuilderTaxonomyPanel() {
             height={container.height - 72}
             rowHeight={32}
             indent={20}
-            openByDefault
+            openByDefault={state.customTree.length < 200}
             disableDrag
             disableDrop
             disableEdit

@@ -26,6 +26,13 @@ export interface TaxonomyMappingLink {
   sourceDescription: string;
 }
 
+/** Origin tracking for nodes cloned from an existing taxonomy */
+export interface SourceOrigin {
+  taxonomy: TaxonomyType;
+  originalNodeId: string;
+  originalCode: string;
+}
+
 /** A single custom taxonomy node */
 export interface CustomNode {
   id: string;
@@ -42,6 +49,7 @@ export interface CustomNode {
   decisionTrail: DecisionStep[];
   children: CustomNode[];
   createdAt: string;
+  sourceOrigin?: SourceOrigin;
 }
 
 /** Wizard step identifiers matching the 7-step decision tree */
@@ -89,6 +97,8 @@ export interface BuilderState {
   savedAppState: SavedAppState | null;
   showResetDialog: boolean;
   showExportPanel: boolean;
+  baseTaxonomy: TaxonomyType | null;
+  quickAddActive: boolean;
 }
 
 export type BuilderAction =
@@ -111,7 +121,10 @@ export type BuilderAction =
   | { type: "TOGGLE_RESET_DIALOG" }
   | { type: "TOGGLE_EXPORT_PANEL" }
   | { type: "LOAD_STATE"; state: BuilderState }
-  | { type: "MARK_SAVED" };
+  | { type: "MARK_SAVED" }
+  | { type: "IMPORT_BASE_TAXONOMY"; tree: CustomNode[]; taxonomy: TaxonomyType; rootName: string }
+  | { type: "QUICK_ADD_START"; parentNodeId: string | null }
+  | { type: "QUICK_ADD_CANCEL" };
 
 export interface PersistedBuilderData {
   version: 1;

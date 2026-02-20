@@ -19,6 +19,8 @@ export const INITIAL_STATE: BuilderState = {
   savedAppState: null,
   showResetDialog: false,
   showExportPanel: false,
+  baseTaxonomy: null,
+  quickAddActive: false,
 };
 
 function addNodeToTree(tree: CustomNode[], parentId: string | null, node: CustomNode): CustomNode[] {
@@ -97,6 +99,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         ...state,
         customTree: addNodeToTree(state.customTree, action.node.parentId, action.node),
         wizard: INITIAL_WIZARD,
+        quickAddActive: false,
       };
 
     case "UPDATE_NODE":
@@ -223,6 +226,34 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
 
     case "MARK_SAVED":
       return { ...state, lastSavedAt: new Date().toISOString() };
+
+    case "IMPORT_BASE_TAXONOMY":
+      return {
+        ...state,
+        customTree: action.tree,
+        baseTaxonomy: action.taxonomy,
+        rootName: action.rootName,
+        wizard: INITIAL_WIZARD,
+        quickAddActive: false,
+      };
+
+    case "QUICK_ADD_START":
+      return {
+        ...state,
+        quickAddActive: true,
+        wizard: {
+          ...INITIAL_WIZARD,
+          active: false,
+          parentNodeId: action.parentNodeId,
+        },
+        guideSidebarOpen: true,
+      };
+
+    case "QUICK_ADD_CANCEL":
+      return {
+        ...state,
+        quickAddActive: false,
+      };
 
     default:
       return state;

@@ -10,6 +10,7 @@ import { NodeCreationGuide } from "./builder/NodeCreationGuide";
 import { MappingsTab } from "./builder/MappingsTab";
 import { ExportPanel } from "./builder/ExportPanel";
 import { ResetDialog } from "./builder/ResetDialog";
+import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { AboutSection } from "./AboutSection";
 import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping } from "./types";
 import "./App.css";
@@ -782,6 +783,7 @@ function AppContent() {
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<TaxonomyType | null>(null);
   const [ecoinventOverlay, setEcoinventOverlay] = useState(false);
+  const [showBaseTaxonomyDialog, setShowBaseTaxonomyDialog] = useState(false);
 
   // Debounced search for performance with large trees
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -1379,7 +1381,7 @@ function AppContent() {
   );
 
   return (
-    <div className={`app ${builderState.active && builderState.guideSidebarOpen ? "app-content-compressed" : ""}`}>
+    <div className={`app ${builderState.active && (builderState.guideSidebarOpen || builderState.quickAddActive) ? "app-content-compressed" : ""}`}>
       <header className="app-header">
         <div className="header-text">
           <h1>Taxonomy Explorer</h1>
@@ -1405,6 +1407,10 @@ function AppContent() {
                 type: "ENTER_BUILDER",
                 savedAppState: { leftTaxonomy, rightTaxonomy },
               });
+              // Show base taxonomy dialog if custom tree is empty
+              if (builderState.customTree.length === 0) {
+                setShowBaseTaxonomyDialog(true);
+              }
             }
           }}
           title="Toggle Custom Taxonomy Builder mode"
@@ -1456,7 +1462,7 @@ function AppContent() {
             </select>
           </div>
           {leftTaxonomy === "custom" ? (
-            <BuilderTaxonomyPanel />
+            <BuilderTaxonomyPanel onShowBaseTaxonomyDialog={() => setShowBaseTaxonomyDialog(true)} />
           ) : (
             <>
               <div className="pane-info">
@@ -1494,7 +1500,7 @@ function AppContent() {
             </select>
           </div>
           {rightTaxonomy === "custom" ? (
-            <BuilderTaxonomyPanel />
+            <BuilderTaxonomyPanel onShowBaseTaxonomyDialog={() => setShowBaseTaxonomyDialog(true)} />
           ) : (
             <>
               <div className="pane-info">
@@ -1675,6 +1681,13 @@ function AppContent() {
       )}
       {builderState.showExportPanel && (
         <ExportPanel />
+      )}
+      {showBaseTaxonomyDialog && (
+        <BaseTaxonomyDialog
+          onClose={() => setShowBaseTaxonomyDialog(false)}
+          getTreeData={getTreeData}
+          getLookup={getLookup}
+        />
       )}
       {builderState.showResetDialog && (
         <ResetDialog

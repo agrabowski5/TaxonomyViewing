@@ -109,7 +109,8 @@
 }
 
 .builder-add-node-btn,
-.builder-add-child-btn {
+.builder-add-child-btn,
+.builder-quick-add-btn {
   padding: 4px 12px;
   border: 1px solid #d97706;
   border-radius: 6px;
@@ -122,8 +123,18 @@
 }
 
 .builder-add-node-btn:hover,
-.builder-add-child-btn:hover {
+.builder-add-child-btn:hover,
+.builder-quick-add-btn:hover {
   background: #fef3c7;
+}
+
+.builder-quick-add-btn {
+  border-color: #0d9488;
+  color: #0f766e;
+}
+
+.builder-quick-add-btn:hover {
+  background: #f0fdfa;
 }
 
 .builder-add-child-btn {
@@ -156,6 +167,24 @@
 .builder-empty-state p {
   margin: 4px 0;
   font-size: 0.9rem;
+}
+
+.builder-use-base-btn {
+  margin-top: 16px;
+  padding: 10px 20px;
+  border: 2px solid #d97706;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.builder-use-base-btn:hover {
+  background: #d97706;
+  color: white;
 }
 
 /* Custom Tree Node Markers */
@@ -1025,4 +1054,63 @@
 .app-content-compressed {
   margin-right: 320px;
   transition: margin-right 0.3s ease;
+}
+
+/* ============================
+   Base Taxonomy Dialog
+   ============================ */
+
+.base-taxonomy-dialog {
+  max-width: 500px;
+}
+
+.base-dialog-description {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.base-dialog-select-group {
+  margin-bottom: 16px;
+}
+
+.base-dialog-select-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.base-dialog-info {
+  margin-top: 8px;
+}
+
+.base-dialog-node-count {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  padding: 4px 10px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.base-dialog-warning {
+  font-size: 0.8rem;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #f59e0b;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.base-dialog-blocked {
+  color: #dc2626;
+  background: #fef2f2;
+  border-color: #fca5a5;
 }
