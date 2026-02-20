@@ -3,9 +3,7 @@ import { useBuilder } from "./context";
 import { convertTreeToCustom, countTreeNodes } from "./convertTreeToCustom";
 import type { TreeNode, LookupEntry, TaxonomyType } from "../types";
 
-type BaseTaxonomyType = Exclude<TaxonomyType, "custom">;
-
-const TAXONOMY_OPTIONS: { value: BaseTaxonomyType; label: string }[] = [
+const TAXONOMY_OPTIONS: { value: TaxonomyType; label: string }[] = [
   { value: "hs", label: "HS — Harmonized System (International)" },
   { value: "cpc", label: "CPC — Central Product Classification" },
   { value: "cn", label: "CN — Combined Nomenclature (EU)" },
@@ -16,7 +14,7 @@ const TAXONOMY_OPTIONS: { value: BaseTaxonomyType; label: string }[] = [
   { value: "t2", label: "T2 — CPC Backbone + HTS Detail" },
 ];
 
-const BLOCKED_TAXONOMIES = new Set<BaseTaxonomyType>(["unspsc"]);
+const BLOCKED_TAXONOMIES = new Set<TaxonomyType>(["unspsc"]);
 const WARN_THRESHOLD = 8000;
 
 interface Props {
@@ -27,7 +25,7 @@ interface Props {
 
 export function BaseTaxonomyDialog({ onClose, getTreeData, getLookup }: Props) {
   const { dispatch } = useBuilder();
-  const [selected, setSelected] = useState<BaseTaxonomyType | "">("");
+  const [selected, setSelected] = useState<TaxonomyType | "">("");
   const [importing, setImporting] = useState(false);
 
   const nodeCount = selected ? countTreeNodes(getTreeData(selected)) : 0;
@@ -38,7 +36,6 @@ export function BaseTaxonomyDialog({ onClose, getTreeData, getLookup }: Props) {
     if (!selected || isBlocked) return;
     setImporting(true);
 
-    // Use requestAnimationFrame to keep UI responsive during large imports
     requestAnimationFrame(() => {
       const tree = getTreeData(selected);
       const lookup = getLookup(selected);
@@ -58,6 +55,10 @@ export function BaseTaxonomyDialog({ onClose, getTreeData, getLookup }: Props) {
   }, [selected, isBlocked, getTreeData, getLookup, dispatch, onClose]);
 
   const handleStartFromScratch = () => {
+    dispatch({
+      type: "SET_ROOT_NAME",
+      name: "Custom Taxonomy",
+    });
     onClose();
   };
 
@@ -71,16 +72,31 @@ export function BaseTaxonomyDialog({ onClose, getTreeData, getLookup }: Props) {
           </button>
         </div>
         <div className="builder-modal-body">
-          <p className="base-dialog-description">
-            Clone an existing taxonomy as the basis for your custom taxonomy, or start from scratch.
-          </p>
+          <div className="base-dialog-options">
+            <button
+              className="base-dialog-option-card"
+              onClick={handleStartFromScratch}
+            >
+              <div className="base-dialog-option-icon">+</div>
+              <div className="base-dialog-option-text">
+                <div className="base-dialog-option-title">Start from Scratch</div>
+                <div className="base-dialog-option-desc">
+                  Build your custom taxonomy from an empty tree.
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <div className="base-dialog-divider">
+            <span>or clone an existing taxonomy</span>
+          </div>
 
           <div className="base-dialog-select-group">
             <label>Base Taxonomy</label>
             <select
               className="builder-form-select"
               value={selected}
-              onChange={(e) => setSelected(e.target.value as BaseTaxonomyType | "")}
+              onChange={(e) => setSelected(e.target.value as TaxonomyType | "")}
             >
               <option value="">Select a taxonomy to clone...</option>
               {TAXONOMY_OPTIONS.map((opt) => (
@@ -110,8 +126,8 @@ export function BaseTaxonomyDialog({ onClose, getTreeData, getLookup }: Props) {
           )}
         </div>
         <div className="builder-modal-footer">
-          <button className="builder-form-cancel" onClick={handleStartFromScratch}>
-            Start from Scratch
+          <button className="builder-form-cancel" onClick={onClose}>
+            Cancel
           </button>
           <button
             className="builder-form-save"

@@ -6,6 +6,14 @@ import { CustomTreeNode } from "./CustomTreeNode";
 import type { TreeNode } from "../types";
 import type { CustomNode, ModificationStatus } from "./types";
 
+const SECTION_COLORS = [
+  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316",
+  "#eab308", "#84cc16", "#22c55e", "#10b981", "#14b8a6",
+  "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#a855f7",
+  "#d946ef", "#f59e0b", "#10b981", "#0891b2", "#7c3aed",
+  "#db2777", "#dc2626",
+];
+
 function customNodeToTreeNode(node: CustomNode): TreeNode {
   return {
     id: node.id,
@@ -31,6 +39,20 @@ function buildModificationMap(nodes: CustomNode[]): Map<string, ModificationStat
   return map;
 }
 
+/** Build section-based color map (same palette as standard taxonomies) */
+function buildColorMap(tree: CustomNode[]): Record<string, string> {
+  const colorMap: Record<string, string> = {};
+  tree.forEach((section, index) => {
+    const color = SECTION_COLORS[index % SECTION_COLORS.length];
+    const assignColor = (node: CustomNode) => {
+      colorMap[node.id] = color;
+      if (node.children.length > 0) node.children.forEach(assignColor);
+    };
+    assignColor(section);
+  });
+  return colorMap;
+}
+
 interface BuilderTaxonomyPanelProps {
   onShowBaseTaxonomyDialog?: () => void;
 }
@@ -52,6 +74,11 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
 
   const modificationMap = useMemo(
     () => buildModificationMap(state.customTree),
+    [state.customTree]
+  );
+
+  const colorMap = useMemo(
+    () => buildColorMap(state.customTree),
     [state.customTree]
   );
 
@@ -122,7 +149,7 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
             height={container.height - 40}
             rowHeight={32}
             indent={20}
-            openByDefault={state.customTree.length < 200}
+            openByDefault={false}
             disableDrag
             disableDrop
             disableEdit
@@ -133,6 +160,7 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
                 onNodeSelect={handleNodeSelect}
                 customTree={state.customTree}
                 modificationMap={modificationMap}
+                colorMap={colorMap}
               />
             )}
           </Tree>

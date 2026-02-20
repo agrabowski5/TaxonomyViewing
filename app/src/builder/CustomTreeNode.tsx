@@ -8,6 +8,7 @@ interface Props extends NodeRendererProps<TreeNode> {
   onNodeSelect?: (node: TreeNode) => void;
   customTree: CustomNode[];
   modificationMap: Map<string, ModificationStatus>;
+  colorMap: Record<string, string>;
 }
 
 function findCustomNode(tree: CustomNode[], id: string): CustomNode | null {
@@ -28,7 +29,7 @@ function countDescendants(n: TreeNode): number {
   return count;
 }
 
-export function CustomTreeNode({ node, style, onNodeSelect, customTree, modificationMap }: Props) {
+export function CustomTreeNode({ node, style, onNodeSelect, customTree, modificationMap, colorMap }: Props) {
   const { dispatch } = useBuilder();
   const data = node.data;
   const isRoot = data.id === "custom-root";
@@ -38,6 +39,7 @@ export function CustomTreeNode({ node, style, onNodeSelect, customTree, modifica
   const linkCount = customData?.mappingLinks.length ?? 0;
   const isGovernanceFlagged = customData?.governanceFlagged ?? false;
   const modStatus = modificationMap.get(data.id) ?? "original";
+  const badgeColor = isRoot ? "#92400e" : (colorMap[data.id] || "#6b7280");
 
   // Inline editing state
   const [editing, setEditing] = useState(false);
@@ -99,7 +101,7 @@ export function CustomTreeNode({ node, style, onNodeSelect, customTree, modifica
       </span>
       <span
         className="node-type-badge"
-        style={{ backgroundColor: isRoot ? "#92400e" : "#d97706" }}
+        style={{ backgroundColor: badgeColor }}
       >
         {data.code}
       </span>
