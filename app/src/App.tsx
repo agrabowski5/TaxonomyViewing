@@ -11,8 +11,10 @@ import { MappingsTab } from "./builder/MappingsTab";
 import { ExportPanel } from "./builder/ExportPanel";
 import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
+import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
 import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping } from "./types";
+import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
 
@@ -94,6 +96,18 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
     label: "T2",
   },
 };
+
+// Find a CustomNode by ID in the builder's custom tree
+function findCustomNodeById(tree: CustomNode[], id: string): CustomNode | null {
+  for (const n of tree) {
+    if (n.id === id) return n;
+    if (n.children.length > 0) {
+      const found = findCustomNodeById(n.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
 
 // Find the ancestor path (list of IDs from root to parent) for a target node in tree data
 function findPathToNode(tree: TreeNode[], targetId: string): string[] {
@@ -637,8 +651,6 @@ function computeEcoinventCoverage(
   if (!ecoinventMapping) return new Set();
   const covered = new Set<string>();
   const em = ecoinventMapping;
-  const cpcAncestorSet = new Set(em.cpcAncestors);
-  const hsAncestorSet = new Set(em.hsAncestors);
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
@@ -646,28 +658,95 @@ function computeEcoinventCoverage(
       let hasCoverage = false;
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
-        hasCoverage = !!em.cpc[clean] || cpcAncestorSet.has(clean);
+        hasCoverage = !!em.cpc[clean];
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         const hsBase = clean.substring(0, Math.min(6, clean.length));
-        hasCoverage = !!em.hs[hsBase] || hsAncestorSet.has(hsBase);
-      } else if (taxonomy === "unspsc") {
-        hasCoverage = false;
+        hasCoverage = !!em.hs[hsBase];
       }
 
-      if (hasCoverage) {
-        covered.add(node.id);
+      if (hasCoverage) covered.add(node.id);
+      if (node.children) walk(node.children);
+    }
+  }
+
+  walk(tree);
+  return covered;
+}
+
+function computeEpaCoverage(
+  tree: TreeNode[],
+  taxonomy: TaxonomyType,
+  emissionFactors: Record<string, EmissionFactorEntry> | null,
+  concordance: ConcordanceData,
+): Set<string> {
+  if (!emissionFactors) return new Set();
+  const covered = new Set<string>();
+  const efKeys = new Set(Object.keys(emissionFactors));
+
+  function walk(nodes: TreeNode[]) {
+    for (const node of nodes) {
+      const clean = stripCode(node.code);
+      let hasCoverage = false;
+
+      if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
+        for (let len = clean.length; len >= 4; len--) {
+          const prefix = clean.substring(0, len);
+          const hsMappings = concordance.cpcToHs[prefix];
+          if (hsMappings && hsMappings.length > 0) {
+            for (const m of hsMappings) {
+              if (efKeys.has(m.code)) { hasCoverage = true; break; }
+            }
+            if (hasCoverage) break;
+          }
+        }
+      } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
+        if (/^\d+$/.test(clean) && clean.length >= 6) {
+          hasCoverage = efKeys.has(clean.substring(0, 6));
+        }
       }
 
-      if (node.children) {
-        walk(node.children);
-        // If any child is covered, parent is covered too
-        for (const child of node.children) {
-          if (covered.has(child.id)) {
-            covered.add(node.id);
+      if (hasCoverage) covered.add(node.id);
+      if (node.children) walk(node.children);
+    }
+  }
+
+  walk(tree);
+  return covered;
+}
+
+function computeExiobaseCoverage(
+  tree: TreeNode[],
+  taxonomy: TaxonomyType,
+  exiobaseFactors: Record<string, ExiobaseFactorEntry> | null,
+  concordance: ConcordanceData,
+): Set<string> {
+  if (!exiobaseFactors) return new Set();
+  const covered = new Set<string>();
+  const exKeys = new Set(Object.keys(exiobaseFactors));
+
+  function walk(nodes: TreeNode[]) {
+    for (const node of nodes) {
+      const clean = stripCode(node.code);
+      let hasCoverage = false;
+
+      if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
+        for (let len = clean.length; len >= 4; len--) {
+          const prefix = clean.substring(0, len);
+          const hsMappings = concordance.cpcToHs[prefix];
+          if (hsMappings && hsMappings.length > 0) {
+            const chapter = hsMappings[0].code.substring(0, 2);
+            if (exKeys.has(chapter)) { hasCoverage = true; }
             break;
           }
         }
+      } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
+        if (/^\d+$/.test(clean) && clean.length >= 2) {
+          hasCoverage = exKeys.has(clean.substring(0, 2));
+        }
       }
+
+      if (hasCoverage) covered.add(node.id);
+      if (node.children) walk(node.children);
     }
   }
 
@@ -776,8 +855,8 @@ function AppContent() {
   const [rightTaxonomy, setRightTaxonomy] = useState<TaxonomyType>("cpc");
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<TaxonomyType | null>(null);
-  const [ecoinventOverlay, setEcoinventOverlay] = useState(false);
   const [showBaseTaxonomyDialog, setShowBaseTaxonomyDialog] = useState(false);
+  const [showLibraryDialog, setShowLibraryDialog] = useState(false);
   const [mappingPanelCollapsed, setMappingPanelCollapsed] = useState(false);
 
   // Debounced search for performance with large trees
@@ -1313,6 +1392,208 @@ function AppContent() {
     [leftTaxonomy, rightTaxonomy, data, getLookup, treeRefs, getTreeData]
   );
 
+  // Handle builder custom node click → map to left pane via sourceOrigin
+  const handleBuilderNodeSelect = useCallback(
+    (node: TreeNode) => {
+      if (node.id === "custom-root") return;
+      const customNode = findCustomNodeById(builderState.customTree, node.id);
+      if (!customNode?.sourceOrigin) {
+        // New node with no source origin — just show it as selected, no mapping
+        setSelectedNode(node);
+        setSelectedFrom(null);
+        return;
+      }
+
+      const origin = customNode.sourceOrigin;
+      const sourceTax = origin.taxonomy;
+      const otherTax = leftTaxonomy;
+
+      // Create a synthetic node with the original taxonomy's ID/code
+      const syntheticNode: TreeNode = {
+        id: origin.originalNodeId,
+        code: origin.originalCode,
+        name: node.name,
+        type: node.type,
+      };
+
+      setSelectedNode(syntheticNode);
+      setSelectedFrom(sourceTax);
+
+      if (!data) return;
+
+      // Reuse the same mapping logic as handleNodeSelect but with explicit sourceTax
+      let mappedNodeId: string | null = null;
+
+      const findT1NodeId = (hsBase: string): string | null => {
+        const t1Lookup = getLookup("t1");
+        const htsEntry = findMappedEntry(hsBase, "hts", t1Lookup, data.concordance);
+        return htsEntry?.nodeId ? htsEntry.nodeId.replace("hts-", "t1-") : null;
+      };
+
+      const findT2NodeId = (hsBase: string): string | null => {
+        const t2Lookup = getLookup("t2");
+        const htsKey = `HTS${hsBase}`;
+        if (t2Lookup[htsKey]) return `t2-hts-${hsBase}`;
+        const htsKey00 = `HTS${hsBase}00`;
+        if (t2Lookup[htsKey00]) return `t2-hts-${hsBase}00`;
+        const cpcMappings = data.concordance.hsToCpc[hsBase];
+        if (cpcMappings && cpcMappings.length > 0) {
+          const cpcCode = cpcMappings[0].code;
+          if (t2Lookup[cpcCode]) return `t2-${cpcCode}`;
+        }
+        return null;
+      };
+
+      if (HS_FAMILY.includes(sourceTax)) {
+        const hsBase = getHsBase(syntheticNode.code, sourceTax);
+        if (hsBase) {
+          if (otherTax === "unspsc") {
+            const fuzzy = findFuzzyMappedEntries(hsBase, sourceTax, "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+            mappedNodeId = fuzzy[0]?.nodeId ?? null;
+          } else if (otherTax === "t1") {
+            mappedNodeId = findT1NodeId(hsBase);
+          } else if (otherTax === "t2") {
+            mappedNodeId = findT2NodeId(hsBase);
+          } else {
+            const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+            mappedNodeId = mapped?.nodeId ?? null;
+          }
+        }
+      } else if (sourceTax === "cpc") {
+        const cleanCpc = stripCode(syntheticNode.code);
+        for (let len = cleanCpc.length; len >= 4; len--) {
+          const prefix = cleanCpc.substring(0, len);
+          const hsMappings = data.concordance.cpcToHs[prefix];
+          if (hsMappings && hsMappings.length > 0) {
+            if (otherTax === "cpc") break;
+            const firstHsCode = hsMappings[0].code;
+            if (otherTax === "unspsc") {
+              const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+              mappedNodeId = fuzzy[0]?.nodeId ?? null;
+            } else if (otherTax === "t1") {
+              mappedNodeId = findT1NodeId(firstHsCode);
+            } else if (otherTax === "t2") {
+              const t2Lookup = getLookup("t2");
+              if (t2Lookup[prefix]) {
+                mappedNodeId = `t2-${prefix}`;
+              } else {
+                mappedNodeId = findT2NodeId(firstHsCode);
+              }
+            } else {
+              const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+              mappedNodeId = mapped?.nodeId ?? null;
+            }
+            break;
+          }
+        }
+      } else if (sourceTax === "t1") {
+        const t1Lookup = getLookup("t1");
+        const t1Origin = getT1Origin(syntheticNode.id, t1Lookup, syntheticNode.code);
+        if (t1Origin === "hts") {
+          const hsBase = getHsBase(syntheticNode.code, "hts");
+          if (hsBase) {
+            if (otherTax === "t2") mappedNodeId = findT2NodeId(hsBase);
+            else if (otherTax !== "t1") {
+              if (otherTax === "unspsc") {
+                const fuzzy = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+                mappedNodeId = fuzzy[0]?.nodeId ?? null;
+              } else {
+                const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+                mappedNodeId = mapped?.nodeId ?? null;
+              }
+            }
+          }
+        } else if (t1Origin === "cpc") {
+          const originalCode = getT1OriginalCode(syntheticNode.code, "cpc", t1Lookup);
+          for (let len = originalCode.length; len >= 4; len--) {
+            const prefix = originalCode.substring(0, len);
+            const hsMappings = data.concordance.cpcToHs[prefix];
+            if (hsMappings && hsMappings.length > 0) {
+              const firstHsCode = hsMappings[0].code;
+              if (otherTax === "t2") mappedNodeId = findT2NodeId(firstHsCode);
+              else if (otherTax !== "t1") {
+                if (otherTax === "unspsc") {
+                  const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+                  mappedNodeId = fuzzy[0]?.nodeId ?? null;
+                } else {
+                  const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+                  mappedNodeId = mapped?.nodeId ?? null;
+                }
+              }
+              break;
+            }
+          }
+        }
+      } else if (sourceTax === "t2") {
+        const t2Origin = getT2Origin(syntheticNode.id);
+        if (t2Origin === "hts") {
+          const hsBase = getHsBase(syntheticNode.code, "hts");
+          if (hsBase) {
+            if (otherTax === "t1") mappedNodeId = findT1NodeId(hsBase);
+            else if (otherTax !== "t2") {
+              if (otherTax === "unspsc") {
+                const fuzzy = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+                mappedNodeId = fuzzy[0]?.nodeId ?? null;
+              } else {
+                const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+                mappedNodeId = mapped?.nodeId ?? null;
+              }
+            }
+          }
+        } else if (t2Origin === "cpc") {
+          const cleanCpc = stripCode(syntheticNode.code);
+          for (let len = cleanCpc.length; len >= 4; len--) {
+            const prefix = cleanCpc.substring(0, len);
+            const hsMappings = data.concordance.cpcToHs[prefix];
+            if (hsMappings && hsMappings.length > 0) {
+              const firstHsCode = hsMappings[0].code;
+              if (otherTax === "t1") mappedNodeId = findT1NodeId(firstHsCode);
+              else if (otherTax !== "t2") {
+                if (otherTax === "unspsc") {
+                  const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+                  mappedNodeId = fuzzy[0]?.nodeId ?? null;
+                } else {
+                  const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+                  mappedNodeId = mapped?.nodeId ?? null;
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      // Cross-pane sync to left pane
+      if (mappedNodeId) {
+        const otherRef = treeRefs[otherTax];
+        const treeData = getTreeData(otherTax);
+        const ancestorPath = findPathToNode(treeData, mappedNodeId);
+        let delay = 50;
+        for (const ancestorId of ancestorPath) {
+          setTimeout(() => {
+            const tree = otherRef.current;
+            if (tree) {
+              const ancestor = tree.get(ancestorId);
+              if (ancestor && !ancestor.isOpen) ancestor.open();
+            }
+          }, delay);
+          delay += 80;
+        }
+        setTimeout(() => {
+          const tree = otherRef.current;
+          if (tree) {
+            const targetNode = tree.get(mappedNodeId!);
+            if (targetNode) {
+              tree.scrollTo(targetNode.id);
+              targetNode.select();
+            }
+          }
+        }, delay + 100);
+      }
+    },
+    [builderState.customTree, leftTaxonomy, data, getLookup, treeRefs, getTreeData]
+  );
+
   const leftColorMap = useMemo(
     () => buildColorMap(getTreeData(leftTaxonomy)),
     [data, leftTaxonomy, getTreeData]
@@ -1327,14 +1608,30 @@ function AppContent() {
     [data]
   );
 
-  // Ecoinvent coverage sets for overlay
+  // EF database coverage sets (always computed, shown as badges on tree nodes)
   const leftEcoinventCoverage = useMemo(
-    () => ecoinventOverlay ? computeEcoinventCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data?.ecoinventMapping ?? null) : new Set<string>(),
-    [ecoinventOverlay, data, leftTaxonomy, getTreeData]
+    () => computeEcoinventCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data?.ecoinventMapping ?? null),
+    [data, leftTaxonomy, getTreeData]
   );
   const rightEcoinventCoverage = useMemo(
-    () => ecoinventOverlay ? computeEcoinventCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data?.ecoinventMapping ?? null) : new Set<string>(),
-    [ecoinventOverlay, data, rightTaxonomy, getTreeData]
+    () => computeEcoinventCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data?.ecoinventMapping ?? null),
+    [data, rightTaxonomy, getTreeData]
+  );
+  const leftEpaCoverage = useMemo(
+    () => data ? computeEpaCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.emissionFactors, data.concordance) : new Set<string>(),
+    [data, leftTaxonomy, getTreeData]
+  );
+  const rightEpaCoverage = useMemo(
+    () => data ? computeEpaCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.emissionFactors, data.concordance) : new Set<string>(),
+    [data, rightTaxonomy, getTreeData]
+  );
+  const leftExiobaseCoverage = useMemo(
+    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.concordance) : new Set<string>(),
+    [data, leftTaxonomy, getTreeData]
+  );
+  const rightExiobaseCoverage = useMemo(
+    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.concordance) : new Set<string>(),
+    [data, rightTaxonomy, getTreeData]
   );
 
   // Ecoinvent info for selected node
@@ -1378,14 +1675,6 @@ function AppContent() {
             Compare HS, CPC, CN, HTS, Canadian &amp; UNSPSC classifications
           </p>
         </div>
-        <button
-          className={`ecoinvent-toggle ${ecoinventOverlay ? "active" : ""}`}
-          onClick={() => setEcoinventOverlay(!ecoinventOverlay)}
-          title="Toggle ecoinvent coverage overlay"
-        >
-          <span className="ecoinvent-toggle-dot" />
-          ecoinvent
-        </button>
         <button
           className={`builder-toggle ${builderState.active ? "active" : ""}`}
           onClick={() => {
@@ -1467,7 +1756,9 @@ function AppContent() {
               fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
               legend={TAXONOMY_INFO[leftTaxonomy].legend}
               colorMap={leftColorMap}
-              ecoinventCoverage={ecoinventOverlay ? leftEcoinventCoverage : undefined}
+              ecoinventCoverage={leftEcoinventCoverage}
+              epaCoverage={leftEpaCoverage}
+              exiobaseCoverage={leftExiobaseCoverage}
             />
           </>
         </div>
@@ -1505,7 +1796,12 @@ function AppContent() {
                   </div>
                 </div>
               )}
-              <BuilderTaxonomyPanel onShowBaseTaxonomyDialog={() => setShowBaseTaxonomyDialog(true)} />
+              <BuilderTaxonomyPanel
+                onShowBaseTaxonomyDialog={() => setShowBaseTaxonomyDialog(true)}
+                onShowLibrary={() => setShowLibraryDialog(true)}
+                searchTerm={debouncedSearch}
+                onNodeSelect={handleBuilderNodeSelect}
+              />
             </>
           ) : (
             <>
@@ -1535,7 +1831,9 @@ function AppContent() {
                 fullName={TAXONOMY_INFO[rightTaxonomy].fullName}
                 legend={TAXONOMY_INFO[rightTaxonomy].legend}
                 colorMap={rightColorMap}
-                ecoinventCoverage={ecoinventOverlay ? rightEcoinventCoverage : undefined}
+                ecoinventCoverage={rightEcoinventCoverage}
+                epaCoverage={rightEpaCoverage}
+                exiobaseCoverage={rightExiobaseCoverage}
               />
             </>
           )}
@@ -1719,6 +2017,7 @@ function AppContent() {
           onClose={() => setShowBaseTaxonomyDialog(false)}
           getTreeData={getTreeData}
           getLookup={getLookup}
+          onOpenLibrary={() => setShowLibraryDialog(true)}
         />
       )}
       {builderState.showResetDialog && (
@@ -1730,9 +2029,15 @@ function AppContent() {
           }}
           onClear={() => {
             const prev = builderState.previousRightTaxonomy;
-            builderDispatch({ type: "EXIT_BUILDER" });
+            builderDispatch({ type: "EXIT_BUILDER", clearData: true });
             if (prev) setRightTaxonomy(prev);
           }}
+        />
+      )}
+      {showLibraryDialog && (
+        <TaxonomyLibraryDialog
+          onClose={() => setShowLibraryDialog(false)}
+          showSave={builderState.active}
         />
       )}
     </div>

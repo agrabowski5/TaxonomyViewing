@@ -269,17 +269,45 @@ function SelectedNodeEditor() {
   );
 }
 
+function findNodeById(tree: CustomNode[], id: string): CustomNode | null {
+  for (const n of tree) {
+    if (n.id === id) return n;
+    if (n.children.length > 0) {
+      const found = findNodeById(n.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 export function NodeCreationGuide() {
   const { state, dispatch } = useBuilder();
   const [showForm, setShowForm] = useState(false);
   const [governanceNote, setGovernanceNote] = useState("");
   const [metaEntries, setMetaEntries] = useState<Array<{ dimension: MetaDimension; value: string }>>([]);
   const [definitionDraft, setDefinitionDraft] = useState("");
+  const [quickAddMode, setQuickAddMode] = useState<"child" | "sibling">("child");
 
   if (!state.guideSidebarOpen && !state.quickAddActive) return null;
 
-  // Quick Add mode: show form directly, no wizard
+  // Quick Add mode: show form directly with child/sibling toggle
   if (state.quickAddActive) {
+    const selectedId = state.wizard.parentNodeId;
+    const selectedNode = selectedId ? findNodeById(state.customTree, selectedId) : null;
+    const hasSelection = !!selectedNode;
+
+    // Determine effective parent based on mode
+    let effectiveParentId: string | null;
+    if (!hasSelection) {
+      // No node selected → always add at root level
+      effectiveParentId = null;
+    } else if (quickAddMode === "child") {
+      effectiveParentId = selectedId;
+    } else {
+      // Sibling: use the selected node's parent (null = root level)
+      effectiveParentId = selectedNode!.parentId;
+    }
+
     return (
       <div className="builder-guide-sidebar">
         <div className="builder-guide-header">
@@ -292,8 +320,28 @@ export function NodeCreationGuide() {
           </button>
         </div>
         <div className="builder-guide-content">
+          {hasSelection && (
+            <div className="quick-add-placement">
+              <label>Placement relative to "{selectedNode!.name}"</label>
+              <div className="quick-add-toggle">
+                <button
+                  className={`quick-add-toggle-btn ${quickAddMode === "child" ? "active" : ""}`}
+                  onClick={() => setQuickAddMode("child")}
+                >
+                  Child
+                </button>
+                <button
+                  className={`quick-add-toggle-btn ${quickAddMode === "sibling" ? "active" : ""}`}
+                  onClick={() => setQuickAddMode("sibling")}
+                >
+                  Sibling
+                </button>
+              </div>
+            </div>
+          )}
           <NodeCreationForm
-            parentNodeId={state.wizard.parentNodeId}
+            key={`${effectiveParentId}-${quickAddMode}`}
+            parentNodeId={effectiveParentId}
             decisionTrail={[]}
             onComplete={() => dispatch({ type: "QUICK_ADD_CANCEL" })}
             onCancel={() => dispatch({ type: "QUICK_ADD_CANCEL" })}

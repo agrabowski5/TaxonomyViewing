@@ -1182,56 +1182,44 @@
   white-space: nowrap;
 }
 
-/* ===== ecoinvent Toggle ===== */
-.ecoinvent-toggle {
-  display: flex;
+/* ===== EF Database Coverage Badges (Tree Node) ===== */
+.ef-badges {
+  display: inline-flex;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.ef-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
   flex-shrink: 0;
-  font-family: inherit;
+  line-height: 1;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
 }
 
-.ecoinvent-toggle:hover {
-  border-color: #f59e0b;
-  color: var(--text);
+.ef-ecoinvent {
+  background: #fef3c7;
+  color: #78350f;
+  box-shadow: 0 0 2px rgba(245, 158, 11, 0.4);
 }
 
-.ecoinvent-toggle.active {
-  background: #fffbeb;
-  border-color: #f59e0b;
-  color: #b45309;
+.ef-epa {
+  background: #dcfce7;
+  color: #14532d;
+  box-shadow: 0 0 2px rgba(34, 197, 94, 0.4);
 }
 
-.ecoinvent-toggle-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--border);
-  transition: background 0.15s;
-}
-
-.ecoinvent-toggle.active .ecoinvent-toggle-dot {
-  background: #f59e0b;
-  box-shadow: 0 0 4px #f59e0b;
-}
-
-/* ===== ecoinvent Coverage Dot (Tree Node) ===== */
-.ecoinvent-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #f59e0b;
-  flex-shrink: 0;
-  box-shadow: 0 0 3px rgba(245, 158, 11, 0.5);
+.ef-exiobase {
+  background: #ede9fe;
+  color: #3b0764;
+  box-shadow: 0 0 2px rgba(139, 92, 246, 0.4);
 }
 
 /* ===== ecoinvent Card (Comparison Panel) ===== */

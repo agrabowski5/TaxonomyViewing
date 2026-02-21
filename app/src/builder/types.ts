@@ -110,7 +110,7 @@ export interface BuilderState {
 
 export type BuilderAction =
   | { type: "ENTER_BUILDER"; previousRightTaxonomy: TaxonomyType }
-  | { type: "EXIT_BUILDER" }
+  | { type: "EXIT_BUILDER"; clearData?: boolean }
   | { type: "SET_ROOT_NAME"; name: string }
   | { type: "ADD_NODE"; node: CustomNode }
   | { type: "UPDATE_NODE"; id: string; updates: Partial<CustomNode> }
@@ -138,4 +138,18 @@ export interface PersistedBuilderData {
   version: 1;
   state: BuilderState;
   savedAt: string;
+}
+
+export interface SavedTaxonomyEntry {
+  id: string;
+  name: string;
+  savedAt: string;
+  nodeCount: number;
+  baseTaxonomy: TaxonomyType | null;
+  state: BuilderState;
+}
+
+export interface TaxonomyLibrary {
+  version: 1;
+  entries: SavedTaxonomyEntry[];
 }

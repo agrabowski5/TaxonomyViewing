@@ -6,6 +6,8 @@ interface Props extends NodeRendererProps<TNode> {
   onNodeSelect?: (node: TNode) => void;
   colorMap?: Record<string, string>;
   ecoinventCoverage?: Set<string>;
+  epaCoverage?: Set<string>;
+  exiobaseCoverage?: Set<string>;
 }
 
 function countDescendants(n: TNode): number {
@@ -15,12 +17,14 @@ function countDescendants(n: TNode): number {
   return count;
 }
 
-export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage }: Props) {
+export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage }: Props) {
   const data = node.data;
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
   const descendantCount = !node.isLeaf ? countDescendants(data) : 0;
   const hasEcoinvent = ecoinventCoverage?.has(data.id);
+  const hasEpa = epaCoverage?.has(data.id);
+  const hasExiobase = exiobaseCoverage?.has(data.id);
 
   return (
     <div
@@ -58,8 +62,12 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
           {descendantCount.toLocaleString()}
         </span>
       )}
-      {hasEcoinvent && (
-        <span className="ecoinvent-dot" title="ecoinvent coverage" />
+      {(hasEcoinvent || hasEpa || hasExiobase) && (
+        <span className="ef-badges">
+          {hasEcoinvent && <span className="ef-badge ef-ecoinvent" title="ecoinvent v3.10">e</span>}
+          {hasEpa && <span className="ef-badge ef-epa" title="EPA/USEEIO">U</span>}
+          {hasExiobase && <span className="ef-badge ef-exiobase" title="EXIOBASE 3.8.2">X</span>}
+        </span>
       )}
       {info && (
         <span

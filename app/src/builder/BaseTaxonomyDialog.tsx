@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useBuilder } from "./context";
 import { convertTreeToCustom, countTreeNodes } from "./convertTreeToCustom";
+import { loadLibrary } from "./persistence";
 import type { TreeNode, LookupEntry, TaxonomyType } from "../types";
 
 const TAXONOMY_OPTIONS: { value: TaxonomyType; label: string }[] = [
@@ -21,12 +22,14 @@ interface Props {
   onClose: () => void;
   getTreeData: (taxonomy: TaxonomyType) => TreeNode[];
   getLookup: (taxonomy: TaxonomyType) => Record<string, LookupEntry>;
+  onOpenLibrary?: () => void;
 }
 
-export function BaseTaxonomyDialog({ onClose, getTreeData, getLookup }: Props) {
+export function BaseTaxonomyDialog({ onClose, getTreeData, getLookup, onOpenLibrary }: Props) {
   const { dispatch } = useBuilder();
   const [selected, setSelected] = useState<TaxonomyType | "">("");
   const [importing, setImporting] = useState(false);
+  const savedCount = useMemo(() => loadLibrary().length, []);
 
   const nodeCount = selected ? countTreeNodes(getTreeData(selected)) : 0;
   const isBlocked = selected ? BLOCKED_TAXONOMIES.has(selected) : false;
@@ -85,6 +88,23 @@ export function BaseTaxonomyDialog({ onClose, getTreeData, getLookup }: Props) {
                 </div>
               </div>
             </button>
+            {savedCount > 0 && onOpenLibrary && (
+              <button
+                className="base-dialog-option-card"
+                onClick={() => {
+                  onClose();
+                  onOpenLibrary();
+                }}
+              >
+                <div className="base-dialog-option-icon">&darr;</div>
+                <div className="base-dialog-option-text">
+                  <div className="base-dialog-option-title">Load Saved Taxonomy</div>
+                  <div className="base-dialog-option-desc">
+                    Load one of your {savedCount} saved {savedCount === 1 ? "taxonomy" : "taxonomies"}.
+                  </div>
+                </div>
+              </button>
+            )}
           </div>
 
           <div className="base-dialog-divider">

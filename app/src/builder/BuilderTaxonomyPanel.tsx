@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { Tree } from "react-arborist";
 import { useContainerSize } from "../useContainerSize";
 import { useBuilder } from "./context";
+import { saveToLibrary } from "./persistence";
 import { CustomTreeNode } from "./CustomTreeNode";
 import type { TreeNode } from "../types";
 import type { CustomNode, ModificationStatus } from "./types";
@@ -53,24 +54,57 @@ function buildColorMap(tree: CustomNode[]): Record<string, string> {
   return colorMap;
 }
 
-interface BuilderTaxonomyPanelProps {
-  onShowBaseTaxonomyDialog?: () => void;
+/** Filter tree nodes by search term, keeping matching nodes + ancestors */
+function filterTreeNodes(tree: TreeNode[], term: string): TreeNode[] {
+  if (!term.trim()) return tree;
+  const lower = term.trim().toLowerCase();
+
+  function matches(node: TreeNode): boolean {
+    return node.code.toLowerCase().includes(lower) || node.name.toLowerCase().includes(lower);
+  }
+
+  function filter(nodes: TreeNode[]): TreeNode[] {
+    const result: TreeNode[] = [];
+    for (const node of nodes) {
+      if (matches(node)) {
+        result.push(node);
+      } else if (node.children) {
+        const filtered = filter(node.children);
+        if (filtered.length > 0) {
+          result.push({ ...node, children: filtered });
+        }
+      }
+    }
+    return result;
+  }
+
+  return filter(tree);
 }
 
-export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxonomyPanelProps) {
+interface BuilderTaxonomyPanelProps {
+  onShowBaseTaxonomyDialog?: () => void;
+  onShowLibrary?: () => void;
+  searchTerm?: string;
+  onNodeSelect?: (node: TreeNode) => void;
+}
+
+export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog, onShowLibrary, searchTerm = "", onNodeSelect }: BuilderTaxonomyPanelProps) {
   const { state, dispatch } = useBuilder();
   const container = useContainerSize();
 
+  const isSearching = searchTerm.trim().length > 0;
+
   const treeData = useMemo<TreeNode[]>(() => {
+    const children = state.customTree.map(customNodeToTreeNode);
     const root: TreeNode = {
       id: "custom-root",
       code: "ROOT",
       name: state.rootName,
       type: "internal",
-      children: state.customTree.map(customNodeToTreeNode),
+      children: isSearching ? filterTreeNodes(children, searchTerm) : children,
     };
     return [root];
-  }, [state.customTree, state.rootName]);
+  }, [state.customTree, state.rootName, searchTerm, isSearching]);
 
   const modificationMap = useMemo(
     () => buildModificationMap(state.customTree),
@@ -88,22 +122,19 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
     } else {
       dispatch({ type: "SELECT_CUSTOM_NODE", id: node.id });
     }
+    if (onNodeSelect) onNodeSelect(node);
   };
+
+  const handleQuickSave = useCallback(() => {
+    if (state.customTree.length === 0) return;
+    const name = `${state.rootName} — ${new Date().toLocaleDateString()}`;
+    saveToLibrary(name, state);
+    dispatch({ type: "MARK_SAVED" });
+  }, [state, dispatch]);
 
   return (
     <div className="tree-panel builder-tree-panel">
       <div className="builder-tree-actions">
-        <button
-          className="builder-add-node-btn"
-          onClick={() => {
-            dispatch({ type: "WIZARD_START", parentNodeId: state.selectedCustomNodeId });
-            if (!state.guideSidebarOpen) {
-              dispatch({ type: "TOGGLE_GUIDE_SIDEBAR" });
-            }
-          }}
-        >
-          + Add Node
-        </button>
         <button
           className="builder-quick-add-btn"
           onClick={() => {
@@ -112,17 +143,15 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
         >
           + Quick Add
         </button>
-        {state.selectedCustomNodeId && (
-          <button
-            className="builder-add-child-btn"
-            onClick={() => {
-              dispatch({ type: "WIZARD_START", parentNodeId: state.selectedCustomNodeId });
-              if (!state.guideSidebarOpen) {
-                dispatch({ type: "TOGGLE_GUIDE_SIDEBAR" });
-              }
-            }}
-          >
-            + Add Child
+        <span className="builder-actions-spacer" />
+        {state.customTree.length > 0 && (
+          <button className="builder-save-btn" onClick={handleQuickSave}>
+            Save
+          </button>
+        )}
+        {onShowLibrary && (
+          <button className="builder-library-btn" onClick={onShowLibrary}>
+            Library
           </button>
         )}
       </div>
@@ -144,12 +173,13 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog }: BuilderTaxono
           </div>
         ) : (
           <Tree<TreeNode>
+            key={`builder-${searchTerm}`}
             initialData={treeData}
             width={container.width}
             height={container.height - 40}
             rowHeight={32}
             indent={20}
-            openByDefault={false}
+            openByDefault={isSearching}
             disableDrag
             disableDrop
             disableEdit

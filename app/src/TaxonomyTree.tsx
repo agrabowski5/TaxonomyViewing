@@ -16,6 +16,8 @@ interface Props {
   colorMap: Record<string, string>;
   treeRef?: React.RefObject<TreeApi<TreeNode> | null>;
   ecoinventCoverage?: Set<string>;
+  epaCoverage?: Set<string>;
+  exiobaseCoverage?: Set<string>;
 }
 
 export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function TaxonomyTree(
@@ -30,6 +32,8 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
     legend,
     colorMap,
     ecoinventCoverage,
+    epaCoverage,
+    exiobaseCoverage,
   },
   ref
 ) {
@@ -64,6 +68,8 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
               onNodeSelect={onNodeSelect}
               colorMap={colorMap}
               ecoinventCoverage={ecoinventCoverage}
+              epaCoverage={epaCoverage}
+              exiobaseCoverage={exiobaseCoverage}
             />
           )}
         </Tree>

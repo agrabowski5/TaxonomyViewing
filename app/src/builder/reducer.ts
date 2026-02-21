@@ -90,6 +90,13 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         showResetDialog: false,
         showExportPanel: false,
         quickAddActive: false,
+        selectedCustomNodeId: null,
+        ...(action.clearData ? {
+          customTree: [],
+          rootName: INITIAL_STATE.rootName,
+          baseTaxonomy: null,
+          lastSavedAt: null,
+        } : {}),
       };
 
     case "SET_ROOT_NAME":

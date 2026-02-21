@@ -35,24 +35,19 @@ export function BuilderProvider({ children }: { children: React.ReactNode }) {
   const prevTreeRef = useRef(state.customTree);
 
   useEffect(() => {
-    if (state.customTree === prevTreeRef.current) {
-      return;
-    }
+    // Always clear pending timer first to prevent race conditions on discard
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    if (state.customTree === prevTreeRef.current) return;
     prevTreeRef.current = state.customTree;
 
-    if (state.customTree.length === 0) {
-      return;
-    }
+    // Don't auto-save empty trees
+    if (state.customTree.length === 0) return;
 
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       saveBuilderState(state);
       dispatch({ type: "MARK_SAVED" });
     }, 500);
-
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
   }, [state.customTree, state]);
 
   return (

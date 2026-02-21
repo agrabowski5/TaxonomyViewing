@@ -1,6 +1,7 @@
-import type { BuilderState, PersistedBuilderData, CustomNode, ModificationStatus, OriginalSnapshot } from "./types";
+import type { BuilderState, PersistedBuilderData, CustomNode, ModificationStatus, OriginalSnapshot, TaxonomyLibrary, SavedTaxonomyEntry } from "./types";
 
 const STORAGE_KEY = "customTaxonomy_v1";
+const LIBRARY_KEY = "customTaxonomyLibrary_v1";
 
 /** Strip default-valued fields from CustomNode to reduce JSON size */
 function compactNode(node: CustomNode): Record<string, unknown> {
@@ -99,5 +100,92 @@ export function clearBuilderState(): void {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     // silently fail
+  }
+}
+
+// --- Multi-taxonomy library ---
+
+function countCustomNodes(nodes: CustomNode[]): number {
+  let count = nodes.length;
+  for (const n of nodes) {
+    if (n.children.length > 0) count += countCustomNodes(n.children);
+  }
+  return count;
+}
+
+function loadLibraryRaw(): TaxonomyLibrary {
+  try {
+    const raw = localStorage.getItem(LIBRARY_KEY);
+    if (!raw) return { version: 1, entries: [] };
+    const lib: TaxonomyLibrary = JSON.parse(raw);
+    if (lib.version !== 1) return { version: 1, entries: [] };
+    return lib;
+  } catch {
+    return { version: 1, entries: [] };
+  }
+}
+
+function saveLibraryRaw(lib: TaxonomyLibrary): void {
+  try {
+    localStorage.setItem(LIBRARY_KEY, JSON.stringify(lib));
+  } catch {
+    // localStorage full or unavailable
+  }
+}
+
+export function loadLibrary(): SavedTaxonomyEntry[] {
+  return loadLibraryRaw().entries;
+}
+
+export function saveToLibrary(name: string, state: BuilderState): string {
+  const lib = loadLibraryRaw();
+  const id = crypto.randomUUID();
+  const compactTree = state.customTree.map(compactNode);
+  const entry: SavedTaxonomyEntry = {
+    id,
+    name,
+    savedAt: new Date().toISOString(),
+    nodeCount: countCustomNodes(state.customTree),
+    baseTaxonomy: state.baseTaxonomy,
+    state: {
+      ...state,
+      customTree: compactTree as unknown as CustomNode[],
+    },
+  };
+  lib.entries.push(entry);
+  saveLibraryRaw(lib);
+  return id;
+}
+
+export function loadFromLibrary(id: string): BuilderState | null {
+  const lib = loadLibraryRaw();
+  const entry = lib.entries.find((e) => e.id === id);
+  if (!entry) return null;
+  try {
+    const expandedTree = (entry.state.customTree as unknown as Record<string, unknown>[]).map(expandNode);
+    return {
+      ...entry.state,
+      customTree: expandedTree,
+      baseTaxonomy: entry.state.baseTaxonomy ?? null,
+      quickAddActive: entry.state.quickAddActive ?? false,
+      previousRightTaxonomy: entry.state.previousRightTaxonomy ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function deleteFromLibrary(id: string): void {
+  const lib = loadLibraryRaw();
+  lib.entries = lib.entries.filter((e) => e.id !== id);
+  saveLibraryRaw(lib);
+}
+
+export function renameInLibrary(id: string, name: string): void {
+  const lib = loadLibraryRaw();
+  const entry = lib.entries.find((e) => e.id === id);
+  if (entry) {
+    entry.name = name;
+    saveLibraryRaw(lib);
   }
 }
