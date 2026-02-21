@@ -174,7 +174,7 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog, onShowLibrary, 
         ) : (
           <Tree<TreeNode>
             key={`builder-${searchTerm}`}
-            initialData={treeData}
+            data={treeData}
             width={container.width}
             height={container.height - 40}
             rowHeight={32}
