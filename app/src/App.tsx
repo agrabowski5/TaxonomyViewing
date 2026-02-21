@@ -13,7 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
-import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping } from "./types";
+import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
@@ -742,6 +742,47 @@ function computeExiobaseCoverage(
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 2) {
           hasCoverage = exKeys.has(clean.substring(0, 2));
+        }
+      }
+
+      if (hasCoverage) covered.add(node.id);
+      if (node.children) walk(node.children);
+    }
+  }
+
+  walk(tree);
+  return covered;
+}
+
+function computeUslciCoverage(
+  tree: TreeNode[],
+  taxonomy: TaxonomyType,
+  uslciCoverage: UslciCoverage | null,
+  concordance: ConcordanceData,
+): Set<string> {
+  if (!uslciCoverage) return new Set();
+  const covered = new Set<string>();
+  const coverageKeys = new Set(Object.keys(uslciCoverage.coverage));
+
+  function walk(nodes: TreeNode[]) {
+    for (const node of nodes) {
+      const clean = stripCode(node.code);
+      let hasCoverage = false;
+
+      if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
+        for (let len = clean.length; len >= 4; len--) {
+          const prefix = clean.substring(0, len);
+          const hsMappings = concordance.cpcToHs[prefix];
+          if (hsMappings && hsMappings.length > 0) {
+            for (const m of hsMappings) {
+              if (coverageKeys.has(m.code)) { hasCoverage = true; break; }
+            }
+            if (hasCoverage) break;
+          }
+        }
+      } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
+        if (/^\d+$/.test(clean) && clean.length >= 6) {
+          hasCoverage = coverageKeys.has(clean.substring(0, 6));
         }
       }
 
@@ -1633,6 +1674,14 @@ function AppContent() {
     () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.concordance) : new Set<string>(),
     [data, rightTaxonomy, getTreeData]
   );
+  const leftUslciCoverage = useMemo(
+    () => data ? computeUslciCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.uslciCoverage, data.concordance) : new Set<string>(),
+    [data, leftTaxonomy, getTreeData]
+  );
+  const rightUslciCoverage = useMemo(
+    () => data ? computeUslciCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.uslciCoverage, data.concordance) : new Set<string>(),
+    [data, rightTaxonomy, getTreeData]
+  );
 
   // Ecoinvent info for selected node
   const ecoinventInfo = useMemo(() => {
@@ -1759,6 +1808,7 @@ function AppContent() {
               ecoinventCoverage={leftEcoinventCoverage}
               epaCoverage={leftEpaCoverage}
               exiobaseCoverage={leftExiobaseCoverage}
+              uslciCoverage={leftUslciCoverage}
             />
           </>
         </div>
@@ -1834,6 +1884,7 @@ function AppContent() {
                 ecoinventCoverage={rightEcoinventCoverage}
                 epaCoverage={rightEpaCoverage}
                 exiobaseCoverage={rightExiobaseCoverage}
+                uslciCoverage={rightUslciCoverage}
               />
             </>
           )}

@@ -18,6 +18,7 @@ interface Props {
   ecoinventCoverage?: Set<string>;
   epaCoverage?: Set<string>;
   exiobaseCoverage?: Set<string>;
+  uslciCoverage?: Set<string>;
 }
 
 export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function TaxonomyTree(
@@ -34,6 +35,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
     ecoinventCoverage,
     epaCoverage,
     exiobaseCoverage,
+    uslciCoverage,
   },
   ref
 ) {
@@ -70,6 +72,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
               ecoinventCoverage={ecoinventCoverage}
               epaCoverage={epaCoverage}
               exiobaseCoverage={exiobaseCoverage}
+              uslciCoverage={uslciCoverage}
             />
           )}
         </Tree>

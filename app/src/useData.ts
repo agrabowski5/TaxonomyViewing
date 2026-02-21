@@ -32,12 +32,13 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
             fetch(`${base}data/t2-lookup.json`).then((r) => r.json()),
           ]);
         // Emission factors are optional — don't block app loading if missing
-        const [emissionFactors, exiobaseFactors, ecoinventMapping] = await Promise.all([
+        const [emissionFactors, exiobaseFactors, ecoinventMapping, uslciCoverage] = await Promise.all([
           fetch(`${base}data/emission-factors.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/exiobase-factors.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/ecoinvent-mapping.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch(`${base}data/uslci-coverage.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
-        setData({ hsTree, cpcTree, cnTree, htsTree, caTree, hsLookup, cpcLookup, cnLookup, htsLookup, caLookup, t1Tree, t1Lookup, t2Tree, t2Lookup, concordance, unspscTree, unspscLookup, unspscHsMapping, emissionFactors, exiobaseFactors, ecoinventMapping });
+        setData({ hsTree, cpcTree, cnTree, htsTree, caTree, hsLookup, cpcLookup, cnLookup, htsLookup, caLookup, t1Tree, t1Lookup, t2Tree, t2Lookup, concordance, unspscTree, unspscLookup, unspscHsMapping, emissionFactors, exiobaseFactors, ecoinventMapping, uslciCoverage });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load data");
       } finally {

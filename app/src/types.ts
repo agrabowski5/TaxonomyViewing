@@ -81,6 +81,21 @@ export interface EcoinventMapping {
   };
 }
 
+export interface UslciCoverageEntry {
+  naicsCodes: string[];
+  processCount: number;
+}
+
+export interface UslciCoverage {
+  coverage: Record<string, UslciCoverageEntry>;
+  stats: {
+    totalProcesses: number;
+    uniqueNaicsCodes: number;
+    coveredHs6Codes: number;
+    source: string;
+  };
+}
+
 export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2";
 
 export interface AppData {
@@ -105,4 +120,5 @@ export interface AppData {
   emissionFactors: Record<string, EmissionFactorEntry> | null;
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null;
   ecoinventMapping: EcoinventMapping | null;
+  uslciCoverage: UslciCoverage | null;
 }
