@@ -9,6 +9,7 @@ interface Props extends NodeRendererProps<TNode> {
   epaCoverage?: Set<string>;
   exiobaseCoverage?: Set<string>;
   uslciCoverage?: Set<string>;
+  bafuCoverage?: Set<string>;
 }
 
 function countDescendants(n: TNode): number {
@@ -18,7 +19,7 @@ function countDescendants(n: TNode): number {
   return count;
 }
 
-export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage, uslciCoverage }: Props) {
+export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage, uslciCoverage, bafuCoverage }: Props) {
   const data = node.data;
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
@@ -27,6 +28,7 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
   const hasEpa = epaCoverage?.has(data.id);
   const hasExiobase = exiobaseCoverage?.has(data.id);
   const hasUslci = uslciCoverage?.has(data.id);
+  const hasBafu = bafuCoverage?.has(data.id);
 
   return (
     <div
@@ -64,12 +66,13 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
           {descendantCount.toLocaleString()}
         </span>
       )}
-      {(hasEcoinvent || hasEpa || hasExiobase || hasUslci) && (
+      {(hasEcoinvent || hasEpa || hasExiobase || hasUslci || hasBafu) && (
         <span className="ef-badges">
           {hasEcoinvent && <span className="ef-badge ef-ecoinvent" title="ecoinvent v3.10">e</span>}
           {hasEpa && <span className="ef-badge ef-epa" title="EPA/USEEIO">U</span>}
           {hasExiobase && <span className="ef-badge ef-exiobase" title="EXIOBASE 3.8.2">X</span>}
           {hasUslci && <span className="ef-badge ef-uslci" title="US LCI (NREL)">L</span>}
+          {hasBafu && <span className="ef-badge ef-bafu" title="BAFU:2025 (Swiss FOEN)">B</span>}
         </span>
       )}
       {info && (

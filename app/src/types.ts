@@ -96,6 +96,21 @@ export interface UslciCoverage {
   };
 }
 
+export interface BafuCoverageEntry {
+  processCount: number;
+}
+
+export interface BafuCoverage {
+  coverage: Record<string, BafuCoverageEntry>;
+  stats: {
+    totalProcesses: number;
+    mappedProcesses: number;
+    unmappedProcesses: number;
+    coveredHsChapters: number;
+    source: string;
+  };
+}
+
 export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2";
 
 export interface AppData {
@@ -121,4 +136,5 @@ export interface AppData {
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null;
   ecoinventMapping: EcoinventMapping | null;
   uslciCoverage: UslciCoverage | null;
+  bafuCoverage: BafuCoverage | null;
 }
