@@ -1491,6 +1491,36 @@
   padding: 28px 32px 32px;
 }
 
+/* Tabs */
+.about-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border);
+}
+
+.about-tab {
+  padding: 8px 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+
+.about-tab.active {
+  color: #4f46e5;
+  border-bottom-color: #4f46e5;
+}
+
+.about-tab:hover:not(.active) {
+  color: var(--text);
+}
+
 .about-intro {
   font-size: 0.95rem;
   color: var(--text-secondary);
