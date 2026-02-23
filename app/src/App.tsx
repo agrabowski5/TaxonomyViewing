@@ -12,7 +12,7 @@ import { ExportPanel } from "./builder/ExportPanel";
 import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
-import { AboutSection } from "./AboutSection";
+import { AboutSection, CoveragePanel } from "./AboutSection";
 import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
@@ -2235,7 +2235,8 @@ function AppContent() {
             </button>
           )}
         </div>
-        <AboutSection />
+        <CoveragePanel data={data} />
+        <AboutSection data={data} />
       </header>
 
       <BuilderBanner />

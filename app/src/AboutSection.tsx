@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo, Fragment } from "react";
+import type { AppData, TreeNode, TaxonomyType } from "./types";
 
 /* Data-source URLs for every taxonomy and concordance */
 const URLS = {
@@ -695,11 +696,371 @@ function LcaDatabasesTab() {
   );
 }
 
+/* =============================== Coverage Matrix Tab =============================== */
+
+const TAXONOMY_GROUPS: { group: string; items: { key: TaxonomyType; label: string }[] }[] = [
+  {
+    group: "Trade / Tariff",
+    items: [
+      { key: "hs", label: "HS" },
+      { key: "cn", label: "CN (EU)" },
+      { key: "hts", label: "HTS (US)" },
+      { key: "ca", label: "CA" },
+    ],
+  },
+  {
+    group: "Product",
+    items: [
+      { key: "cpc", label: "CPC" },
+      { key: "cpa", label: "CPA" },
+      { key: "unspsc", label: "UNSPSC" },
+    ],
+  },
+  {
+    group: "Industry",
+    items: [
+      { key: "naics", label: "NAICS" },
+      { key: "isic", label: "ISIC" },
+      { key: "nace", label: "NACE" },
+    ],
+  },
+  {
+    group: "Economic / I-O",
+    items: [
+      { key: "bea", label: "BEA" },
+    ],
+  },
+  {
+    group: "Combined",
+    items: [
+      { key: "t1", label: "Taxonomy 1" },
+      { key: "t2", label: "Taxonomy 2" },
+    ],
+  },
+];
+
+const DB_COLUMNS = [
+  { key: "ecoinvent", label: "ecoinvent" },
+  { key: "epa", label: "EPA/USEEIO" },
+  { key: "exiobase", label: "EXIOBASE" },
+  { key: "uslci", label: "US LCI" },
+  { key: "bafu", label: "BAFU" },
+];
+
+function mStripCode(code: string): string {
+  return code.replace(/[\.\s\-]/g, "");
+}
+
+function collectLeaves(nodes: TreeNode[]): TreeNode[] {
+  const leaves: TreeNode[] = [];
+  function walk(n: TreeNode) {
+    if (!n.children || n.children.length === 0) {
+      leaves.push(n);
+    } else {
+      for (const c of n.children) walk(c);
+    }
+  }
+  for (const n of nodes) walk(n);
+  return leaves;
+}
+
+interface ResolvedLeaf {
+  hsCodes: string[];
+  cpcCodes: string[];
+}
+
+function resolveLeaf(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  data: AppData,
+): ResolvedLeaf {
+  const clean = mStripCode(node.code);
+
+  // HS-family: direct HS-6
+  if (taxonomy === "hs" || taxonomy === "cn" || taxonomy === "hts" || taxonomy === "ca") {
+    const hs6 = clean.substring(0, 6);
+    return { hsCodes: hs6.length >= 6 ? [hs6] : [], cpcCodes: [] };
+  }
+
+  // CPC: direct CPC + concordance to HS
+  if (taxonomy === "cpc") {
+    const hsMappings = data.concordance?.cpcToHs[clean];
+    const hsCodes = hsMappings ? hsMappings.map(m => m.code) : [];
+    return { hsCodes, cpcCodes: [clean] };
+  }
+
+  // UNSPSC: fuzzy mapping to HS
+  if (taxonomy === "unspsc") {
+    const mappings = data.unspscHsMapping?.unspscToHs[clean];
+    const hsCodes = mappings ? mappings.map(m => m.code) : [];
+    return { hsCodes, cpcCodes: [] };
+  }
+
+  // NAICS: concordance to HS
+  if (taxonomy === "naics") {
+    const mappings = data.naicsHsConcordance?.forward[clean];
+    const hsCodes = mappings ? mappings.map(m => m.code) : [];
+    return { hsCodes, cpcCodes: [] };
+  }
+
+  // ISIC/NACE: concordance to CPC, then CPC to HS
+  if (taxonomy === "isic" || taxonomy === "nace") {
+    const cpcMappings = data.isicCpcConcordance?.forward[clean];
+    if (!cpcMappings) return { hsCodes: [], cpcCodes: [] };
+    const cpcCodes = cpcMappings.map(m => m.code);
+    const hsCodes: string[] = [];
+    for (const cpc of cpcCodes) {
+      const hs = data.concordance?.cpcToHs[cpc];
+      if (hs) hsCodes.push(...hs.map(m => m.code));
+    }
+    return { hsCodes, cpcCodes };
+  }
+
+  // CPA: concordance to HS
+  if (taxonomy === "cpa") {
+    const mappings = data.cpaHsConcordance?.forward[clean];
+    const hsCodes = mappings ? mappings.map(m => m.code) : [];
+    return { hsCodes, cpcCodes: [] };
+  }
+
+  // BEA: concordance to HS
+  if (taxonomy === "bea") {
+    const mappings = data.beaHsConcordance?.forward[clean];
+    const hsCodes = mappings ? mappings.map(m => m.code) : [];
+    return { hsCodes, cpcCodes: [] };
+  }
+
+  // T1: check origin from ID
+  if (taxonomy === "t1") {
+    if (node.id.startsWith("t1-svc-")) {
+      const cpcCode = clean.startsWith("SVC") ? clean.substring(3) : clean;
+      const hsMappings = data.concordance?.cpcToHs[cpcCode];
+      const hsCodes = hsMappings ? hsMappings.map(m => m.code) : [];
+      return { hsCodes, cpcCodes: [cpcCode] };
+    } else {
+      const hs6 = clean.substring(0, 6);
+      return { hsCodes: hs6.length >= 6 ? [hs6] : [], cpcCodes: [] };
+    }
+  }
+
+  // T2: check origin from ID
+  if (taxonomy === "t2") {
+    if (node.id.startsWith("t2-hts-")) {
+      const htsCode = clean.startsWith("HTS") ? clean.substring(3) : clean;
+      const hs6 = htsCode.substring(0, 6);
+      return { hsCodes: hs6.length >= 6 ? [hs6] : [], cpcCodes: [] };
+    } else {
+      const hsMappings = data.concordance?.cpcToHs[clean];
+      const hsCodes = hsMappings ? hsMappings.map(m => m.code) : [];
+      return { hsCodes, cpcCodes: [clean] };
+    }
+  }
+
+  return { hsCodes: [], cpcCodes: [] };
+}
+
+function isEcoinventCovered(resolved: ResolvedLeaf, data: AppData): boolean {
+  if (!data.ecoinventMapping) return false;
+  for (const cpc of resolved.cpcCodes) {
+    if (data.ecoinventMapping.cpc[cpc]) return true;
+    for (let len = cpc.length - 1; len >= 2; len--) {
+      if (data.ecoinventMapping.cpc[cpc.substring(0, len)]) return true;
+    }
+  }
+  for (const hs of resolved.hsCodes) {
+    if (data.ecoinventMapping.hs[hs]) return true;
+    for (let len = hs.length - 1; len >= 2; len--) {
+      if (data.ecoinventMapping.hs[hs.substring(0, len)]) return true;
+    }
+  }
+  return false;
+}
+
+function isEpaCovered(resolved: ResolvedLeaf, data: AppData): boolean {
+  if (!data.emissionFactors) return false;
+  for (const hs of resolved.hsCodes) {
+    if (data.emissionFactors[hs]) return true;
+  }
+  return false;
+}
+
+function isExiobaseCovered(resolved: ResolvedLeaf, data: AppData): boolean {
+  if (!data.exiobaseFactors) return false;
+  for (const hs of resolved.hsCodes) {
+    if (data.exiobaseFactors[hs.substring(0, 2)]) return true;
+  }
+  return false;
+}
+
+function isUslciCovered(resolved: ResolvedLeaf, data: AppData): boolean {
+  if (!data.uslciCoverage) return false;
+  for (const hs of resolved.hsCodes) {
+    if (data.uslciCoverage.coverage[hs]) return true;
+  }
+  return false;
+}
+
+function isBafuCovered(resolved: ResolvedLeaf, data: AppData): boolean {
+  if (!data.bafuCoverage) return false;
+  for (const hs of resolved.hsCodes) {
+    if (data.bafuCoverage.coverage[hs.substring(0, 2)]) return true;
+  }
+  return false;
+}
+
+interface MatrixRow {
+  leafCount: number;
+  cells: Record<string, { covered: number; total: number; pct: number }>;
+}
+
+function computeMatrix(data: AppData): Record<string, MatrixRow> {
+  const result: Record<string, MatrixRow> = {};
+
+  const treeMap: Record<string, TreeNode[]> = {
+    hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree,
+    cpc: data.cpcTree, cpa: data.cpaTree, unspsc: data.unspscTree,
+    naics: data.naicsTree, isic: data.isicTree, nace: data.naceTree,
+    bea: data.beaTree, t1: data.t1Tree, t2: data.t2Tree,
+  };
+
+  const dbChecks: [string, (r: ResolvedLeaf, d: AppData) => boolean][] = [
+    ["ecoinvent", isEcoinventCovered],
+    ["epa", isEpaCovered],
+    ["exiobase", isExiobaseCovered],
+    ["uslci", isUslciCovered],
+    ["bafu", isBafuCovered],
+  ];
+
+  for (const [taxKey, tree] of Object.entries(treeMap)) {
+    if (!tree || tree.length === 0) continue;
+
+    const leaves = collectLeaves(tree);
+    const counts: Record<string, number> = {};
+    for (const [dbKey] of dbChecks) counts[dbKey] = 0;
+
+    for (const leaf of leaves) {
+      const resolved = resolveLeaf(leaf, taxKey as TaxonomyType, data);
+      for (const [dbKey, checkFn] of dbChecks) {
+        if (checkFn(resolved, data)) counts[dbKey]++;
+      }
+    }
+
+    const cells: Record<string, { covered: number; total: number; pct: number }> = {};
+    for (const [dbKey] of dbChecks) {
+      cells[dbKey] = {
+        covered: counts[dbKey],
+        total: leaves.length,
+        pct: leaves.length > 0 ? (counts[dbKey] / leaves.length) * 100 : 0,
+      };
+    }
+
+    result[taxKey] = { leafCount: leaves.length, cells };
+  }
+
+  return result;
+}
+
+function heatColor(pct: number): string {
+  if (pct === 0) return "#f8fafc";
+  if (pct < 5) return "#fef2f2";
+  if (pct < 15) return "#fef9c3";
+  if (pct < 35) return "#d9f99d";
+  if (pct < 65) return "#86efac";
+  return "#22c55e";
+}
+
+function CoverageMatrixTab({ data }: { data: AppData | null }) {
+  const matrix = useMemo(() => {
+    if (!data) return null;
+    return computeMatrix(data);
+  }, [data]);
+
+  if (!matrix) {
+    return <p style={{ textAlign: "center", padding: 32, color: "#6b7280" }}>Loading data&hellip;</p>;
+  }
+
+  return (
+    <>
+      <p className="about-intro">
+        This matrix shows what percentage of each taxonomy&rsquo;s leaf nodes
+        can be resolved to LCA data from each database, via the concordance
+        chains described in the other tabs.
+      </p>
+
+      <div className="coverage-matrix-wrapper">
+        <table className="coverage-matrix">
+          <thead>
+            <tr>
+              <th className="cm-tax-header">Taxonomy</th>
+              <th className="cm-leaf-header">Leaves</th>
+              {DB_COLUMNS.map(db => (
+                <th key={db.key} className="cm-db-header">{db.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {TAXONOMY_GROUPS.map(group => (
+              <Fragment key={group.group}>
+                <tr className="cm-group-row">
+                  <td colSpan={2 + DB_COLUMNS.length}>{group.group}</td>
+                </tr>
+                {group.items.map(item => {
+                  const row = matrix[item.key];
+                  if (!row) return null;
+                  return (
+                    <tr key={item.key} className="cm-data-row">
+                      <td className="cm-tax-name">{item.label}</td>
+                      <td className="cm-leaf-count">{row.leafCount.toLocaleString()}</td>
+                      {DB_COLUMNS.map(db => {
+                        const cell = row.cells[db.key];
+                        if (!cell) return <td key={db.key} className="cm-cell" />;
+                        return (
+                          <td
+                            key={db.key}
+                            className="cm-cell"
+                            style={{ backgroundColor: heatColor(cell.pct) }}
+                            title={`${item.label} \u00d7 ${db.label}: ${cell.covered.toLocaleString()} / ${cell.total.toLocaleString()} leaves (${cell.pct.toFixed(1)}%)`}
+                          >
+                            <div className="cm-pct">{cell.pct < 0.05 ? "0%" : `${cell.pct.toFixed(1)}%`}</div>
+                            <div className="cm-count">{cell.covered.toLocaleString()} / {cell.total.toLocaleString()}</div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="cm-legend">
+        <span className="cm-legend-label">0%</span>
+        <div className="cm-gradient" />
+        <span className="cm-legend-label">100%</span>
+      </div>
+
+      <div className="about-details" style={{ marginTop: 16 }}>
+        <h4>Notes</h4>
+        <ul style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.6, paddingLeft: 20 }}>
+          <li><strong>Leaf nodes</strong> are the most specific codes in each hierarchy (no children).</li>
+          <li><strong>ecoinvent</strong> is checked via direct CPC/HS code mapping (with parent-code inheritance).</li>
+          <li><strong>EPA/USEEIO</strong> and <strong>US LCI</strong> are checked at HS-6 resolution (via NAICS concordance).</li>
+          <li><strong>EXIOBASE</strong> and <strong>BAFU</strong> are checked at HS-2 chapter level &mdash; high coverage reflects coarse mapping granularity.</li>
+          <li><strong>UNSPSC</strong> uses fuzzy text matching (~4.4% of codes have HS mappings).</li>
+          <li><strong>ISIC/NACE</strong> resolve through CPC (ISIC&rarr;CPC concordance), then CPC&rarr;HS.</li>
+        </ul>
+      </div>
+    </>
+  );
+}
+
 /* =============================== Main Component =============================== */
 
-export function AboutSection() {
+export function AboutSection({ data }: { data: AppData | null }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"taxonomies" | "lca">("taxonomies");
+  const [tab, setTab] = useState<"taxonomies" | "lca" | "matrix">("taxonomies");
 
   if (!open) {
     return (
@@ -731,9 +1092,56 @@ export function AboutSection() {
             >
               LCA Databases
             </button>
+            <button
+              className={`about-tab ${tab === "matrix" ? "active" : ""}`}
+              onClick={() => setTab("matrix")}
+            >
+              Coverage Matrix
+            </button>
           </div>
 
-          {tab === "taxonomies" ? <TaxonomyMapTab /> : <LcaDatabasesTab />}
+          {tab === "taxonomies" && <TaxonomyMapTab />}
+          {tab === "lca" && <LcaDatabasesTab />}
+          {tab === "matrix" && <CoverageMatrixTab data={data} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =============================== Standalone Coverage Panel =============================== */
+
+export function CoveragePanel({ data }: { data: AppData | null }) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button className="coverage-toggle" onClick={() => setOpen(true)} title="Coverage Matrix">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <rect x="1" y="1" width="4" height="4" rx="0.5" opacity="0.3"/>
+          <rect x="6" y="1" width="4" height="4" rx="0.5" opacity="0.6"/>
+          <rect x="11" y="1" width="4" height="4" rx="0.5" opacity="0.9"/>
+          <rect x="1" y="6" width="4" height="4" rx="0.5" opacity="0.5"/>
+          <rect x="6" y="6" width="4" height="4" rx="0.5" opacity="0.8"/>
+          <rect x="11" y="6" width="4" height="4" rx="0.5" opacity="0.4"/>
+          <rect x="1" y="11" width="4" height="4" rx="0.5" opacity="0.7"/>
+          <rect x="6" y="11" width="4" height="4" rx="0.5" opacity="0.3"/>
+          <rect x="11" y="11" width="4" height="4" rx="0.5" opacity="0.6"/>
+        </svg>
+        Coverage
+      </button>
+    );
+  }
+
+  return (
+    <div className="about-overlay" onClick={() => setOpen(false)}>
+      <div className="about-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="about-header">
+          <h2>LCA Coverage Matrix</h2>
+          <button className="about-close" onClick={() => setOpen(false)}>&times;</button>
+        </div>
+        <div className="about-body">
+          <CoverageMatrixTab data={data} />
         </div>
       </div>
     </div>
