@@ -1618,6 +1618,95 @@
   border-top: 3px dashed;
 }
 
+.about-legend-line.dotted {
+  border-top: 3px dotted;
+}
+
+/* Concordance Details Table */
+.about-concordance-details {
+  margin-top: 4px;
+  margin-bottom: 24px;
+}
+
+.about-concordance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.about-concordance-table thead {
+  background: #f8fafc;
+}
+
+.about-concordance-table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+}
+
+.about-concordance-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: top;
+}
+
+.about-concordance-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.about-concordance-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.about-conc-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.about-conc-badge.shared {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.about-conc-badge.official {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.about-conc-badge.fuzzy {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.about-conc-badge.structural {
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+/* SVG node hover effect */
+.about-node-hover {
+  cursor: default;
+}
+
+.about-node-hover:hover rect {
+  filter: brightness(1.15);
+}
+
 /* Detail Cards */
 .about-details-grid {
   display: grid;

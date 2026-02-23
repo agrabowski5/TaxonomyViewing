@@ -15,236 +15,192 @@ export function AboutSection() {
     <div className="about-overlay" onClick={() => setOpen(false)}>
       <div className="about-panel" onClick={(e) => e.stopPropagation()}>
         <div className="about-header">
-          <h2>About Taxonomy Explorer</h2>
-          <button className="about-close" onClick={() => setOpen(false)}>×</button>
+          <h2>Taxonomy Map &amp; Data Sources</h2>
+          <button className="about-close" onClick={() => setOpen(false)}>&times;</button>
         </div>
 
         <div className="about-body">
           <p className="about-intro">
-            Taxonomy Explorer is a tool for comparing international trade and product
-            classification systems side-by-side, with cross-taxonomy mapping, ecoinvent
-            environmental data integration, and a custom taxonomy builder.
+            This diagram shows all 11 classification systems and how they connect
+            via concordance tables, shared code bases, and fuzzy matching.
+            Hover over any node or connection line for source details.
           </p>
 
-          <h3>Data Source Interconnections</h3>
+          <h3>Taxonomy Interconnection Map</h3>
           <div className="about-diagram-container">
-            <svg viewBox="0 0 960 700" className="about-diagram">
-              {/* Background regions */}
-              <rect x="30" y="20" width="340" height="260" rx="12" fill="#eef2ff" stroke="#c7d2fe" strokeWidth="1.5" />
-              <text x="200" y="46" textAnchor="middle" className="about-region-label">HS-Family Taxonomies</text>
+            <svg viewBox="0 0 900 500" className="about-diagram">
 
-              <rect x="30" y="310" width="340" height="130" rx="12" fill="#ecfeff" stroke="#a5f3fc" strokeWidth="1.5" />
-              <text x="200" y="336" textAnchor="middle" className="about-region-label">Product Classifications</text>
+              {/* === Background Region: HS-Family === */}
+              <rect x="30" y="15" width="840" height="145" rx="12" fill="#eef2ff" stroke="#c7d2fe" strokeWidth="1.5" />
+              <text x="450" y="38" textAnchor="middle" className="about-region-label">
+                HS-Family Taxonomies (Shared 6-Digit Base)
+              </text>
 
-              <rect x="530" y="20" width="400" height="200" rx="12" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1.5" />
-              <text x="730" y="46" textAnchor="middle" className="about-region-label">Combined Taxonomies</text>
+              {/* === ROW 0: HS-FAMILY NODES === */}
 
-              <rect x="530" y="250" width="400" height="210" rx="12" fill="#fef2f2" stroke="#fca5a5" strokeWidth="1.5" />
-              <text x="730" y="276" textAnchor="middle" className="about-region-label">Environmental Data</text>
-
-              <rect x="530" y="490" width="400" height="100" rx="12" fill="#f0fdf4" stroke="#86efac" strokeWidth="1.5" />
-              <text x="730" y="516" textAnchor="middle" className="about-region-label">Concordance / Mappings</text>
-
-              {/* HS (center of HS-family) */}
-              <g>
-                <rect x="148" y="70" width="105" height="50" rx="8" fill="#6366f1" />
-                <text x="200" y="100" textAnchor="middle" className="about-node-text">HS</text>
-                <text x="200" y="135" textAnchor="middle" className="about-node-detail">6,940 codes</text>
-                <text x="200" y="148" textAnchor="middle" className="about-node-source">UN Comtrade</text>
+              {/* HS — hub node, gold border */}
+              <g className="about-node-hover">
+                <title>{"HS \u2014 Harmonized System (International)\n6,940 codes\nSource: UN Comtrade\nhttps://github.com/datasets/harmonized-system"}</title>
+                <rect x="340" y="50" width="120" height="52" rx="8" fill="#4f46e5" stroke="#f59e0b" strokeWidth="3" />
+                <text x="400" y="82" textAnchor="middle" className="about-node-text">HS</text>
               </g>
+              <text x="400" y="118" textAnchor="middle" className="about-node-detail">6,940 codes</text>
+              <text x="400" y="130" textAnchor="middle" className="about-node-source">UN Comtrade (hub)</text>
 
-              {/* CN/EU */}
-              <g>
-                <rect x="55" y="170" width="105" height="50" rx="8" fill="#1e40af" />
-                <text x="107" y="200" textAnchor="middle" className="about-node-text">CN (EU)</text>
-                <text x="107" y="235" textAnchor="middle" className="about-node-detail">12,113 codes</text>
-                <text x="107" y="248" textAnchor="middle" className="about-node-source">Finnish Customs</text>
+              {/* CN */}
+              <g className="about-node-hover">
+                <title>{"CN \u2014 Combined Nomenclature (EU)\n12,113 codes\nSource: Finnish Customs (Tulli)\nhttps://tilastot.tulli.fi"}</title>
+                <rect x="65" y="85" width="110" height="48" rx="8" fill="#1e40af" />
+                <text x="120" y="114" textAnchor="middle" className="about-node-text">CN (EU)</text>
               </g>
+              <text x="120" y="149" textAnchor="middle" className="about-node-detail">12,113 codes</text>
+              <text x="120" y="161" textAnchor="middle" className="about-node-source">Finnish Customs</text>
 
-              {/* HTS/US */}
-              <g>
-                <rect x="185" y="170" width="105" height="50" rx="8" fill="#92400e" />
-                <text x="237" y="200" textAnchor="middle" className="about-node-text">HTS (US)</text>
-                <text x="237" y="235" textAnchor="middle" className="about-node-detail">29,675 codes</text>
-                <text x="237" y="248" textAnchor="middle" className="about-node-source">USITC</text>
+              {/* HTS */}
+              <g className="about-node-hover">
+                <title>{"HTS \u2014 Harmonized Tariff Schedule (US)\n29,675 codes\nSource: US International Trade Commission\nhttps://hts.usitc.gov"}</title>
+                <rect x="520" y="85" width="110" height="48" rx="8" fill="#92400e" />
+                <text x="575" y="114" textAnchor="middle" className="about-node-text">HTS (US)</text>
               </g>
+              <text x="575" y="149" textAnchor="middle" className="about-node-detail">29,675 codes</text>
+              <text x="575" y="161" textAnchor="middle" className="about-node-source">USITC</text>
 
-              {/* Canadian */}
-              <g>
-                <rect x="250" y="80" width="105" height="50" rx="8" fill="#9f1239" />
-                <text x="302" y="110" textAnchor="middle" className="about-node-text">CA</text>
-                <text x="302" y="145" textAnchor="middle" className="about-node-detail">19,252 codes</text>
-                <text x="302" y="158" textAnchor="middle" className="about-node-source">CBSA</text>
+              {/* CA */}
+              <g className="about-node-hover">
+                <title>{"CA \u2014 Canadian Customs Tariff\n19,252 codes\nSource: Canada Border Services Agency (CBSA)\nhttps://www.cbsa-asfc.gc.ca/trade-commerce/tariff-tarif/"}</title>
+                <rect x="720" y="85" width="110" height="48" rx="8" fill="#9f1239" />
+                <text x="775" y="114" textAnchor="middle" className="about-node-text">CA</text>
               </g>
+              <text x="775" y="149" textAnchor="middle" className="about-node-detail">19,252 codes</text>
+              <text x="775" y="161" textAnchor="middle" className="about-node-source">CBSA</text>
 
-              {/* HS → CN, HTS, CA arrows (shared 6-digit base) */}
-              <line x1="175" y1="120" x2="120" y2="170" stroke="#6366f1" strokeWidth="2" strokeDasharray="6,3" markerEnd="url(#arrowBlue)" />
-              <line x1="225" y1="120" x2="237" y2="170" stroke="#6366f1" strokeWidth="2" strokeDasharray="6,3" markerEnd="url(#arrowBlue)" />
-              <line x1="253" y1="95" x2="250" y2="95" stroke="#6366f1" strokeWidth="2" strokeDasharray="6,3" markerEnd="url(#arrowBlue)" />
-              <text x="135" y="165" textAnchor="middle" className="about-edge-label">6-digit</text>
-              <text x="255" y="165" textAnchor="middle" className="about-edge-label">6-digit</text>
+              {/* HS-family connector lines (dashed indigo) */}
+              <line x1="340" y1="80" x2="175" y2="100" stroke="#6366f1" strokeWidth="2.5" strokeDasharray="8,4">
+                <title>{"Shared 6-digit HS base codes\nCN extends HS with EU-specific 8-digit codes"}</title>
+              </line>
+              <text x="248" y="80" textAnchor="middle" className="about-edge-label">6-digit</text>
+
+              <line x1="460" y1="80" x2="520" y2="100" stroke="#6366f1" strokeWidth="2.5" strokeDasharray="8,4">
+                <title>{"Shared 6-digit HS base codes\nHTS extends HS with US-specific tariff lines"}</title>
+              </line>
+              <text x="495" y="82" textAnchor="middle" className="about-edge-label">6-digit</text>
+
+              <line x1="460" y1="84" x2="720" y2="100" stroke="#6366f1" strokeWidth="2.5" strokeDasharray="8,4">
+                <title>{"Shared 6-digit HS base codes\nCA extends HS with Canadian tariff items"}</title>
+              </line>
+              <text x="600" y="82" textAnchor="middle" className="about-edge-label">6-digit</text>
+
+              {/* === ROW 1: DIRECT HS CONCORDANCES === */}
+
+              {/* NAICS */}
+              <g className="about-node-hover">
+                <title>{"NAICS 2022 \u2014 North American Industry Classification\n2,122 codes\nSource: US Census Bureau\nhttps://www.census.gov/naics/"}</title>
+                <rect x="55" y="250" width="110" height="48" rx="8" fill="#0c4a6e" />
+                <text x="110" y="279" textAnchor="middle" className="about-node-text">NAICS</text>
+              </g>
+              <text x="110" y="314" textAnchor="middle" className="about-node-detail">2,122 codes</text>
+              <text x="110" y="326" textAnchor="middle" className="about-node-source">US Census Bureau</text>
 
               {/* CPC */}
-              <g>
-                <rect x="55" y="350" width="105" height="50" rx="8" fill="#0891b2" />
-                <text x="107" y="380" textAnchor="middle" className="about-node-text">CPC</text>
-                <text x="107" y="415" textAnchor="middle" className="about-node-detail">4,596 codes</text>
-                <text x="107" y="428" textAnchor="middle" className="about-node-source">UN Stats</text>
+              <g className="about-node-hover">
+                <title>{"CPC 2.1 \u2014 Central Product Classification\n4,596 codes\nSource: UN Statistics Division\nhttps://unstats.un.org/unsd/classifications/Econ/cpc"}</title>
+                <rect x="215" y="250" width="110" height="48" rx="8" fill="#0891b2" />
+                <text x="270" y="279" textAnchor="middle" className="about-node-text">CPC</text>
               </g>
+              <text x="270" y="314" textAnchor="middle" className="about-node-detail">4,596 codes</text>
+              <text x="270" y="326" textAnchor="middle" className="about-node-source">UN Stats</text>
+
+              {/* CPA */}
+              <g className="about-node-hover">
+                <title>{"CPA 2.1 \u2014 Classification of Products by Activity (EU)\n5,522 codes\nSource: Eurostat / EIONET\nhttps://dd.eionet.europa.eu/vocabulary/eurostat/cpa2_1/csv"}</title>
+                <rect x="375" y="250" width="110" height="48" rx="8" fill="#c2410c" />
+                <text x="430" y="279" textAnchor="middle" className="about-node-text">CPA</text>
+              </g>
+              <text x="430" y="314" textAnchor="middle" className="about-node-detail">5,522 codes</text>
+              <text x="430" y="326" textAnchor="middle" className="about-node-source">Eurostat / EIONET</text>
+
+              {/* BEA */}
+              <g className="about-node-hover">
+                <title>{"BEA \u2014 Input-Output Commodity Codes (US)\n500 codes\nSource: Bureau of Economic Analysis\nhttps://www.bea.gov/industry/input-output-accounts-data"}</title>
+                <rect x="535" y="250" width="110" height="48" rx="8" fill="#064e3b" />
+                <text x="590" y="279" textAnchor="middle" className="about-node-text">BEA</text>
+              </g>
+              <text x="590" y="314" textAnchor="middle" className="about-node-detail">500 codes</text>
+              <text x="590" y="326" textAnchor="middle" className="about-node-source">BEA.gov</text>
 
               {/* UNSPSC */}
-              <g>
-                <rect x="210" y="350" width="120" height="50" rx="8" fill="#7c3aed" />
-                <text x="270" y="380" textAnchor="middle" className="about-node-text">UNSPSC</text>
-                <text x="270" y="415" textAnchor="middle" className="about-node-detail">77,337 codes</text>
-                <text x="270" y="428" textAnchor="middle" className="about-node-source">Oklahoma Open Data</text>
+              <g className="about-node-hover">
+                <title>{"UNSPSC \u2014 Products & Services Code\n77,337 codes\nSource: Oklahoma Open Data\nhttps://data.ok.gov/dataset/unspsc-codes"}</title>
+                <rect x="685" y="250" width="120" height="48" rx="8" fill="#7c3aed" />
+                <text x="745" y="279" textAnchor="middle" className="about-node-text">UNSPSC</text>
               </g>
+              <text x="745" y="314" textAnchor="middle" className="about-node-detail">77,337 codes</text>
+              <text x="745" y="326" textAnchor="middle" className="about-node-source">Oklahoma Open Data</text>
 
-              {/* Concordance CPC↔HS */}
-              <g>
-                <rect x="560" y="530" width="140" height="44" rx="8" fill="#059669" />
-                <text x="630" y="550" textAnchor="middle" className="about-node-text-sm">CPC↔HS</text>
-                <text x="630" y="564" textAnchor="middle" className="about-node-text-sm">Concordance</text>
+              {/* === ROW 1 CONNECTION LINES: HS -> each === */}
+
+              {/* HS -> NAICS (Official concordance, green solid) */}
+              <path d="M 370 102 Q 240 175 110 250" fill="none" stroke="#059669" strokeWidth="2">
+                <title>{"NAICS\u2194HS Concordance\nSource: US Census Bureau imp-code.txt\nhttps://www.census.gov/foreign-trade/schedules/b/2025/imp-code.txt"}</title>
+              </path>
+              <text x="220" y="170" textAnchor="middle" className="about-edge-label" fill="#059669">imp-code.txt</text>
+
+              {/* HS -> CPC (Official concordance, green solid) */}
+              <path d="M 385 102 Q 328 175 270 250" fill="none" stroke="#059669" strokeWidth="2">
+                <title>{"CPC\u2194HS Concordance\n5,843 mappings\nSource: UN Stats, CPC21-HS2017.csv\nhttps://unstats.un.org/unsd/classifications/Econ/tables/CPC/CPCv21_HS2017/CPC21-HS2017.csv"}</title>
+              </path>
+              <text x="312" y="180" textAnchor="middle" className="about-edge-label" fill="#059669">5,843 mappings</text>
+
+              {/* HS -> CPA (Official concordance, green solid) */}
+              <path d="M 410 102 Q 420 175 430 250" fill="none" stroke="#059669" strokeWidth="2">
+                <title>{"CPA\u2194HS Concordance\nSource: Eurostat RAMON\nCPA2008_to_HS2007.csv + HS2007_to_CPA2008.csv"}</title>
+              </path>
+              <text x="435" y="180" textAnchor="middle" className="about-edge-label" fill="#059669">Eurostat RAMON</text>
+
+              {/* HS -> BEA (Official concordance, green solid) */}
+              <path d="M 430 102 Q 510 175 590 250" fill="none" stroke="#059669" strokeWidth="2">
+                <title>{"BEA\u2194HS Concordance\nSource: BEA.gov, HSConcord.xls\nhttps://apps.bea.gov/industry/xls/HSConcord.xls"}</title>
+              </path>
+              <text x="525" y="170" textAnchor="middle" className="about-edge-label" fill="#059669">HSConcord.xls</text>
+
+              {/* HS -> UNSPSC (Fuzzy matching, red dashed) */}
+              <path d="M 445 102 Q 595 175 745 250" fill="none" stroke="#dc2626" strokeWidth="2" strokeDasharray="6,4">
+                <title>{"UNSPSC\u2194HS Fuzzy Text Matching\nJaccard similarity \u2265 0.3, top 3 matches\n~4.4% coverage\nNo official concordance exists"}</title>
+              </path>
+              <text x="615" y="165" textAnchor="middle" className="about-edge-label" fill="#dc2626">Fuzzy (Jaccard ~4.4%)</text>
+
+              {/* === ROW 2: CPC-CONNECTED === */}
+
+              {/* ISIC */}
+              <g className="about-node-hover">
+                <title>{"ISIC Rev. 4 \u2014 Intl Standard Industrial Classification\n766 codes\nSource: UN Statistics Division\nhttps://unstats.un.org/unsd/classifications/Econ/Download/In%20Text/ISIC_Rev_4_english_structure.Txt"}</title>
+                <rect x="215" y="385" width="110" height="48" rx="8" fill="#1e1b4b" />
+                <text x="270" y="414" textAnchor="middle" className="about-node-text">ISIC</text>
               </g>
-              <text x="630" y="587" textAnchor="middle" className="about-node-detail">5,843 mappings (UN)</text>
+              <text x="270" y="449" textAnchor="middle" className="about-node-detail">766 codes</text>
+              <text x="270" y="461" textAnchor="middle" className="about-node-source">UN Stats</text>
 
-              {/* Fuzzy UNSPSC↔HS */}
-              <g>
-                <rect x="770" y="530" width="130" height="44" rx="8" fill="#7c3aed" opacity="0.8" />
-                <text x="835" y="550" textAnchor="middle" className="about-node-text-sm">UNSPSC↔HS</text>
-                <text x="835" y="564" textAnchor="middle" className="about-node-text-sm">Fuzzy Match</text>
+              {/* NACE */}
+              <g className="about-node-hover">
+                <title>{"NACE Rev. 2 \u2014 EU Economic Activities\n996 codes\nSource: Eurostat / EIONET\nhttps://dd.eionet.europa.eu/vocabulary/eurostat/nace_r2/csv"}</title>
+                <rect x="425" y="385" width="110" height="48" rx="8" fill="#500724" />
+                <text x="480" y="414" textAnchor="middle" className="about-node-text">NACE</text>
               </g>
-              <text x="835" y="587" textAnchor="middle" className="about-node-detail">Jaccard ≥ 0.3</text>
+              <text x="480" y="449" textAnchor="middle" className="about-node-detail">996 codes</text>
+              <text x="480" y="461" textAnchor="middle" className="about-node-source">Eurostat / EIONET</text>
 
-              {/* Concordance arrows */}
-              <path d="M 160 375 Q 400 500 560 552" fill="none" stroke="#059669" strokeWidth="2" markerEnd="url(#arrowGreen)" />
-              <path d="M 200 120 Q 400 80 560 552" fill="none" stroke="#059669" strokeWidth="2" strokeDasharray="4,4" markerEnd="url(#arrowGreen)" />
+              {/* CPC -> ISIC (Official concordance, green solid) */}
+              <line x1="270" y1="298" x2="270" y2="385" stroke="#059669" strokeWidth="2">
+                <title>{"ISIC\u2194CPC Concordance\nSource: UN Stats, ISIC4-CPC21.txt\nhttps://unstats.un.org/unsd/classifications/Econ/tables/CPC/CPCv21_ISIC4/cpc21-isic4.txt"}</title>
+              </line>
+              <text x="288" y="345" textAnchor="start" className="about-edge-label" fill="#059669">ISIC4-CPC21.txt</text>
 
-              {/* Fuzzy arrows */}
-              <path d="M 330 375 Q 550 510 770 552" fill="none" stroke="#7c3aed" strokeWidth="2" strokeDasharray="4,4" markerEnd="url(#arrowPurple)" />
-              <path d="M 253 95 Q 520 40 770 552" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeDasharray="4,4" markerEnd="url(#arrowPurple)" />
+              {/* ISIC <-> NACE (Structural identity, teal dotted) */}
+              <line x1="325" y1="409" x2="425" y2="409" stroke="#0891b2" strokeWidth="2.5" strokeDasharray="3,3">
+                <title>{"NACE \u2248 ISIC \u2014 Structural Identity\nNACE Rev.2 codes are identical to ISIC Rev.4 at numeric levels (2/3/4 digits)\nNo separate concordance needed"}</title>
+              </line>
+              <text x="375" y="400" textAnchor="middle" className="about-edge-label" fill="#0891b2">{"\u2248 same codes"}</text>
 
-              {/* T1 (HTS Goods + CPC Services) */}
-              <g>
-                <rect x="555" y="70" width="170" height="50" rx="8" fill="#d97706" />
-                <text x="640" y="100" textAnchor="middle" className="about-node-text">T1</text>
-                <text x="640" y="135" textAnchor="middle" className="about-node-detail">31,595 codes</text>
-                <text x="640" y="148" textAnchor="middle" className="about-node-source">HTS goods + CPC services</text>
-              </g>
-
-              {/* T2 (CPC Backbone + HTS Detail) */}
-              <g>
-                <rect x="750" y="70" width="160" height="50" rx="8" fill="#b45309" />
-                <text x="830" y="100" textAnchor="middle" className="about-node-text">T2</text>
-                <text x="830" y="135" textAnchor="middle" className="about-node-detail">24,428 codes</text>
-                <text x="830" y="148" textAnchor="middle" className="about-node-source">CPC backbone + HTS detail</text>
-              </g>
-
-              {/* HTS → T1 */}
-              <path d="M 290 195 Q 430 130 555 95" fill="none" stroke="#d97706" strokeWidth="2.5" markerEnd="url(#arrowAmber)" />
-              <text x="418" y="142" textAnchor="middle" className="about-edge-label-bold">HTS sections I-XXII</text>
-
-              {/* CPC → T1 */}
-              <path d="M 107 350 Q 300 280 555 95" fill="none" stroke="#d97706" strokeWidth="2.5" markerEnd="url(#arrowAmber)" />
-              <text x="300" y="300" textAnchor="middle" className="about-edge-label-bold">CPC sections 5-9</text>
-
-              {/* CPC → T2 */}
-              <path d="M 160 355 Q 460 250 750 95" fill="none" stroke="#b45309" strokeWidth="2.5" markerEnd="url(#arrowAmberDark)" />
-              <text x="465" y="248" textAnchor="middle" className="about-edge-label-bold">CPC backbone</text>
-
-              {/* HTS → T2 */}
-              <path d="M 290 185 Q 550 100 750 90" fill="none" stroke="#b45309" strokeWidth="2" strokeDasharray="6,3" markerEnd="url(#arrowAmberDark)" />
-              <text x="530" y="105" textAnchor="middle" className="about-edge-label">HTS detail under leaves</text>
-
-              {/* ecoinvent */}
-              <g>
-                <rect x="550" y="295" width="130" height="50" rx="8" fill="#f59e0b" />
-                <text x="615" y="325" textAnchor="middle" className="about-node-text">ecoinvent</text>
-                <text x="615" y="358" textAnchor="middle" className="about-node-detail">4,031 products</text>
-                <text x="615" y="371" textAnchor="middle" className="about-node-source">v3.10 Cut-Off</text>
-              </g>
-
-              {/* ecoinvent → CPC */}
-              <path d="M 550 320 Q 350 345 160 370" fill="none" stroke="#f59e0b" strokeWidth="2" markerEnd="url(#arrowAmber)" />
-              <text x="350" y="350" textAnchor="middle" className="about-edge-label">660 CPC codes</text>
-
-              {/* ecoinvent → HS */}
-              <path d="M 590 295 Q 400 195 253 100" fill="none" stroke="#f59e0b" strokeWidth="2" markerEnd="url(#arrowAmber)" />
-              <text x="430" y="192" textAnchor="middle" className="about-edge-label">966 HS codes</text>
-
-              {/* EPA NAICS Emission Factors */}
-              <g>
-                <rect x="695" y="295" width="110" height="50" rx="8" fill="#dc2626" opacity="0.9" />
-                <text x="750" y="315" textAnchor="middle" className="about-node-text-sm">EPA NAICS</text>
-                <text x="750" y="329" textAnchor="middle" className="about-node-text-sm">Emission</text>
-                <text x="750" y="343" textAnchor="middle" className="about-node-text-sm">Factors</text>
-              </g>
-              <text x="750" y="360" textAnchor="middle" className="about-node-detail">kg CO2e/USD by NAICS-6</text>
-              <text x="750" y="373" textAnchor="middle" className="about-node-source">EPA Supply Chain GHG v1.3</text>
-
-              {/* Census HTS→NAICS concordance bridge */}
-              <g>
-                <rect x="695" y="390" width="110" height="40" rx="6" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1" />
-                <text x="750" y="407" textAnchor="middle" className="about-bridge-text">HTS→NAICS</text>
-                <text x="750" y="420" textAnchor="middle" className="about-bridge-text">Concordance</text>
-              </g>
-              <text x="750" y="443" textAnchor="middle" className="about-node-detail">Census Bureau imp-code.txt</text>
-
-              {/* EPA → Census concordance → HS */}
-              <line x1="750" y1="345" x2="750" y2="390" stroke="#dc2626" strokeWidth="2" markerEnd="url(#arrowRed)" />
-              <path d="M 695 410 Q 450 350 253 108" fill="none" stroke="#dc2626" strokeWidth="2" strokeDasharray="5,3" markerEnd="url(#arrowRed)" />
-              <text x="460" y="300" textAnchor="middle" className="about-edge-label" fill="#dc2626">via HS-6 join</text>
-
-              {/* EXIOBASE */}
-              <g>
-                <rect x="820" y="295" width="100" height="50" rx="8" fill="#2563eb" opacity="0.85" />
-                <text x="870" y="316" textAnchor="middle" className="about-node-text-sm">EXIOBASE</text>
-                <text x="870" y="330" textAnchor="middle" className="about-node-text-sm">3.8.2</text>
-              </g>
-              <text x="870" y="360" textAnchor="middle" className="about-node-detail">kg CO2e by sector</text>
-              <text x="870" y="373" textAnchor="middle" className="about-node-source">ExioML (Zenodo)</text>
-
-              {/* EXIOBASE → HS chapters */}
-              <path d="M 820 320 Q 510 210 253 100" fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="5,3" markerEnd="url(#arrowExio)" />
-              <text x="530" y="218" textAnchor="middle" className="about-edge-label">HS 2-digit chapters</text>
-
-              {/* Custom Taxonomy Builder */}
-              <g>
-                <rect x="80" y="560" width="260" height="60" rx="12" fill="#fffbeb" stroke="#f59e0b" strokeWidth="2" strokeDasharray="6,4" />
-                <text x="210" y="587" textAnchor="middle" className="about-custom-label">Custom Taxonomy Builder</text>
-                <text x="210" y="605" textAnchor="middle" className="about-node-detail">User-defined nodes, meta-parameters,</text>
-                <text x="210" y="617" textAnchor="middle" className="about-node-detail">cross-taxonomy mappings, decision trails</text>
-              </g>
-
-              {/* Custom ↔ all taxonomies (dashed) */}
-              <path d="M 210 560 L 200 120" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
-              <path d="M 170 560 L 107 400" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
-              <path d="M 260 560 L 270 400" fill="none" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
-
-              {/* Arrow markers */}
-              <defs>
-                <marker id="arrowBlue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#6366f1" />
-                </marker>
-                <marker id="arrowGreen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#059669" />
-                </marker>
-                <marker id="arrowPurple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#7c3aed" />
-                </marker>
-                <marker id="arrowAmber" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#f59e0b" />
-                </marker>
-                <marker id="arrowAmberDark" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#b45309" />
-                </marker>
-                <marker id="arrowRed" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#dc2626" />
-                </marker>
-                <marker id="arrowExio" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                  <path d="M 0 0 L 8 3 L 0 6 Z" fill="#2563eb" />
-                </marker>
-              </defs>
             </svg>
           </div>
 
@@ -252,86 +208,134 @@ export function AboutSection() {
             <h4>Legend</h4>
             <div className="about-legend-grid">
               <div className="about-legend-item">
-                <span className="about-legend-line solid" style={{ borderColor: "#6366f1" }}></span>
+                <span className="about-legend-line dashed" style={{ borderColor: "#6366f1" }}></span>
                 <span>Shared 6-digit HS base codes</span>
               </div>
               <div className="about-legend-item">
-                <span className="about-legend-line solid" style={{ borderColor: "#d97706" }}></span>
-                <span>Taxonomy composition (direct source)</span>
-              </div>
-              <div className="about-legend-item">
-                <span className="about-legend-line dashed" style={{ borderColor: "#059669" }}></span>
-                <span>CPC↔HS concordance table (UN)</span>
-              </div>
-              <div className="about-legend-item">
-                <span className="about-legend-line dashed" style={{ borderColor: "#7c3aed" }}></span>
-                <span>Fuzzy text matching (Jaccard similarity)</span>
-              </div>
-              <div className="about-legend-item">
-                <span className="about-legend-line solid" style={{ borderColor: "#f59e0b" }}></span>
-                <span>ecoinvent product-to-code mapping</span>
+                <span className="about-legend-line solid" style={{ borderColor: "#059669" }}></span>
+                <span>Official concordance table</span>
               </div>
               <div className="about-legend-item">
                 <span className="about-legend-line dashed" style={{ borderColor: "#dc2626" }}></span>
-                <span>EPA emission factors via NAICS→HS join</span>
+                <span>Fuzzy text matching (Jaccard similarity)</span>
               </div>
               <div className="about-legend-item">
-                <span className="about-legend-line dashed" style={{ borderColor: "#2563eb" }}></span>
-                <span>EXIOBASE sector factors → HS chapters</span>
-              </div>
-              <div className="about-legend-item">
-                <span className="about-legend-line dashed" style={{ borderColor: "#d97706" }}></span>
-                <span>Custom taxonomy user mappings</span>
+                <span className="about-legend-line dotted" style={{ borderColor: "#0891b2" }}></span>
+                <span>Structural identity (same numeric codes)</span>
               </div>
             </div>
           </div>
 
+          <div className="about-concordance-details">
+            <h4>Concordance Details</h4>
+            <table className="about-concordance-table">
+              <thead>
+                <tr>
+                  <th>Connection</th>
+                  <th>Type</th>
+                  <th>Source</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>HS &harr; CN / HTS / CA</strong></td>
+                  <td><span className="about-conc-badge shared">Shared Code</span></td>
+                  <td>Inherent structure</td>
+                  <td>First 6 digits identical; national extensions add 8-10 digit detail</td>
+                </tr>
+                <tr>
+                  <td><strong>CPC &harr; HS</strong></td>
+                  <td><span className="about-conc-badge official">Official</span></td>
+                  <td>UN Statistics Division</td>
+                  <td>CPC21-HS2017.csv &mdash; 5,843 mappings</td>
+                </tr>
+                <tr>
+                  <td><strong>NAICS &harr; HS</strong></td>
+                  <td><span className="about-conc-badge official">Official</span></td>
+                  <td>US Census Bureau</td>
+                  <td>imp-code.txt &mdash; HTS-10 to NAICS-6</td>
+                </tr>
+                <tr>
+                  <td><strong>ISIC &harr; CPC</strong></td>
+                  <td><span className="about-conc-badge official">Official</span></td>
+                  <td>UN Statistics Division</td>
+                  <td>ISIC4-CPC21.txt</td>
+                </tr>
+                <tr>
+                  <td><strong>CPA &harr; HS</strong></td>
+                  <td><span className="about-conc-badge official">Official</span></td>
+                  <td>Eurostat RAMON</td>
+                  <td>CPA2008_to_HS2007.csv + HS2007_to_CPA2008.csv</td>
+                </tr>
+                <tr>
+                  <td><strong>BEA &harr; HS</strong></td>
+                  <td><span className="about-conc-badge official">Official</span></td>
+                  <td>BEA.gov</td>
+                  <td>HSConcord.xls</td>
+                </tr>
+                <tr>
+                  <td><strong>NACE &asymp; ISIC</strong></td>
+                  <td><span className="about-conc-badge structural">Structural</span></td>
+                  <td>Inherent</td>
+                  <td>NACE Rev.2 uses identical codes to ISIC Rev.4 at 2/3/4 digits</td>
+                </tr>
+                <tr>
+                  <td><strong>UNSPSC &harr; HS</strong></td>
+                  <td><span className="about-conc-badge fuzzy">Fuzzy</span></td>
+                  <td>Computed</td>
+                  <td>Jaccard similarity &ge; 0.3, top 3 matches, ~4.4% coverage</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           <div className="about-details">
-            <h4>Data Sources</h4>
+            <h4>Taxonomy Sources</h4>
             <div className="about-details-grid">
-              <div className="about-detail-card" style={{ borderLeftColor: "#6366f1" }}>
-                <strong>HS — Harmonized System</strong>
+              <div className="about-detail-card" style={{ borderLeftColor: "#4f46e5" }}>
+                <strong>HS &mdash; Harmonized System</strong>
                 <p>6,940 codes from UN Comtrade. The international standard for classifying traded goods. All HS-family taxonomies (CN, HTS, CA) share the first 6 digits.</p>
               </div>
               <div className="about-detail-card" style={{ borderLeftColor: "#1e40af" }}>
-                <strong>CN — Combined Nomenclature (EU)</strong>
+                <strong>CN &mdash; Combined Nomenclature (EU)</strong>
                 <p>12,113 codes from Finnish Customs. Extends HS with EU-specific 8-digit codes for tariff and statistical purposes.</p>
               </div>
               <div className="about-detail-card" style={{ borderLeftColor: "#92400e" }}>
-                <strong>HTS — Harmonized Tariff Schedule (US)</strong>
+                <strong>HTS &mdash; Harmonized Tariff Schedule (US)</strong>
                 <p>29,675 codes from the US International Trade Commission (USITC). Extends HS with US-specific tariff lines.</p>
               </div>
               <div className="about-detail-card" style={{ borderLeftColor: "#9f1239" }}>
-                <strong>CA — Canadian Customs Tariff</strong>
+                <strong>CA &mdash; Canadian Customs Tariff</strong>
                 <p>19,252 codes from Canada Border Services Agency (CBSA). Canada's extension of the HS system.</p>
               </div>
               <div className="about-detail-card" style={{ borderLeftColor: "#0891b2" }}>
-                <strong>CPC — Central Product Classification</strong>
-                <p>4,596 codes from UN Statistics Division (Ver. 2.1). Covers both goods and services. Linked to HS via a UN concordance table with 5,843 mappings.</p>
+                <strong>CPC &mdash; Central Product Classification</strong>
+                <p>4,596 codes from UN Statistics Division (Ver. 2.1). Covers both goods and services. Linked to HS via UN concordance table with 5,843 mappings.</p>
               </div>
               <div className="about-detail-card" style={{ borderLeftColor: "#7c3aed" }}>
-                <strong>UNSPSC — Products &amp; Services Code</strong>
-                <p>77,337 codes from Oklahoma Open Data. Connected to HS via fuzzy text matching (Jaccard similarity threshold 0.3, top 3 matches).</p>
+                <strong>UNSPSC &mdash; Products &amp; Services Code</strong>
+                <p>77,337 codes from Oklahoma Open Data. Connected to HS via fuzzy text matching (Jaccard similarity threshold 0.3, top 3 matches, ~4.4% coverage).</p>
               </div>
-              <div className="about-detail-card" style={{ borderLeftColor: "#d97706" }}>
-                <strong>T1 — HTS Goods + CPC Services</strong>
-                <p>31,595 codes. A combined taxonomy using HTS sections I-XXII for goods and CPC sections 5-9 for services, providing unified goods+services coverage.</p>
+              <div className="about-detail-card" style={{ borderLeftColor: "#0c4a6e" }}>
+                <strong>NAICS &mdash; North American Industry Classification</strong>
+                <p>2,122 codes from US Census Bureau (2022 edition). Industry classification linked to HS via Census Bureau imp-code.txt concordance.</p>
               </div>
-              <div className="about-detail-card" style={{ borderLeftColor: "#b45309" }}>
-                <strong>T2 — CPC Backbone + HTS Detail</strong>
-                <p>24,428 codes. Uses the full CPC tree as a backbone structure, with HTS tariff lines nested under CPC goods leaf nodes via the concordance table.</p>
+              <div className="about-detail-card" style={{ borderLeftColor: "#1e1b4b" }}>
+                <strong>ISIC &mdash; Intl Standard Industrial Classification</strong>
+                <p>766 codes from UN Stats (Rev. 4). Global industry classification with official concordance to CPC (ISIC4-CPC21.txt).</p>
               </div>
-              <div className="about-detail-card" style={{ borderLeftColor: "#f59e0b" }}>
-                <strong>ecoinvent v3.10</strong>
-                <p>4,031 products mapped to 660 CPC codes and 966 HS codes (from the Cut-Off Activity Overview). Provides environmental impact data as a coverage overlay.</p>
+              <div className="about-detail-card" style={{ borderLeftColor: "#500724" }}>
+                <strong>NACE &mdash; EU Economic Activities</strong>
+                <p>996 codes from Eurostat/EIONET (Rev. 2). EU implementation of ISIC &mdash; identical numeric code structure.</p>
               </div>
-              <div className="about-detail-card" style={{ borderLeftColor: "#dc2626" }}>
-                <strong>EPA NAICS Emission Factors</strong>
-                <p>Supply Chain GHG Emission Factors v1.3 (kg CO2e per 2022 USD), keyed by NAICS-6 industry code. Joined to HS-6 trade codes via the Census Bureau HTS-10→NAICS-6 concordance (imp-code.txt). Shows carbon intensity with production vs. margins breakdown.</p>
+              <div className="about-detail-card" style={{ borderLeftColor: "#c2410c" }}>
+                <strong>CPA &mdash; Classification of Products by Activity</strong>
+                <p>5,522 codes from Eurostat/EIONET (2.1). EU product classification linked to HS via Eurostat RAMON concordance.</p>
               </div>
-              <div className="about-detail-card" style={{ borderLeftColor: "#2563eb" }}>
-                <strong>EXIOBASE 3.8.2</strong>
-                <p>Sector-level emission factors from the ExioML dataset (Zenodo). Mapped to HS 2-digit chapter codes via a manual sector-to-chapter correspondence. Shows kg CO2e by EXIOBASE product sector.</p>
+              <div className="about-detail-card" style={{ borderLeftColor: "#064e3b" }}>
+                <strong>BEA &mdash; Input-Output Commodity Codes</strong>
+                <p>~500 codes from BEA.gov. US economic analysis classification linked to HS via BEA concordance (HSConcord.xls).</p>
               </div>
             </div>
           </div>
