@@ -13,7 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
-import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, BafuCoverage, GenericConcordance } from "./types";
+import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
@@ -662,6 +662,178 @@ function ExiobaseFactorDisplay({ entry }: { entry: ExiobaseFactorEntry }) {
         ))}
       </div>
       <div className="emission-source">{entry.source}</div>
+    </div>
+  );
+}
+
+// Look up BAFU chapter data for a selected node (keyed by HS 2-digit chapter)
+function getBafuChapterData(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  bafuCoverage: BafuCoverage | null,
+  concordance: ConcordanceData,
+): BafuCoverageEntry | null {
+  if (!bafuCoverage) return null;
+  const cov = bafuCoverage.coverage;
+
+  if (HS_FAMILY.includes(taxonomy)) {
+    const hsBase = getHsBase(node.code, taxonomy);
+    if (!hsBase || hsBase.length < 2) return null;
+    const chapter = hsBase.substring(0, 2);
+    return cov[chapter] ?? null;
+  }
+
+  if (taxonomy === "cpc") {
+    const cleanCpc = stripCode(node.code);
+    for (let len = cleanCpc.length; len >= 4; len--) {
+      const prefix = cleanCpc.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        const chapter = hsMappings[0].code.substring(0, 2);
+        if (cov[chapter]) return cov[chapter];
+      }
+    }
+  }
+
+  if (taxonomy === "t1") {
+    const origin = getT1Origin(node.id, {} as Record<string, LookupEntry>, node.code);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 2) {
+        const chapter = hsBase.substring(0, 2);
+        return cov[chapter] ?? null;
+      }
+    }
+  }
+
+  if (taxonomy === "t2") {
+    const origin = getT2Origin(node.id);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 2) {
+        const chapter = hsBase.substring(0, 2);
+        return cov[chapter] ?? null;
+      }
+    } else if (origin === "cpc") {
+      const cleanCpc = stripCode(node.code);
+      for (let len = cleanCpc.length; len >= 4; len--) {
+        const prefix = cleanCpc.substring(0, len);
+        const hsMappings = concordance.cpcToHs[prefix];
+        if (hsMappings && hsMappings.length > 0) {
+          const chapter = hsMappings[0].code.substring(0, 2);
+          if (cov[chapter]) return cov[chapter];
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function BafuFactorDisplay({ entry }: { entry: BafuCoverageEntry }) {
+  return <LciFactorDisplay entry={entry} title="Direct Emissions (BAFU)" source="BAFU:2025 (direct process emissions only, GWP-100 AR6)" cardClass="bafu-card" />;
+}
+
+function UslciFactorDisplay({ entry }: { entry: UslciCoverageEntry }) {
+  return <LciFactorDisplay entry={entry} title="Direct Emissions (US LCI)" source="NREL USLCI (direct process emissions only, GWP-100 AR6)" cardClass="uslci-card" />;
+}
+
+// Look up USLCI data for a selected node (keyed by HS-6 code)
+function getUslciData(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  uslciCoverage: UslciCoverage | null,
+  concordance: ConcordanceData,
+): UslciCoverageEntry | null {
+  if (!uslciCoverage) return null;
+  const cov = uslciCoverage.coverage;
+
+  if (HS_FAMILY.includes(taxonomy)) {
+    const hsBase = getHsBase(node.code, taxonomy);
+    if (!hsBase || hsBase.length < 6) return null;
+    return cov[hsBase.substring(0, 6)] ?? null;
+  }
+
+  if (taxonomy === "cpc") {
+    const cleanCpc = stripCode(node.code);
+    for (let len = cleanCpc.length; len >= 4; len--) {
+      const prefix = cleanCpc.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        const hsCode = hsMappings[0].code;
+        if (cov[hsCode]) return cov[hsCode];
+      }
+    }
+  }
+
+  if (taxonomy === "t1") {
+    const origin = getT1Origin(node.id, {} as Record<string, LookupEntry>, node.code);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 6) return cov[hsBase.substring(0, 6)] ?? null;
+    }
+  }
+
+  if (taxonomy === "t2") {
+    const origin = getT2Origin(node.id);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 6) return cov[hsBase.substring(0, 6)] ?? null;
+    } else if (origin === "cpc") {
+      const cleanCpc = stripCode(node.code);
+      for (let len = cleanCpc.length; len >= 4; len--) {
+        const prefix = cleanCpc.substring(0, len);
+        const hsMappings = concordance.cpcToHs[prefix];
+        if (hsMappings && hsMappings.length > 0) {
+          const hsCode = hsMappings[0].code;
+          if (cov[hsCode]) return cov[hsCode];
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function LciFactorDisplay({ entry, title, source, cardClass }: {
+  entry: { withGhgData: number; unitStats: Record<string, LciUnitStats>; topProcesses: { name: string; ghg: number; unit: string }[] };
+  title: string;
+  source: string;
+  cardClass: string;
+}) {
+  if (entry.withGhgData === 0) return null;
+
+  // Find the "kg" unit stats as the most meaningful for goods
+  const kgStats = entry.unitStats["kg"];
+  const primaryUnit = kgStats ? "kg" : Object.keys(entry.unitStats)[0];
+  const primaryStats = kgStats || entry.unitStats[primaryUnit];
+
+  return (
+    <div className={`emission-factor-card ${cardClass}`}>
+      <h4>{title}</h4>
+      {primaryStats && (
+        <div className="lci-summary">
+          <div className="emission-main">
+            <span className="emission-value">{primaryStats.median.toFixed(3)}</span>
+            <span className="emission-unit">kg CO₂e / {primaryUnit}</span>
+          </div>
+          <div className="lci-range">
+            <span className="lci-range-label">Range:</span>{" "}
+            {primaryStats.min.toFixed(3)} – {primaryStats.max.toFixed(3)} ({primaryStats.count} processes)
+          </div>
+        </div>
+      )}
+      {entry.topProcesses.length > 0 && (
+        <div className="lci-processes">
+          {entry.topProcesses.slice(0, 5).map((p, i) => (
+            <div key={i} className="lci-process">
+              <span className="lci-process-name">{p.name}</span>
+              <span className="lci-process-value">{p.ghg.toFixed(3)} kg CO₂e/{p.unit}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="emission-source">{source}</div>
     </div>
   );
 }
@@ -1440,6 +1612,16 @@ function AppContent() {
   const exiobaseFactor = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return null;
     return getExiobaseFactor(selectedNode, selectedFrom, data.exiobaseFactors, data.concordance);
+  }, [selectedNode, selectedFrom, data]);
+
+  const bafuFactor = useMemo(() => {
+    if (!selectedNode || !selectedFrom || !data) return null;
+    return getBafuChapterData(selectedNode, selectedFrom, data.bafuCoverage, data.concordance);
+  }, [selectedNode, selectedFrom, data]);
+
+  const uslciFactor = useMemo(() => {
+    if (!selectedNode || !selectedFrom || !data) return null;
+    return getUslciData(selectedNode, selectedFrom, data.uslciCoverage, data.concordance);
   }, [selectedNode, selectedFrom, data]);
 
   // Handle node selection: update state + sync other pane
@@ -2291,6 +2473,14 @@ function AppContent() {
               <ExiobaseFactorDisplay entry={exiobaseFactor} />
             )}
 
+            {bafuFactor && bafuFactor.withGhgData > 0 && (
+              <BafuFactorDisplay entry={bafuFactor} />
+            )}
+
+            {uslciFactor && uslciFactor.withGhgData > 0 && (
+              <UslciFactorDisplay entry={uslciFactor} />
+            )}
+
             {(ecoinventInfo.cpc || ecoinventInfo.hs) && (
               <EcoinventDisplay
                 cpc={ecoinventInfo.cpc}
@@ -2300,7 +2490,7 @@ function AppContent() {
               />
             )}
 
-            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !ecoinventInfo.cpc && !ecoinventInfo.hs && (
+            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !(bafuFactor && bafuFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && (
               <div className="comparison-item no-mapping">
                 <p className="name">No mappings found at this level</p>
               </div>

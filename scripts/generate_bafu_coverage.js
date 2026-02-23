@@ -38,44 +38,98 @@ const CATEGORY_TO_HS_CHAPTERS = {
   'compressed air': ['84'],
 };
 
+// GWP-100 values (IPCC AR6)
+const GWP = {
+  'carbon dioxide, fossil': 1,
+  'carbon dioxide, land transformation': 1,
+  'methane, fossil': 29.8,
+  'methane, biogenic': 27.2,
+  'dinitrogen monoxide': 273,
+};
+
 const zipPath = path.join(__dirname, '..', 'BAFU-2025 ecospold1.zip');
 const zip = new AdmZip(zipPath);
 const entries = zip.getEntries().filter(e => e.entryName.endsWith('.xml'));
 
 console.log('Processing', entries.length, 'XML files...');
 
-// Extract categories and count processes per HS chapter
-const hsChapterProcesses = {};
+// Per-HS-chapter data: { processCount, processes: [{name, ghg, unit}] }
+const hsChapterData = {};
 const unmappedCategories = {};
 let totalMapped = 0;
 let totalUnmapped = 0;
+let totalWithGhg = 0;
 
 for (const entry of entries) {
   const content = entry.getData().toString('utf8');
-  const catMatch = content.match(/category="([^"]+)"/);
-  if (catMatch === null) continue;
 
-  const topCategory = catMatch[1].toLowerCase();
+  // Extract reference function attributes
+  const refMatch = content.match(/<referenceFunction\s([^>]+)\/>/);
+  if (!refMatch) continue;
+  const refAttrs = refMatch[1];
+  const refName = (refAttrs.match(/\bname="([^"]*)"/) || [])[1] || '';
+  const refUnit = (refAttrs.match(/\bunit="([^"]*)"/) || [])[1] || '';
+  const refCat = (refAttrs.match(/\bcategory="([^"]*)"/) || [])[1] || '';
+
+  const topCategory = refCat.toLowerCase();
   const hsChapters = CATEGORY_TO_HS_CHAPTERS[topCategory];
 
-  if (hsChapters) {
-    totalMapped++;
-    for (const ch of hsChapters) {
-      hsChapterProcesses[ch] = (hsChapterProcesses[ch] || 0) + 1;
-    }
-  } else {
+  if (!hsChapters) {
     totalUnmapped++;
     unmappedCategories[topCategory] = (unmappedCategories[topCategory] || 0) + 1;
+    continue;
   }
+
+  totalMapped++;
+
+  // Extract GHG emissions from exchange blocks (outputGroup=4, category="emissions to air")
+  const exchangeBlocks = content.match(/<exchange\s[\s\S]*?<\/exchange>/g) || [];
+  let totalCO2e = 0;
+
+  for (const block of exchangeBlocks) {
+    if (!/<outputGroup>4<\/outputGroup>/.test(block)) continue;
+    const cat = (block.match(/\bcategory="([^"]*)"/) || [])[1] || '';
+    if (!cat.toLowerCase().includes('emissions to air')) continue;
+
+    const name = (block.match(/\bname="([^"]*)"/) || [])[1] || '';
+    const value = parseFloat((block.match(/\bmeanValue="([^"]*)"/) || [])[1] || '0');
+    if (isNaN(value) || value <= 0) continue;
+
+    const nameLower = name.toLowerCase();
+    for (const [ghgName, gwp] of Object.entries(GWP)) {
+      if (nameLower.includes(ghgName)) {
+        totalCO2e += value * gwp;
+        break;
+      }
+    }
+  }
+
+  for (const ch of hsChapters) {
+    if (!hsChapterData[ch]) {
+      hsChapterData[ch] = { processCount: 0, processes: [] };
+    }
+    hsChapterData[ch].processCount++;
+    if (totalCO2e > 0) {
+      hsChapterData[ch].processes.push({
+        name: refName,
+        ghg: totalCO2e,
+        unit: refUnit,
+      });
+    }
+  }
+
+  if (totalCO2e > 0) totalWithGhg++;
 }
 
 console.log('Mapped processes:', totalMapped);
+console.log('With GHG data:', totalWithGhg);
 console.log('Unmapped processes:', totalUnmapped, '(services/energy/waste - expected)');
-console.log('HS chapters covered:', Object.keys(hsChapterProcesses).length);
+console.log('HS chapters covered:', Object.keys(hsChapterData).length);
 
 console.log('\nHS chapter coverage:');
-for (const [ch, count] of Object.entries(hsChapterProcesses).sort()) {
-  console.log('  HS', ch, ':', count, 'processes');
+for (const [ch, data] of Object.entries(hsChapterData).sort()) {
+  const withGhg = data.processes.length;
+  console.log('  HS', ch, ':', data.processCount, 'processes,', withGhg, 'with GHG data');
 }
 
 console.log('\nUnmapped categories (top 15):');
@@ -84,10 +138,46 @@ for (const [cat, count] of unmappedSorted.slice(0, 15)) {
   console.log('  ', count, cat);
 }
 
-// Generate coverage JSON
+// Build output: for each chapter, keep top 10 processes by GHG (sorted descending)
+// and compute summary stats grouped by reference unit
 const coverage = {};
-for (const [ch, count] of Object.entries(hsChapterProcesses)) {
-  coverage[ch] = { processCount: count };
+for (const [ch, data] of Object.entries(hsChapterData)) {
+  const procs = data.processes;
+
+  // Group by unit and compute stats
+  const byUnit = {};
+  for (const p of procs) {
+    if (!byUnit[p.unit]) byUnit[p.unit] = [];
+    byUnit[p.unit].push(p.ghg);
+  }
+
+  const unitStats = {};
+  for (const [unit, values] of Object.entries(byUnit)) {
+    values.sort((a, b) => a - b);
+    const sum = values.reduce((s, v) => s + v, 0);
+    unitStats[unit] = {
+      count: values.length,
+      min: values[0],
+      max: values[values.length - 1],
+      avg: sum / values.length,
+      median: values[Math.floor(values.length / 2)],
+    };
+  }
+
+  // Top 10 processes by GHG (descending)
+  procs.sort((a, b) => b.ghg - a.ghg);
+  const topProcesses = procs.slice(0, 10).map(p => ({
+    name: p.name.replace(/\s*\{[^}]*\}\s*/g, '').trim(), // strip location tags like {CH}
+    ghg: Math.round(p.ghg * 1e6) / 1e6, // 6 decimal places
+    unit: p.unit,
+  }));
+
+  coverage[ch] = {
+    processCount: data.processCount,
+    withGhgData: procs.length,
+    unitStats,
+    topProcesses,
+  };
 }
 
 const output = {
@@ -95,9 +185,11 @@ const output = {
   stats: {
     totalProcesses: entries.length,
     mappedProcesses: totalMapped,
+    mappedWithGhg: totalWithGhg,
     unmappedProcesses: totalUnmapped,
     coveredHsChapters: Object.keys(coverage).length,
     source: 'BAFU:2025 Swiss Federal LCI Database (ESU-services/FOEN)',
+    note: 'GHG values are DIRECT process emissions only (not full supply chain). Uses GWP-100 from IPCC AR6.',
   },
 };
 

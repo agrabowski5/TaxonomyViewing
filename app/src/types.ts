@@ -81,23 +81,45 @@ export interface EcoinventMapping {
   };
 }
 
+export interface LciUnitStats {
+  count: number;
+  min: number;
+  max: number;
+  avg: number;
+  median: number;
+}
+
+export interface LciProcess {
+  name: string;
+  ghg: number;
+  unit: string;
+}
+
 export interface UslciCoverageEntry {
   naicsCodes: string[];
   processCount: number;
+  withGhgData: number;
+  unitStats: Record<string, LciUnitStats>;
+  topProcesses: LciProcess[];
 }
 
 export interface UslciCoverage {
   coverage: Record<string, UslciCoverageEntry>;
   stats: {
     totalProcesses: number;
+    totalWithGhg: number;
     uniqueNaicsCodes: number;
     coveredHs6Codes: number;
     source: string;
+    note: string;
   };
 }
 
 export interface BafuCoverageEntry {
   processCount: number;
+  withGhgData: number;
+  unitStats: Record<string, LciUnitStats>;
+  topProcesses: LciProcess[];
 }
 
 export interface BafuCoverage {
@@ -105,9 +127,11 @@ export interface BafuCoverage {
   stats: {
     totalProcesses: number;
     mappedProcesses: number;
+    mappedWithGhg: number;
     unmappedProcesses: number;
     coveredHsChapters: number;
     source: string;
+    note: string;
   };
 }
 

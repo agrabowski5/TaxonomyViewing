@@ -1207,6 +1207,79 @@
   white-space: nowrap;
 }
 
+/* Shared LCI factor card styles (BAFU, USLCI) */
+.lci-summary {
+  margin-bottom: 6px;
+}
+
+.lci-range {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.lci-range-label {
+  font-weight: 600;
+}
+
+.lci-processes {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 6px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+}
+
+.lci-process {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.lci-process-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lci-process-value {
+  font-weight: 600;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* BAFU card */
+.bafu-card {
+  border-color: #be123c;
+  background: linear-gradient(135deg, #fff1f2, #ffe4e6);
+}
+
+.bafu-card h4 { color: #9f1239; }
+.bafu-card .emission-value { color: #be123c; }
+.bafu-card .emission-source { color: #9f1239; }
+.bafu-card .lci-range { color: #881337; }
+.bafu-card .lci-process-name { color: #4c0519; }
+.bafu-card .lci-process-value { color: #be123c; }
+
+/* USLCI card */
+.uslci-card {
+  border-color: #1d4ed8;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+}
+
+.uslci-card h4 { color: #1e40af; }
+.uslci-card .emission-value { color: #1d4ed8; }
+.uslci-card .emission-source { color: #1e40af; }
+.uslci-card .lci-range { color: #1e3a8a; }
+.uslci-card .lci-process-name { color: #172554; }
+.uslci-card .lci-process-value { color: #1d4ed8; }
+
 /* ===== EF Database Coverage Badges (Tree Node) ===== */
 .ef-badges {
   display: inline-flex;
