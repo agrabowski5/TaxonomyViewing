@@ -357,6 +357,31 @@
   color: #9f1239;
 }
 
+.taxonomy-label.naics {
+  background: #cffafe;
+  color: #0c4a6e;
+}
+
+.taxonomy-label.isic {
+  background: #ede9fe;
+  color: #1e1b4b;
+}
+
+.taxonomy-label.nace {
+  background: #fce7f3;
+  color: #500724;
+}
+
+.taxonomy-label.cpa {
+  background: #ffedd5;
+  color: #431407;
+}
+
+.taxonomy-label.bea {
+  background: #d1fae5;
+  color: #064e3b;
+}
+
 /* ===== Detail Panel ===== */
 .detail-column {
   background: var(--surface);

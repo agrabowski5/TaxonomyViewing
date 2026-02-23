@@ -13,7 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
-import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, BafuCoverage } from "./types";
+import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, BafuCoverage, GenericConcordance } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
@@ -44,7 +44,7 @@ function buildColorMap(tree: TreeNode[]): Record<string, string> {
   return colorMap;
 }
 
-const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc", "t1", "t2"];
+const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc", "t1", "t2", "naics", "isic", "nace", "cpa", "bea"];
 
 const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; taxonomyClass: string; label: string }> = {
   hs: {
@@ -95,6 +95,36 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
     taxonomyClass: "t2",
     label: "T2",
   },
+  naics: {
+    fullName: "NAICS 2022 (North American Industry Classification)",
+    legend: "Sectors \u2192 Subsectors \u2192 Industry Groups \u2192 Industries \u2192 National Industries",
+    taxonomyClass: "naics",
+    label: "NAICS",
+  },
+  isic: {
+    fullName: "ISIC Rev. 4 (Intl Standard Industrial Classification)",
+    legend: "Sections \u2192 Divisions \u2192 Groups \u2192 Classes",
+    taxonomyClass: "isic",
+    label: "ISIC",
+  },
+  nace: {
+    fullName: "NACE Rev. 2 (EU Economic Activities)",
+    legend: "Sections \u2192 Divisions \u2192 Groups \u2192 Classes",
+    taxonomyClass: "nace",
+    label: "NACE",
+  },
+  cpa: {
+    fullName: "CPA 2.1 (Classification of Products by Activity)",
+    legend: "Sections \u2192 Divisions \u2192 Groups \u2192 Classes \u2192 Categories \u2192 Subcategories",
+    taxonomyClass: "cpa",
+    label: "CPA",
+  },
+  bea: {
+    fullName: "BEA Input-Output Commodity Codes (US)",
+    legend: "Sectors \u2192 Summary \u2192 Detail",
+    taxonomyClass: "bea",
+    label: "BEA",
+  },
 };
 
 // Find a CustomNode by ID in the builder's custom tree
@@ -134,6 +164,84 @@ function stripCode(code: string): string {
 
 // HS-family taxonomies share the same base HS codes (first 6 digits)
 const HS_FAMILY: TaxonomyType[] = ["hs", "cn", "hts", "ca"];
+
+// New taxonomy families for concordance-based mapping
+const CONCORDANCE_TAXONOMIES: TaxonomyType[] = ["naics", "isic", "nace", "cpa", "bea"];
+
+// Resolve a new-taxonomy code to HS-6 codes via its concordance
+function resolveToHsCodes(
+  code: string,
+  taxonomy: TaxonomyType,
+  naicsHsConcordance: GenericConcordance | null,
+  isicCpcConcordance: GenericConcordance | null,
+  cpaHsConcordance: GenericConcordance | null,
+  beaHsConcordance: GenericConcordance | null,
+  concordance: ConcordanceData,
+): string[] {
+  const clean = stripCode(code);
+  if (taxonomy === "naics" && naicsHsConcordance) {
+    const mappings = naicsHsConcordance.forward[clean];
+    if (mappings) return mappings.map((m) => m.code);
+  }
+  if ((taxonomy === "isic" || taxonomy === "nace") && isicCpcConcordance) {
+    // ISIC/NACE -> CPC -> HS (two-hop chain)
+    const cpcMappings = isicCpcConcordance.forward[clean];
+    if (cpcMappings) {
+      const hsCodes: string[] = [];
+      for (const cm of cpcMappings) {
+        const hsMappings = concordance.cpcToHs[cm.code];
+        if (hsMappings) {
+          for (const hm of hsMappings) hsCodes.push(hm.code);
+        }
+      }
+      return hsCodes;
+    }
+  }
+  if (taxonomy === "cpa" && cpaHsConcordance) {
+    const mappings = cpaHsConcordance.forward[clean];
+    if (mappings) return mappings.map((m) => m.code);
+  }
+  if (taxonomy === "bea" && beaHsConcordance) {
+    const mappings = beaHsConcordance.forward[clean];
+    if (mappings) return mappings.map((m) => m.code);
+  }
+  return [];
+}
+
+// Resolve an HS-6 code to a new-taxonomy code via reverse concordance
+function resolveFromHsCode(
+  hsCode: string,
+  taxonomy: TaxonomyType,
+  naicsHsConcordance: GenericConcordance | null,
+  isicCpcConcordance: GenericConcordance | null,
+  cpaHsConcordance: GenericConcordance | null,
+  beaHsConcordance: GenericConcordance | null,
+  concordance: ConcordanceData,
+): string | null {
+  if (taxonomy === "naics" && naicsHsConcordance) {
+    const mappings = naicsHsConcordance.reverse[hsCode];
+    if (mappings && mappings.length > 0) return mappings[0].code;
+  }
+  if ((taxonomy === "isic" || taxonomy === "nace") && isicCpcConcordance) {
+    // HS -> CPC -> ISIC/NACE (two-hop reverse)
+    const cpcMappings = concordance.hsToCpc[hsCode];
+    if (cpcMappings) {
+      for (const cm of cpcMappings) {
+        const isicMappings = isicCpcConcordance.reverse[cm.code];
+        if (isicMappings && isicMappings.length > 0) return isicMappings[0].code;
+      }
+    }
+  }
+  if (taxonomy === "cpa" && cpaHsConcordance) {
+    const mappings = cpaHsConcordance.reverse[hsCode];
+    if (mappings && mappings.length > 0) return mappings[0].code;
+  }
+  if (taxonomy === "bea" && beaHsConcordance) {
+    const mappings = beaHsConcordance.reverse[hsCode];
+    if (mappings && mappings.length > 0) return mappings[0].code;
+  }
+  return null;
+}
 
 // T1 helper: detect whether a T1 node originated from HTS or CPC services
 function getT1Origin(nodeId: string, lookup: Record<string, LookupEntry>, code: string): "hts" | "cpc" | null {
@@ -956,12 +1064,18 @@ function AppContent() {
     unspsc: useRef<TreeApi<TreeNode>>(null),
     t1: useRef<TreeApi<TreeNode>>(null),
     t2: useRef<TreeApi<TreeNode>>(null),
+    naics: useRef<TreeApi<TreeNode>>(null),
+    isic: useRef<TreeApi<TreeNode>>(null),
+    nace: useRef<TreeApi<TreeNode>>(null),
+    cpa: useRef<TreeApi<TreeNode>>(null),
+    bea: useRef<TreeApi<TreeNode>>(null),
   };
 
   const getTreeData = useCallback((taxonomy: TaxonomyType): TreeNode[] => {
     if (!data) return [];
     const map: Record<string, TreeNode[]> = {
       hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree, t1: data.t1Tree, t2: data.t2Tree,
+      naics: data.naicsTree, isic: data.isicTree, nace: data.naceTree, cpa: data.cpaTree, bea: data.beaTree,
     };
     return map[taxonomy] ?? [];
   }, [data]);
@@ -970,6 +1084,7 @@ function AppContent() {
     if (!data) return {};
     const map: Record<string, Record<string, LookupEntry>> = {
       hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup, t1: data.t1Lookup, t2: data.t2Lookup,
+      naics: data.naicsLookup, isic: data.isicLookup, nace: data.naceLookup, cpa: data.cpaLookup, bea: data.beaLookup,
     };
     return map[taxonomy] ?? {};
   }, [data]);
@@ -985,6 +1100,34 @@ function AppContent() {
     () => filterTreeData(getTreeData(rightTaxonomy), debouncedSearch),
     [data, rightTaxonomy, debouncedSearch, getTreeData]
   );
+
+  // Helper: find concordance-based taxonomy entry from an HS code
+  const findConcordanceMappedEntry = useCallback((hsCode: string, targetTax: TaxonomyType): MappedEntry | null => {
+    if (!data) return null;
+    const targetLookup = getLookup(targetTax);
+    for (let len = Math.min(6, hsCode.length); len >= 4; len -= 2) {
+      const prefix = hsCode.substring(0, len);
+      const code = resolveFromHsCode(prefix, targetTax, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.concordance);
+      if (code && targetLookup[code]) {
+        return {
+          taxonomy: targetTax,
+          code,
+          description: targetLookup[code].description,
+          nodeId: `${targetTax}-${code}`,
+        };
+      }
+    }
+    return null;
+  }, [data, getLookup]);
+
+  // Unified helper: findMappedEntry + concordance fallback
+  const findAnyMappedEntry = useCallback((hsCode: string, targetTax: TaxonomyType): MappedEntry | null => {
+    if (!data) return null;
+    if (CONCORDANCE_TAXONOMIES.includes(targetTax)) {
+      return findConcordanceMappedEntry(hsCode, targetTax);
+    }
+    return findMappedEntry(hsCode, targetTax, getLookup(targetTax), data.concordance);
+  }, [data, getLookup, findConcordanceMappedEntry]);
 
   // Compute mappings from selected node to all other taxonomies
   const mappings = useMemo(() => {
@@ -1057,7 +1200,7 @@ function AppContent() {
           const entry = findT2Entry(hsBase);
           if (entry) results.push(entry);
         } else {
-          const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
+          const entry = findAnyMappedEntry(hsBase, tax);
           if (entry) results.push(entry);
         }
       }
@@ -1098,7 +1241,7 @@ function AppContent() {
                 }
               }
             } else {
-              const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+              const entry = findAnyMappedEntry(firstHsCode, tax);
               if (entry) results.push(entry);
             }
           }
@@ -1125,7 +1268,7 @@ function AppContent() {
           const entry = findT2Entry(firstHsCode);
           if (entry) results.push(entry);
         } else {
-          const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+          const entry = findAnyMappedEntry(firstHsCode, tax);
           if (entry) results.push(entry);
         }
       }
@@ -1152,7 +1295,7 @@ function AppContent() {
             const entry = findT2Entry(hsBase);
             if (entry) results.push(entry);
           } else {
-            const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
+            const entry = findAnyMappedEntry(hsBase, tax);
             if (entry) results.push(entry);
           }
         }
@@ -1177,7 +1320,7 @@ function AppContent() {
                 const entry = findT2Entry(firstHsCode);
                 if (entry) results.push(entry);
               } else {
-                const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+                const entry = findAnyMappedEntry(firstHsCode, tax);
                 if (entry) results.push(entry);
               }
             }
@@ -1206,7 +1349,7 @@ function AppContent() {
             const entry = findT1Entry(hsBase);
             if (entry) results.push(entry);
           } else {
-            const entry = findMappedEntry(hsBase, tax, getLookup(tax), data.concordance);
+            const entry = findAnyMappedEntry(hsBase, tax);
             if (entry) results.push(entry);
           }
         }
@@ -1231,7 +1374,7 @@ function AppContent() {
                 const entry = findT1Entry(firstHsCode);
                 if (entry) results.push(entry);
               } else {
-                const entry = findMappedEntry(firstHsCode, tax, getLookup(tax), data.concordance);
+                const entry = findAnyMappedEntry(firstHsCode, tax);
                 if (entry) results.push(entry);
               }
             }
@@ -1241,8 +1384,37 @@ function AppContent() {
       }
     }
 
+    // Case 6: Source is a concordance-based taxonomy (NAICS, ISIC, NACE, CPA, BEA)
+    if (CONCORDANCE_TAXONOMIES.includes(selectedFrom)) {
+      const clean = stripCode(selectedNode.code);
+      const hsCodes = resolveToHsCodes(clean, selectedFrom, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.concordance);
+      if (hsCodes.length === 0) return [];
+      const firstHsCode = hsCodes[0];
+      const results: MappedEntry[] = [];
+      for (const tax of ALL_TAXONOMIES) {
+        if (tax === selectedFrom) continue;
+        if (tax === "unspsc") {
+          const fuzzyEntries = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+          results.push(...fuzzyEntries);
+        } else if (tax === "t1") {
+          const entry = findT1Entry(firstHsCode);
+          if (entry) results.push(entry);
+        } else if (tax === "t2") {
+          const entry = findT2Entry(firstHsCode);
+          if (entry) results.push(entry);
+        } else if (CONCORDANCE_TAXONOMIES.includes(tax)) {
+          const entry = findConcordanceMappedEntry(firstHsCode, tax);
+          if (entry) results.push(entry);
+        } else {
+          const entry = findAnyMappedEntry(firstHsCode, tax);
+          if (entry) results.push(entry);
+        }
+      }
+      return results;
+    }
+
     return [];
-  }, [selectedNode, selectedFrom, data, getLookup]);
+  }, [selectedNode, selectedFrom, data, getLookup, findAnyMappedEntry, findConcordanceMappedEntry]);
 
   // Compute emission factor for selected node
   const emissionFactor = useMemo(() => {
@@ -1303,7 +1475,7 @@ function AppContent() {
           } else if (otherTax === "t2") {
             mappedNodeId = findT2NodeId(hsBase);
           } else {
-            const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+            const mapped = findAnyMappedEntry(hsBase, otherTax);
             mappedNodeId = mapped?.nodeId ?? null;
           }
         }
@@ -1329,7 +1501,7 @@ function AppContent() {
                 mappedNodeId = findT2NodeId(firstHsCode);
               }
             } else {
-              const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+              const mapped = findAnyMappedEntry(firstHsCode, otherTax);
               mappedNodeId = mapped?.nodeId ?? null;
             }
             break;
@@ -1349,7 +1521,7 @@ function AppContent() {
           } else if (otherTax === "t2") {
             mappedNodeId = findT2NodeId(firstHsCode);
           } else {
-            const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+            const mapped = findAnyMappedEntry(firstHsCode, otherTax);
             mappedNodeId = mapped?.nodeId ?? null;
           }
         }
@@ -1368,7 +1540,7 @@ function AppContent() {
             } else if (otherTax === "t2") {
               mappedNodeId = findT2NodeId(hsBase);
             } else {
-              const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+              const mapped = findAnyMappedEntry(hsBase, otherTax);
               mappedNodeId = mapped?.nodeId ?? null;
             }
           }
@@ -1387,7 +1559,7 @@ function AppContent() {
               } else if (otherTax === "t2") {
                 mappedNodeId = findT2NodeId(firstHsCode);
               } else {
-                const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+                const mapped = findAnyMappedEntry(firstHsCode, otherTax);
                 mappedNodeId = mapped?.nodeId ?? null;
               }
               break;
@@ -1409,7 +1581,7 @@ function AppContent() {
             } else if (otherTax === "t2") {
               // both T2, no cross-mapping
             } else {
-              const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+              const mapped = findAnyMappedEntry(hsBase, otherTax);
               mappedNodeId = mapped?.nodeId ?? null;
             }
           }
@@ -1429,11 +1601,29 @@ function AppContent() {
               } else if (otherTax === "t2") {
                 // both T2
               } else {
-                const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+                const mapped = findAnyMappedEntry(firstHsCode, otherTax);
                 mappedNodeId = mapped?.nodeId ?? null;
               }
               break;
             }
+          }
+        }
+      } else if (CONCORDANCE_TAXONOMIES.includes(sourceTax)) {
+        // Source is NAICS/ISIC/NACE/CPA/BEA: resolve to HS codes via concordance
+        const clean = stripCode(node.code);
+        const hsCodes = resolveToHsCodes(clean, sourceTax, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.concordance);
+        if (hsCodes.length > 0) {
+          const firstHsCode = hsCodes[0];
+          if (otherTax === "unspsc") {
+            const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+            mappedNodeId = fuzzy[0]?.nodeId ?? null;
+          } else if (otherTax === "t1") {
+            mappedNodeId = findT1NodeId(firstHsCode);
+          } else if (otherTax === "t2") {
+            mappedNodeId = findT2NodeId(firstHsCode);
+          } else {
+            const mapped = findAnyMappedEntry(firstHsCode, otherTax);
+            mappedNodeId = mapped?.nodeId ?? null;
           }
         }
       }
@@ -1470,7 +1660,7 @@ function AppContent() {
         }, delay + 100);
       }
     },
-    [leftTaxonomy, rightTaxonomy, data, getLookup, treeRefs, getTreeData]
+    [leftTaxonomy, rightTaxonomy, data, getLookup, findAnyMappedEntry, treeRefs, getTreeData]
   );
 
   // Handle builder custom node click → map to left pane via sourceOrigin
@@ -1536,7 +1726,7 @@ function AppContent() {
           } else if (otherTax === "t2") {
             mappedNodeId = findT2NodeId(hsBase);
           } else {
-            const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+            const mapped = findAnyMappedEntry(hsBase, otherTax);
             mappedNodeId = mapped?.nodeId ?? null;
           }
         }
@@ -1561,7 +1751,7 @@ function AppContent() {
                 mappedNodeId = findT2NodeId(firstHsCode);
               }
             } else {
-              const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+              const mapped = findAnyMappedEntry(firstHsCode, otherTax);
               mappedNodeId = mapped?.nodeId ?? null;
             }
             break;
@@ -1579,7 +1769,7 @@ function AppContent() {
                 const fuzzy = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
                 mappedNodeId = fuzzy[0]?.nodeId ?? null;
               } else {
-                const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+                const mapped = findAnyMappedEntry(hsBase, otherTax);
                 mappedNodeId = mapped?.nodeId ?? null;
               }
             }
@@ -1597,7 +1787,7 @@ function AppContent() {
                   const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
                   mappedNodeId = fuzzy[0]?.nodeId ?? null;
                 } else {
-                  const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+                  const mapped = findAnyMappedEntry(firstHsCode, otherTax);
                   mappedNodeId = mapped?.nodeId ?? null;
                 }
               }
@@ -1616,7 +1806,7 @@ function AppContent() {
                 const fuzzy = findFuzzyMappedEntries(hsBase, "hts", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
                 mappedNodeId = fuzzy[0]?.nodeId ?? null;
               } else {
-                const mapped = findMappedEntry(hsBase, otherTax, getLookup(otherTax), data.concordance);
+                const mapped = findAnyMappedEntry(hsBase, otherTax);
                 mappedNodeId = mapped?.nodeId ?? null;
               }
             }
@@ -1634,12 +1824,29 @@ function AppContent() {
                   const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
                   mappedNodeId = fuzzy[0]?.nodeId ?? null;
                 } else {
-                  const mapped = findMappedEntry(firstHsCode, otherTax, getLookup(otherTax), data.concordance);
+                  const mapped = findAnyMappedEntry(firstHsCode, otherTax);
                   mappedNodeId = mapped?.nodeId ?? null;
                 }
               }
               break;
             }
+          }
+        }
+      } else if (CONCORDANCE_TAXONOMIES.includes(sourceTax)) {
+        const clean = stripCode(syntheticNode.code);
+        const hsCodes = resolveToHsCodes(clean, sourceTax, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.concordance);
+        if (hsCodes.length > 0) {
+          const firstHsCode = hsCodes[0];
+          if (otherTax === "unspsc") {
+            const fuzzy = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
+            mappedNodeId = fuzzy[0]?.nodeId ?? null;
+          } else if (otherTax === "t1") {
+            mappedNodeId = findT1NodeId(firstHsCode);
+          } else if (otherTax === "t2") {
+            mappedNodeId = findT2NodeId(firstHsCode);
+          } else {
+            const mapped = findAnyMappedEntry(firstHsCode, otherTax);
+            mappedNodeId = mapped?.nodeId ?? null;
           }
         }
       }
@@ -1672,7 +1879,7 @@ function AppContent() {
         }, delay + 100);
       }
     },
-    [builderState.customTree, leftTaxonomy, data, getLookup, treeRefs, getTreeData]
+    [builderState.customTree, leftTaxonomy, data, getLookup, findAnyMappedEntry, treeRefs, getTreeData]
   );
 
   const leftColorMap = useMemo(
@@ -1752,14 +1959,27 @@ function AppContent() {
 
   const taxonomyOptions = (
     <>
-      <option value="hs">HS - Harmonized System (International)</option>
-      <option value="cpc">CPC - Central Product Classification</option>
-      <option value="cn">CN - Combined Nomenclature (EU)</option>
-      <option value="hts">HTS - Harmonized Tariff Schedule (US)</option>
-      <option value="ca">Canadian Customs Tariff</option>
-      <option value="unspsc">UNSPSC - Products &amp; Services Code</option>
-      <option value="t1">T1 - HTS Goods + CPC Services</option>
-      <option value="t2">T2 - CPC Backbone + HTS Detail</option>
+      <optgroup label="Goods / Trade Classifications">
+        <option value="hs">HS - Harmonized System (International)</option>
+        <option value="cn">CN - Combined Nomenclature (EU)</option>
+        <option value="hts">HTS - Harmonized Tariff Schedule (US)</option>
+        <option value="ca">Canadian Customs Tariff</option>
+      </optgroup>
+      <optgroup label="Product Classifications">
+        <option value="cpc">CPC - Central Product Classification</option>
+        <option value="cpa">CPA - Products by Activity (EU)</option>
+        <option value="unspsc">UNSPSC - Products &amp; Services Code</option>
+        <option value="bea">BEA - Input-Output Commodities (US)</option>
+      </optgroup>
+      <optgroup label="Activity / Industry Classifications">
+        <option value="naics">NAICS - Industry Classification (NA)</option>
+        <option value="isic">ISIC - Industrial Classification (Intl)</option>
+        <option value="nace">NACE - Economic Activities (EU)</option>
+      </optgroup>
+      <optgroup label="Combined Taxonomies">
+        <option value="t1">T1 - HTS Goods + CPC Services</option>
+        <option value="t2">T2 - CPC Backbone + HTS Detail</option>
+      </optgroup>
     </>
   );
 
@@ -1769,7 +1989,7 @@ function AppContent() {
         <div className="header-text">
           <h1>Taxonomy Explorer</h1>
           <p className="subtitle">
-            Compare HS, CPC, CN, HTS, Canadian &amp; UNSPSC classifications
+            Compare 13 international trade, product &amp; industry classifications
           </p>
         </div>
         <button

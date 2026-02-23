@@ -111,7 +111,13 @@ export interface BafuCoverage {
   };
 }
 
-export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2";
+export interface GenericConcordance {
+  forward: Record<string, { code: string; partial?: boolean }[]>;
+  reverse: Record<string, { code: string; partial?: boolean }[]>;
+}
+
+export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2"
+  | "naics" | "isic" | "nace" | "cpa" | "bea";
 
 export interface AppData {
   hsTree: TreeNode[];
@@ -130,8 +136,22 @@ export interface AppData {
   t1Lookup: Record<string, LookupEntry>;
   t2Tree: TreeNode[];
   t2Lookup: Record<string, LookupEntry>;
+  naicsTree: TreeNode[];
+  naicsLookup: Record<string, LookupEntry>;
+  isicTree: TreeNode[];
+  isicLookup: Record<string, LookupEntry>;
+  naceTree: TreeNode[];
+  naceLookup: Record<string, LookupEntry>;
+  cpaTree: TreeNode[];
+  cpaLookup: Record<string, LookupEntry>;
+  beaTree: TreeNode[];
+  beaLookup: Record<string, LookupEntry>;
   concordance: ConcordanceData;
   unspscHsMapping: FuzzyMappingData;
+  naicsHsConcordance: GenericConcordance | null;
+  isicCpcConcordance: GenericConcordance | null;
+  cpaHsConcordance: GenericConcordance | null;
+  beaHsConcordance: GenericConcordance | null;
   emissionFactors: Record<string, EmissionFactorEntry> | null;
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null;
   ecoinventMapping: EcoinventMapping | null;

@@ -977,7 +977,7 @@ def generate_unspsc():
 
 
 # ─────────────────────────────────────────────
-# 8. UNSPSC ↔ HS Fuzzy Text Mapping
+# 8. UNSPSC <-> HS Fuzzy Text Mapping
 # ─────────────────────────────────────────────
 def generate_unspsc_hs_fuzzy_mapping():
     print("\n=== Generating UNSPSC-HS fuzzy text mapping ===")
@@ -1103,10 +1103,10 @@ def generate_taxonomy1():
             reprefix_node(node)
         return result
 
-    # Re-prefix HTS tree: hts-* → t1-*
+    # Re-prefix HTS tree: hts-* -> t1-*
     t1_hts = reprefix_tree(hts_tree, 'hts-', 't1-')
 
-    # Filter CPC to service sections (codes starting with 5-9) and re-prefix: cpc-* → t1-svc-*
+    # Filter CPC to service sections (codes starting with 5-9) and re-prefix: cpc-* -> t1-svc-*
     cpc_services = [s for s in cpc_tree if s['code'] in ('5', '6', '7', '8', '9')]
     t1_svc = reprefix_tree(cpc_services, 'cpc-', 't1-svc-')
 
@@ -1146,7 +1146,7 @@ def generate_taxonomy1():
 # ─────────────────────────────────────────────
 def generate_taxonomy2():
     """Build T2: full CPC tree as backbone, with HTS tariff-line detail nested
-    under CPC goods leaf nodes (sections 0-4) via the CPC↔HS concordance."""
+    under CPC goods leaf nodes (sections 0-4) via the CPC<->HS concordance."""
     print("\n=== Generating Taxonomy 2 (CPC backbone + HTS detail) ===")
     import copy
 
@@ -1164,7 +1164,7 @@ def generate_taxonomy2():
 
     cpc_to_hs = concordance['cpcToHs']
 
-    # Build HTS index: clean_code → node (with children) for all HTS nodes
+    # Build HTS index: clean_code -> node (with children) for all HTS nodes
     hts_index = {}
     def index_hts(nodes):
         for n in nodes:
@@ -1217,7 +1217,7 @@ def generate_taxonomy2():
             for child in node['children']:
                 reprefix_node_inplace(child, old_prefix, new_prefix)
 
-    # Deep copy full CPC tree, re-prefix cpc-* → t2-*
+    # Deep copy full CPC tree, re-prefix cpc-* -> t2-*
     t2_tree = reprefix_tree(cpc_tree, 'cpc-', 't2-')
 
     # Track used IDs to handle duplicates (some HS codes map to multiple CPC parents)
@@ -1322,6 +1322,731 @@ def generate_taxonomy2():
     print(f"  Total lookup entries: {len(combined_lookup)}")
 
 
+# ─────────────────────────────────────────────
+# 11. NAICS (North American Industry Classification System)
+# ─────────────────────────────────────────────
+def generate_naics():
+    print("\n=== Generating NAICS data ===")
+
+    csv_path = os.path.join(RAW_DIR, 'naics-2022-converted.csv')
+    if not os.path.exists(csv_path):
+        print("  ERROR: naics-2022-converted.csv not found. Run convert_excel.js first.")
+        return
+
+    codes = []
+    with open(csv_path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            code = row['code'].strip()
+            title = row['title'].strip()
+            if code and title:
+                codes.append({'code': code, 'title': title})
+
+    level_names = {2: 'sector', 3: 'subsector', 4: 'industry_group', 5: 'naics_industry', 6: 'national_industry'}
+
+    # Build tree
+    tree = []
+    nodes_by_code = {}
+
+    for entry in codes:
+        code = entry['code']
+        title = entry['title']
+        level = len(code)
+        type_name = level_names.get(level, 'item')
+
+        node = {
+            'id': f'naics-{code}',
+            'code': code,
+            'name': title,
+            'type': type_name,
+        }
+
+        if level < 6:
+            node['children'] = []
+
+        nodes_by_code[code] = node
+
+        if level == 2:
+            tree.append(node)
+        else:
+            parent_code = code[:-1]
+            if parent_code in nodes_by_code:
+                parent = nodes_by_code[parent_code]
+                if 'children' not in parent:
+                    parent['children'] = []
+                parent['children'].append(node)
+
+    # Clean empty children
+    def clean_tree(nodes):
+        for node in nodes:
+            if 'children' in node:
+                if len(node['children']) == 0:
+                    del node['children']
+                else:
+                    clean_tree(node['children'])
+
+    clean_tree(tree)
+
+    # Build lookup
+    lookup = {}
+    for entry in codes:
+        code = entry['code']
+        level = len(code)
+        sector_code = code[:2]
+        sector_name = nodes_by_code.get(sector_code, {}).get('name', '')
+
+        lookup[code] = {
+            'code': code,
+            'description': entry['title'],
+            'section': sector_code,
+            'sectionName': sector_name,
+            'level': level,
+            'type': level_names.get(level, 'item')
+        }
+
+    write_json('naics-tree.json', tree)
+    write_json('naics-lookup.json', lookup)
+    print(f"  NAICS: {len(tree)} sectors, {len(codes)} total codes")
+
+
+# ─────────────────────────────────────────────
+# 12. ISIC (International Standard Industrial Classification)
+# ─────────────────────────────────────────────
+def generate_isic():
+    print("\n=== Generating ISIC data ===")
+
+    codes = []
+    with open(os.path.join(RAW_DIR, 'isic-rev4-structure.txt'), 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        next(reader)  # skip header
+        for row in reader:
+            if len(row) >= 2:
+                codes.append({'code': row[0].strip(), 'title': row[1].strip()})
+
+    # ISIC section -> division range mapping
+    section_ranges = {
+        'A': (1, 3), 'B': (5, 9), 'C': (10, 33), 'D': (35, 35),
+        'E': (36, 39), 'F': (41, 43), 'G': (45, 47), 'H': (49, 53),
+        'I': (55, 56), 'J': (58, 63), 'K': (64, 66), 'L': (68, 68),
+        'M': (69, 75), 'N': (77, 82), 'O': (84, 84), 'P': (85, 85),
+        'Q': (86, 88), 'R': (90, 93), 'S': (94, 96), 'T': (97, 98), 'U': (99, 99),
+    }
+
+    # Build division -> section mapping
+    div_to_section = {}
+    for section, (start, end) in section_ranges.items():
+        for d in range(start, end + 1):
+            div_to_section[f'{d:02d}'] = section
+
+    # Build tree
+    tree = []
+    nodes_by_code = {}
+
+    for entry in codes:
+        code = entry['code']
+        title = entry['title']
+
+        # Determine level
+        if len(code) == 1 and code.isalpha():
+            level_name = 'section'
+            level = 1
+        elif len(code) == 2 and code.isdigit():
+            level_name = 'division'
+            level = 2
+        elif len(code) == 3 and code.isdigit():
+            level_name = 'group'
+            level = 3
+        elif len(code) == 4 and code.isdigit():
+            level_name = 'class'
+            level = 4
+        else:
+            continue
+
+        node = {
+            'id': f'isic-{code}',
+            'code': code,
+            'name': title,
+            'type': level_name,
+        }
+
+        if level < 4:
+            node['children'] = []
+
+        nodes_by_code[code] = node
+
+        if level_name == 'section':
+            tree.append(node)
+        elif level_name == 'division':
+            section = div_to_section.get(code, '')
+            if section and section in nodes_by_code:
+                nodes_by_code[section].setdefault('children', []).append(node)
+        else:
+            parent_code = code[:-1]
+            if parent_code in nodes_by_code:
+                nodes_by_code[parent_code].setdefault('children', []).append(node)
+
+    # Clean empty children
+    def clean_tree(nodes):
+        for node in nodes:
+            if 'children' in node:
+                if len(node['children']) == 0:
+                    del node['children']
+                else:
+                    clean_tree(node['children'])
+
+    clean_tree(tree)
+
+    # Build lookup
+    lookup = {}
+    for entry in codes:
+        code = entry['code']
+        if len(code) == 1 and code.isalpha():
+            section = code
+            level = 1
+            type_name = 'section'
+        elif code.isdigit():
+            section = div_to_section.get(code[:2], '')
+            level = len(code)
+            type_name = {2: 'division', 3: 'group', 4: 'class'}.get(level, 'item')
+        else:
+            continue
+
+        section_name = nodes_by_code.get(section, {}).get('name', '') if section else ''
+        lookup[code] = {
+            'code': code,
+            'description': entry['title'],
+            'section': section,
+            'sectionName': section_name,
+            'level': level,
+            'type': type_name
+        }
+
+    write_json('isic-tree.json', tree)
+    write_json('isic-lookup.json', lookup)
+    print(f"  ISIC: {len(tree)} sections, {len(lookup)} total codes")
+
+
+# ─────────────────────────────────────────────
+# 13. NACE (Statistical Classification of Economic Activities in the EU)
+# ─────────────────────────────────────────────
+def generate_nace():
+    print("\n=== Generating NACE data ===")
+
+    codes = []
+    with open(os.path.join(RAW_DIR, 'nace-rev2.csv'), 'r', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            notation = row['Notation'].strip()
+            label = row['Label'].strip()
+            status = row.get('Status', '').strip()
+
+            # Skip invalid entries
+            if status == 'invalid':
+                continue
+
+            # Only keep valid NACE codes: single letter A-U or letter + 2-4 digits
+            if not re.match(r'^[A-U]\d{0,4}$', notation):
+                continue
+
+            codes.append({'notation': notation, 'label': label})
+
+    # Build tree — strip section letter prefix for numeric codes
+    tree = []
+    nodes_by_code = {}
+
+    for entry in codes:
+        notation = entry['notation']
+        label = entry['label']
+
+        if len(notation) == 1:
+            code = notation  # section letter
+            level_name = 'section'
+            level = 1
+        else:
+            code = notation[1:]  # strip section letter: A01 -> 01
+            level = len(code)
+            level_name = {2: 'division', 3: 'group', 4: 'class'}.get(level, 'item')
+
+        node = {
+            'id': f'nace-{code}',
+            'code': code,
+            'name': label,
+            'type': level_name,
+        }
+
+        if level < 4:
+            node['children'] = []
+
+        nodes_by_code[code] = node
+
+        if level_name == 'section':
+            tree.append(node)
+        elif level_name == 'division':
+            section_letter = notation[0]
+            if section_letter in nodes_by_code:
+                nodes_by_code[section_letter].setdefault('children', []).append(node)
+        else:
+            parent_code = code[:-1]
+            if parent_code in nodes_by_code:
+                nodes_by_code[parent_code].setdefault('children', []).append(node)
+
+    # Clean empty children
+    def clean_tree(nodes):
+        for node in nodes:
+            if 'children' in node:
+                if len(node['children']) == 0:
+                    del node['children']
+                else:
+                    clean_tree(node['children'])
+
+    clean_tree(tree)
+
+    # Build lookup (numeric codes match ISIC for concordance reuse)
+    lookup = {}
+    for entry in codes:
+        notation = entry['notation']
+        if len(notation) == 1:
+            code = notation
+            section = notation
+            level = 1
+            type_name = 'section'
+        else:
+            code = notation[1:]
+            section = notation[0]
+            level = len(code)
+            type_name = {2: 'division', 3: 'group', 4: 'class'}.get(level, 'item')
+
+        section_name = nodes_by_code.get(section, {}).get('name', '') if section in nodes_by_code else ''
+        lookup[code] = {
+            'code': code,
+            'description': entry['label'],
+            'section': section,
+            'sectionName': section_name,
+            'level': level,
+            'type': type_name
+        }
+
+    write_json('nace-tree.json', tree)
+    write_json('nace-lookup.json', lookup)
+    print(f"  NACE: {len(tree)} sections, {len(lookup)} total codes")
+
+
+# ─────────────────────────────────────────────
+# 14. CPA (Classification of Products by Activity)
+# ─────────────────────────────────────────────
+def generate_cpa():
+    print("\n=== Generating CPA data ===")
+
+    codes = []
+    with open(os.path.join(RAW_DIR, 'cpa-21.csv'), 'r', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            notation = row['Notation'].strip()
+            label = row['Label'].strip()
+            status = row.get('Status', '').strip()
+
+            if status == 'invalid':
+                continue
+
+            # Strip CPA_ prefix
+            if notation.startswith('CPA_'):
+                notation = notation[4:]
+
+            # Only keep valid codes: single letter or letter + 2-6 digits
+            if not re.match(r'^[A-U]\d{0,6}$', notation):
+                continue
+
+            codes.append({'notation': notation, 'label': label})
+
+    level_names = {1: 'section', 2: 'division', 3: 'group', 4: 'class', 5: 'category', 6: 'subcategory'}
+
+    # Build tree
+    tree = []
+    nodes_by_code = {}
+
+    for entry in codes:
+        notation = entry['notation']
+        label = entry['label']
+
+        if len(notation) == 1:
+            code = notation  # section letter
+            level = 1
+        else:
+            code = notation[1:]  # strip section letter
+            level = len(code)
+
+        type_name = level_names.get(level, 'item')
+
+        node = {
+            'id': f'cpa-{code}',
+            'code': code,
+            'name': label,
+            'type': type_name,
+        }
+
+        if level < 6:
+            node['children'] = []
+
+        nodes_by_code[code] = node
+
+        if level == 1:
+            tree.append(node)
+        elif level == 2:
+            section_letter = notation[0]
+            if section_letter in nodes_by_code:
+                nodes_by_code[section_letter].setdefault('children', []).append(node)
+        else:
+            parent_code = code[:-1]
+            if parent_code in nodes_by_code:
+                nodes_by_code[parent_code].setdefault('children', []).append(node)
+
+    # Clean empty children
+    def clean_tree(nodes):
+        for node in nodes:
+            if 'children' in node:
+                if len(node['children']) == 0:
+                    del node['children']
+                else:
+                    clean_tree(node['children'])
+
+    clean_tree(tree)
+
+    # Build lookup
+    lookup = {}
+    for entry in codes:
+        notation = entry['notation']
+        if len(notation) == 1:
+            code = notation
+            section = notation
+            level = 1
+        else:
+            code = notation[1:]
+            section = notation[0]
+            level = len(code)
+
+        type_name = level_names.get(level, 'item')
+        section_name = nodes_by_code.get(section, {}).get('name', '') if section in nodes_by_code else ''
+        lookup[code] = {
+            'code': code,
+            'description': entry['label'],
+            'section': section,
+            'sectionName': section_name,
+            'level': level,
+            'type': type_name
+        }
+
+    write_json('cpa-tree.json', tree)
+    write_json('cpa-lookup.json', lookup)
+    print(f"  CPA: {len(tree)} sections, {len(lookup)} total codes")
+
+
+# ─────────────────────────────────────────────
+# 15. BEA (Bureau of Economic Analysis Input-Output Codes)
+# ─────────────────────────────────────────────
+def generate_bea():
+    print("\n=== Generating BEA data ===")
+
+    csv_path = os.path.join(RAW_DIR, 'bea-io-codes-converted.csv')
+    if not os.path.exists(csv_path):
+        print("  ERROR: bea-io-codes-converted.csv not found. Run convert_excel.js first.")
+        return
+
+    rows = []
+    with open(csv_path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            sc = row['sector_code'].strip()
+            sd = row['sector_desc'].strip()
+            smc = row['summary_code'].strip()
+            smd = row['summary_desc'].strip()
+            dc = row['detail_code'].strip()
+            dd = row['detail_desc'].strip()
+            if sc:
+                rows.append({
+                    'sector_code': sc, 'sector_desc': sd,
+                    'summary_code': smc, 'summary_desc': smd,
+                    'detail_code': dc, 'detail_desc': dd,
+                })
+
+    # Build tree: Sector -> Summary -> Detail
+    tree = []
+    sector_nodes = {}
+    summary_nodes = {}
+    detail_seen = set()
+
+    for row in rows:
+        sc = row['sector_code']
+        smc = row['summary_code']
+        dc = row['detail_code']
+
+        # Sector level
+        if sc and sc not in sector_nodes:
+            node = {
+                'id': f'bea-{sc}',
+                'code': sc,
+                'name': row['sector_desc'],
+                'type': 'sector',
+                'children': []
+            }
+            sector_nodes[sc] = node
+            tree.append(node)
+
+        # Summary level
+        if smc and smc not in summary_nodes:
+            node = {
+                'id': f'bea-{smc}',
+                'code': smc,
+                'name': row['summary_desc'],
+                'type': 'summary',
+                'children': []
+            }
+            summary_nodes[smc] = node
+            if sc in sector_nodes:
+                sector_nodes[sc]['children'].append(node)
+
+        # Detail level
+        if dc and dc not in detail_seen:
+            detail_seen.add(dc)
+            node = {
+                'id': f'bea-{dc}',
+                'code': dc,
+                'name': row['detail_desc'],
+                'type': 'detail',
+            }
+            if smc in summary_nodes:
+                summary_nodes[smc]['children'].append(node)
+
+    # Clean empty children
+    def clean_tree(nodes):
+        for node in nodes:
+            if 'children' in node:
+                if len(node['children']) == 0:
+                    del node['children']
+                else:
+                    clean_tree(node['children'])
+
+    clean_tree(tree)
+
+    # Build lookup
+    lookup = {}
+
+    def add_to_lookup(nodes, section='', section_name=''):
+        for node in nodes:
+            if node['type'] == 'sector':
+                section = node['code']
+                section_name = node['name']
+            lookup[node['code']] = {
+                'code': node['code'],
+                'description': node['name'],
+                'section': section,
+                'sectionName': section_name,
+                'level': {'sector': 1, 'summary': 2, 'detail': 3}.get(node['type'], 0),
+                'type': node['type']
+            }
+            if 'children' in node:
+                add_to_lookup(node['children'], section, section_name)
+
+    add_to_lookup(tree)
+
+    write_json('bea-tree.json', tree)
+    write_json('bea-lookup.json', lookup)
+    print(f"  BEA: {len(tree)} sectors, {len(summary_nodes)} summary, {len(detail_seen)} detail, {len(lookup)} total")
+
+
+# ─────────────────────────────────────────────
+# 16. NAICS <-> HS Concordance
+# ─────────────────────────────────────────────
+def generate_naics_hs_concordance():
+    print("\n=== Generating NAICS-HS concordance ===")
+
+    imp_path = os.path.join(RAW_DIR, 'imp-code.txt')
+    if not os.path.exists(imp_path):
+        print("  WARNING: imp-code.txt not found. Generating empty concordance.")
+        write_json('naics-hs-concordance.json', {'forward': {}, 'reverse': {}})
+        return
+
+    naics_to_hs = {}
+    hs_to_naics = {}
+
+    with open(imp_path, 'r', encoding='latin-1') as f:
+        for line in f:
+            line = line.rstrip()
+            if not line or len(line) < 20:
+                continue
+
+            # HTS-10 code is first 10 chars
+            hts10 = line[:10].strip()
+            if not hts10 or not hts10[0].isdigit():
+                continue
+
+            # NAICS code is second-to-last whitespace-delimited field
+            parts = line.rsplit(None, 5)
+            if len(parts) < 3:
+                continue
+
+            naics = parts[-2].strip()
+
+            # Must be 6 digits, skip partial codes with X
+            if len(naics) != 6 or 'X' in naics or not naics.isdigit():
+                continue
+
+            hs6 = hts10[:6]
+            naics_to_hs.setdefault(naics, set()).add(hs6)
+            hs_to_naics.setdefault(hs6, set()).add(naics)
+
+    concordance = {
+        'forward': {k: [{'code': c} for c in sorted(v)] for k, v in naics_to_hs.items()},
+        'reverse': {k: [{'code': c} for c in sorted(v)] for k, v in hs_to_naics.items()},
+    }
+
+    write_json('naics-hs-concordance.json', concordance)
+    print(f"  NAICS->HS: {len(naics_to_hs)} NAICS codes -> {sum(len(v) for v in naics_to_hs.values())} mappings")
+    print(f"  HS->NAICS: {len(hs_to_naics)} HS codes -> {sum(len(v) for v in hs_to_naics.values())} mappings")
+
+
+# ─────────────────────────────────────────────
+# 17. ISIC <-> CPC Concordance
+# ─────────────────────────────────────────────
+def generate_isic_cpc_concordance():
+    print("\n=== Generating ISIC-CPC concordance ===")
+
+    txt_path = os.path.join(RAW_DIR, 'ISIC4-CPC21.txt')
+    if not os.path.exists(txt_path):
+        print("  WARNING: ISIC4-CPC21.txt not found. Generating empty concordance.")
+        write_json('isic-cpc-concordance.json', {'forward': {}, 'reverse': {}})
+        return
+
+    isic_to_cpc = {}
+    cpc_to_isic = {}
+
+    with open(txt_path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            cpc_code = row['CPC21code'].strip().strip('"')
+            isic_code = row['ISIC4code'].strip().strip('"')
+
+            if not cpc_code or not isic_code:
+                continue
+
+            isic_to_cpc.setdefault(isic_code, []).append({'code': cpc_code})
+            cpc_to_isic.setdefault(cpc_code, []).append({'code': isic_code})
+
+    concordance = {
+        'forward': isic_to_cpc,
+        'reverse': cpc_to_isic,
+    }
+
+    write_json('isic-cpc-concordance.json', concordance)
+    print(f"  ISIC->CPC: {len(isic_to_cpc)} ISIC codes -> {sum(len(v) for v in isic_to_cpc.values())} mappings")
+    print(f"  CPC->ISIC: {len(cpc_to_isic)} CPC codes -> {sum(len(v) for v in cpc_to_isic.values())} mappings")
+
+
+# ─────────────────────────────────────────────
+# 18. CPA <-> HS Concordance
+# ─────────────────────────────────────────────
+def _hs_concordance_to_6digit(hs_dotted):
+    """Convert concordance HS code (e.g., '1001.1', '708.2') to 6-digit HS code."""
+    parts = hs_dotted.split('.')
+    if len(parts) == 1:
+        heading = parts[0].zfill(4)
+        return heading + '00'
+    else:
+        heading = parts[0].zfill(4)
+        sub = parts[1].ljust(2, '0')
+        return heading + sub
+
+
+def generate_cpa_hs_concordance():
+    print("\n=== Generating CPA-HS concordance ===")
+
+    cpa_to_hs = {}
+    hs_to_cpa = {}
+
+    cpa_hs_path = os.path.join(RAW_DIR, 'CPA2008_to_HS2007.csv')
+    if os.path.exists(cpa_hs_path):
+        with open(cpa_hs_path, 'r', encoding='utf-8-sig') as f:
+            reader = csv.reader(f)
+            next(reader)  # skip header
+            for row in reader:
+                if len(row) < 2:
+                    continue
+                cpa_dotted = row[0].strip()
+                hs_dotted = row[1].strip()
+
+                cpa_code = cpa_dotted.replace('.', '')
+                hs_code = _hs_concordance_to_6digit(hs_dotted)
+
+                cpa_to_hs.setdefault(cpa_code, set()).add(hs_code)
+                hs_to_cpa.setdefault(hs_code, set()).add(cpa_code)
+
+    hs_cpa_path = os.path.join(RAW_DIR, 'HS2007_to_CPA2008.csv')
+    if os.path.exists(hs_cpa_path):
+        with open(hs_cpa_path, 'r', encoding='utf-8-sig') as f:
+            reader = csv.reader(f)
+            next(reader)  # skip header
+            for row in reader:
+                if len(row) < 2:
+                    continue
+                hs_dotted = row[0].strip()
+                cpa_dotted = row[1].strip()
+
+                cpa_code = cpa_dotted.replace('.', '')
+                hs_code = _hs_concordance_to_6digit(hs_dotted)
+
+                cpa_to_hs.setdefault(cpa_code, set()).add(hs_code)
+                hs_to_cpa.setdefault(hs_code, set()).add(cpa_code)
+
+    concordance = {
+        'forward': {k: [{'code': c} for c in sorted(v)] for k, v in cpa_to_hs.items()},
+        'reverse': {k: [{'code': c} for c in sorted(v)] for k, v in hs_to_cpa.items()},
+    }
+
+    write_json('cpa-hs-concordance.json', concordance)
+    print(f"  CPA->HS: {len(cpa_to_hs)} CPA codes -> {sum(len(v) for v in cpa_to_hs.values())} mappings")
+    print(f"  HS->CPA: {len(hs_to_cpa)} HS codes -> {sum(len(v) for v in hs_to_cpa.values())} mappings")
+
+
+# ─────────────────────────────────────────────
+# 19. BEA <-> HS Concordance
+# ─────────────────────────────────────────────
+def generate_bea_hs_concordance():
+    print("\n=== Generating BEA-HS concordance ===")
+
+    csv_path = os.path.join(RAW_DIR, 'bea-hs-concordance.csv')
+    if not os.path.exists(csv_path):
+        print("  WARNING: bea-hs-concordance.csv not found. Run convert_excel.js first.")
+        write_json('bea-hs-concordance.json', {'forward': {}, 'reverse': {}})
+        return
+
+    bea_to_hs = {}
+    hs_to_bea = {}
+
+    with open(csv_path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            bea_code = row['bea_code'].strip()
+            hs10 = row['hs_code'].strip()
+
+            if not bea_code or not hs10:
+                continue
+
+            hs6 = hs10[:6]
+            if len(hs6) < 6:
+                continue
+
+            bea_to_hs.setdefault(bea_code, set()).add(hs6)
+            hs_to_bea.setdefault(hs6, set()).add(bea_code)
+
+    concordance = {
+        'forward': {k: [{'code': c} for c in sorted(v)] for k, v in bea_to_hs.items()},
+        'reverse': {k: [{'code': c} for c in sorted(v)] for k, v in hs_to_bea.items()},
+    }
+
+    write_json('bea-hs-concordance.json', concordance)
+    print(f"  BEA->HS: {len(bea_to_hs)} BEA codes -> {sum(len(v) for v in bea_to_hs.values())} mappings")
+    print(f"  HS->BEA: {len(hs_to_bea)} HS codes -> {sum(len(v) for v in hs_to_bea.values())} mappings")
+
+
 if __name__ == '__main__':
     print("Generating taxonomy data...")
     generate_hs()
@@ -1334,4 +2059,13 @@ if __name__ == '__main__':
     generate_unspsc_hs_fuzzy_mapping()
     generate_taxonomy1()
     generate_taxonomy2()
+    generate_naics()
+    generate_isic()
+    generate_nace()
+    generate_cpa()
+    generate_bea()
+    generate_naics_hs_concordance()
+    generate_isic_cpc_concordance()
+    generate_cpa_hs_concordance()
+    generate_bea_hs_concordance()
     print("\nDone!")

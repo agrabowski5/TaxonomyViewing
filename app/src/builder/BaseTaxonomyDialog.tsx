@@ -11,6 +11,11 @@ const TAXONOMY_OPTIONS: { value: TaxonomyType; label: string }[] = [
   { value: "hts", label: "HTS — Harmonized Tariff Schedule (US)" },
   { value: "ca", label: "Canadian Customs Tariff" },
   { value: "unspsc", label: "UNSPSC — Products & Services Code" },
+  { value: "naics", label: "NAICS — North American Industry Classification" },
+  { value: "isic", label: "ISIC — Intl Standard Industrial Classification" },
+  { value: "nace", label: "NACE — EU Economic Activities" },
+  { value: "cpa", label: "CPA — Classification of Products by Activity" },
+  { value: "bea", label: "BEA — Input-Output Commodity Codes" },
   { value: "t1", label: "T1 — HTS Goods + CPC Services" },
   { value: "t2", label: "T2 — CPC Backbone + HTS Detail" },
 ];
