@@ -19,6 +19,7 @@ const URLS = {
   isicCpc: "https://unstats.un.org/unsd/classifications/Econ/tables/CPC/CPCv21_ISIC4/cpc21-isic4.txt",
   cpaHs: "https://ec.europa.eu/eurostat/ramon/relations/index.cfm",
   beaHs: "https://apps.bea.gov/industry/xls/HSConcord.xls",
+  beaNaics: "https://www.bea.gov/sites/default/files/2023-10/BEA-Industry-and-Commodity-Codes-and-NAICS-Concordance.xlsx",
   /* LCA databases */
   ecoinvent: "https://ecoinvent.org/the-ecoinvent-database/",
   epa: "https://www.epa.gov/land-research/us-environmentally-extended-input-output-useeio-technical-content",
@@ -208,6 +209,12 @@ function TaxonomyMapTab() {
           </path>
           <text x="615" y="165" textAnchor="middle" className="about-edge-label" fill="#dc2626">Fuzzy (Jaccard ~4.4%)</text>
 
+          {/* BEA <-> NAICS (Official concordance, green solid) */}
+          <path d="M 165 274 Q 350 355 535 274" fill="none" stroke="#059669" strokeWidth="2">
+            <title>{"BEA\u2194NAICS Concordance\n499 mappings · BEA.gov\nBEA I-O codes to NAICS 2017"}</title>
+          </path>
+          <text x="350" y="342" textAnchor="middle" className="about-edge-label" fill="#059669">499 BEA-NAICS mappings</text>
+
           {/* === ROW 2: CPC-CONNECTED === */}
 
           {/* ISIC */}
@@ -316,6 +323,12 @@ function TaxonomyMapTab() {
               <td><span className="about-conc-badge official">Official</span></td>
               <td><ExtLink href={URLS.beaHs}>HSConcord.xls</ExtLink></td>
               <td>BEA Input-Output to HS concordance</td>
+            </tr>
+            <tr>
+              <td><strong>BEA &harr; NAICS</strong></td>
+              <td><span className="about-conc-badge official">Official</span></td>
+              <td><ExtLink href={URLS.beaNaics}>BEA-NAICS.xlsx</ExtLink></td>
+              <td>499 mappings &mdash; BEA I-O detail codes to NAICS 2017</td>
             </tr>
             <tr>
               <td><strong>NACE &asymp; ISIC</strong></td>

@@ -1393,6 +1393,21 @@ function AppContent() {
       const results: MappedEntry[] = [];
       for (const tax of ALL_TAXONOMIES) {
         if (tax === selectedFrom) continue;
+        // Direct BEA↔NAICS shortcut (prefer over HS-hop)
+        if (data.beaNaicsConcordance &&
+            ((selectedFrom === "bea" && tax === "naics") || (selectedFrom === "naics" && tax === "bea"))) {
+          const directMappings = selectedFrom === "bea"
+            ? data.beaNaicsConcordance.forward[clean]
+            : data.beaNaicsConcordance.reverse[clean];
+          if (directMappings && directMappings.length > 0) {
+            const targetLookup = getLookup(tax);
+            const directCode = directMappings[0].code;
+            if (targetLookup[directCode]) {
+              results.push({ taxonomy: tax, code: directCode, description: targetLookup[directCode].description, nodeId: `${tax}-${directCode}` });
+              continue;
+            }
+          }
+        }
         if (tax === "unspsc") {
           const fuzzyEntries = findFuzzyMappedEntries(firstHsCode, "hs", "unspsc", data.unspscHsMapping, getLookup("unspsc"));
           results.push(...fuzzyEntries);

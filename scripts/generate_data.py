@@ -2047,6 +2047,40 @@ def generate_bea_hs_concordance():
     print(f"  HS->BEA: {len(hs_to_bea)} HS codes -> {sum(len(v) for v in hs_to_bea.values())} mappings")
 
 
+def generate_bea_naics_concordance():
+    print("\n=== Generating BEA-NAICS concordance ===")
+
+    csv_path = os.path.join(RAW_DIR, 'bea-naics-concordance.csv')
+    if not os.path.exists(csv_path):
+        print("  WARNING: bea-naics-concordance.csv not found. Run convert_excel.js first.")
+        write_json('bea-naics-concordance.json', {'forward': {}, 'reverse': {}})
+        return
+
+    bea_to_naics = {}
+    naics_to_bea = {}
+
+    with open(csv_path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            bea_code = row['bea_code'].strip()
+            naics_code = row['naics_code'].strip()
+
+            if not bea_code or not naics_code:
+                continue
+
+            bea_to_naics.setdefault(bea_code, set()).add(naics_code)
+            naics_to_bea.setdefault(naics_code, set()).add(bea_code)
+
+    concordance = {
+        'forward': {k: [{'code': c} for c in sorted(v)] for k, v in bea_to_naics.items()},
+        'reverse': {k: [{'code': c} for c in sorted(v)] for k, v in naics_to_bea.items()},
+    }
+
+    write_json('bea-naics-concordance.json', concordance)
+    print(f"  BEA->NAICS: {len(bea_to_naics)} BEA codes -> {sum(len(v) for v in bea_to_naics.values())} mappings")
+    print(f"  NAICS->BEA: {len(naics_to_bea)} NAICS codes -> {sum(len(v) for v in naics_to_bea.values())} mappings")
+
+
 if __name__ == '__main__':
     print("Generating taxonomy data...")
     generate_hs()
@@ -2068,4 +2102,5 @@ if __name__ == '__main__':
     generate_isic_cpc_concordance()
     generate_cpa_hs_concordance()
     generate_bea_hs_concordance()
+    generate_bea_naics_concordance()
     print("\nDone!")

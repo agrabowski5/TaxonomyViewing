@@ -52,6 +52,24 @@ for (let i = 5; i < beaData.length; i++) {
 fs.writeFileSync(path.join(RAW_DIR, 'bea-io-codes-converted.csv'), beaLines.join('\n'), 'utf8');
 console.log(`  BEA codes: ${beaLines.length - 1} rows`);
 
+// 2b. BEA-NAICS concordance (from same xlsx, col 6=BEA detail, col 11=NAICS code)
+console.log('Extracting BEA-NAICS concordance...');
+const beaNaicsLines = ['bea_code,naics_code'];
+const beaNaicsSeen = new Set();
+for (let i = 5; i < beaData.length; i++) {
+  const row = beaData[i];
+  if (!row || !row[6] || !row[11]) continue;
+  const beaCode = String(row[6]).trim();
+  const naicsCode = String(row[11]).trim();
+  if (!beaCode || !naicsCode || beaCode === 'undefined' || naicsCode === 'undefined') continue;
+  const key = `${beaCode}|${naicsCode}`;
+  if (beaNaicsSeen.has(key)) continue;
+  beaNaicsSeen.add(key);
+  beaNaicsLines.push(`"${beaCode}","${naicsCode}"`);
+}
+fs.writeFileSync(path.join(RAW_DIR, 'bea-naics-concordance.csv'), beaNaicsLines.join('\n'), 'utf8');
+console.log(`  BEA-NAICS: ${beaNaicsLines.length - 1} rows`);
+
 // 3. BEA-HS concordance (xls -> csv)
 console.log('Converting BEA-HS concordance...');
 const beaHsWb = xlsx.readFile(path.join(RAW_DIR, 'bea-hs-concordance.xls'));

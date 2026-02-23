@@ -50,7 +50,7 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
           ]);
         // Optional data — don't block app loading if missing
         const [emissionFactors, exiobaseFactors, ecoinventMapping, uslciCoverage, bafuCoverage,
-               naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance] = await Promise.all([
+               naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, beaNaicsConcordance] = await Promise.all([
           fetch(`${base}data/emission-factors.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/exiobase-factors.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/ecoinvent-mapping.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
@@ -60,6 +60,7 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
           fetch(`${base}data/isic-cpc-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/cpa-hs-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/bea-hs-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch(`${base}data/bea-naics-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
         setData({
           hsTree, cpcTree, cnTree, htsTree, caTree,
@@ -69,7 +70,7 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
           naceTree, naceLookup, cpaTree, cpaLookup,
           beaTree, beaLookup,
           concordance, unspscTree, unspscLookup, unspscHsMapping,
-          naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance,
+          naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, beaNaicsConcordance,
           emissionFactors, exiobaseFactors, ecoinventMapping, uslciCoverage, bafuCoverage,
         });
       } catch (e) {

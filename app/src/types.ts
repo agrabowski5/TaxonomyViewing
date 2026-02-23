@@ -152,6 +152,7 @@ export interface AppData {
   isicCpcConcordance: GenericConcordance | null;
   cpaHsConcordance: GenericConcordance | null;
   beaHsConcordance: GenericConcordance | null;
+  beaNaicsConcordance: GenericConcordance | null;
   emissionFactors: Record<string, EmissionFactorEntry> | null;
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null;
   ecoinventMapping: EcoinventMapping | null;
