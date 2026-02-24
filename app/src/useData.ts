@@ -49,10 +49,11 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
             fetch(`${base}data/bea-lookup.json`).then((r) => r.json()),
           ]);
         // Optional data — don't block app loading if missing
-        const [emissionFactors, exiobaseFactors, ecoinventMapping, uslciCoverage, bafuCoverage,
+        const [emissionFactors, exiobaseFactors, exiobaseConcordance, ecoinventMapping, uslciCoverage, bafuCoverage,
                naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, beaNaicsConcordance] = await Promise.all([
           fetch(`${base}data/emission-factors.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/exiobase-factors.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch(`${base}data/exiobase-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/ecoinvent-mapping.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/uslci-coverage.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/bafu-coverage.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
@@ -71,7 +72,7 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
           beaTree, beaLookup,
           concordance, unspscTree, unspscLookup, unspscHsMapping,
           naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, beaNaicsConcordance,
-          emissionFactors, exiobaseFactors, ecoinventMapping, uslciCoverage, bafuCoverage,
+          emissionFactors, exiobaseFactors, exiobaseConcordance, ecoinventMapping, uslciCoverage, bafuCoverage,
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load data");

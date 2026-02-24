@@ -13,7 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection, CoveragePanel } from "./AboutSection";
-import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance } from "./types";
+import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
@@ -666,6 +666,165 @@ function ExiobaseFactorDisplay({ entry }: { entry: ExiobaseFactorEntry }) {
   );
 }
 
+interface ExiobaseProductMatch {
+  products: { code: string; name: string }[];
+  matchedVia: "hs" | "cpa" | "isic" | "nace";
+  matchedCode: string;
+}
+
+function getExiobaseProducts(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  exiobaseConcordance: ExiobaseConcordance | null,
+  concordance: ConcordanceData,
+): ExiobaseProductMatch | null {
+  if (!exiobaseConcordance) return null;
+  const c = exiobaseConcordance;
+
+  function toMatch(codes: string[], via: "hs" | "cpa" | "isic" | "nace", matchedCode: string): ExiobaseProductMatch {
+    const unique = [...new Set(codes)];
+    return {
+      products: unique.map(code => ({ code, name: c.products[code] ?? code })),
+      matchedVia: via,
+      matchedCode,
+    };
+  }
+
+  // HS-family
+  if (HS_FAMILY.includes(taxonomy)) {
+    const hsBase = getHsBase(node.code, taxonomy);
+    if (!hsBase) return null;
+    for (let len = Math.min(6, hsBase.length); len >= 4; len--) {
+      const prefix = hsBase.substring(0, len);
+      const exioCodes = c.hsToExio[prefix];
+      if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "hs", prefix);
+    }
+    return null;
+  }
+
+  // CPC: try CPA bridge first, then chain via HS
+  if (taxonomy === "cpc") {
+    const clean = stripCode(node.code);
+    for (let len = clean.length; len >= 2; len--) {
+      const prefix = clean.substring(0, len);
+      const exioCodes = c.cpaToExio[prefix];
+      if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "cpa", prefix);
+    }
+    for (let len = clean.length; len >= 4; len--) {
+      const prefix = clean.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings) {
+        for (const m of hsMappings) {
+          const exioCodes = c.hsToExio[m.code];
+          if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "hs", m.code);
+        }
+      }
+    }
+    return null;
+  }
+
+  // CPA: direct lookup
+  if (taxonomy === "cpa") {
+    const clean = stripCode(node.code);
+    for (let len = clean.length; len >= 2; len--) {
+      const prefix = clean.substring(0, len);
+      const exioCodes = c.cpaToExio[prefix];
+      if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "cpa", prefix);
+    }
+    return null;
+  }
+
+  // ISIC: direct lookup
+  if (taxonomy === "isic") {
+    const clean = stripCode(node.code);
+    for (let len = clean.length; len >= 1; len--) {
+      const prefix = clean.substring(0, len);
+      const exioCodes = c.isicToExio[prefix];
+      if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "isic", prefix);
+    }
+    return null;
+  }
+
+  // NACE: try naceToExio then isicToExio
+  if (taxonomy === "nace") {
+    const clean = stripCode(node.code);
+    for (let len = clean.length; len >= 1; len--) {
+      const prefix = clean.substring(0, len);
+      const exioCodes = c.naceToExio[prefix] ?? c.isicToExio[prefix];
+      if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "nace", prefix);
+    }
+    return null;
+  }
+
+  // T1: detect origin
+  if (taxonomy === "t1") {
+    if (node.id.startsWith("t1-svc-")) {
+      const cpcCode = node.code.startsWith("SVC") ? stripCode(node.code).substring(3) : stripCode(node.code);
+      for (let len = cpcCode.length; len >= 2; len--) {
+        const prefix = cpcCode.substring(0, len);
+        const exioCodes = c.cpaToExio[prefix];
+        if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "cpa", prefix);
+      }
+    } else {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase) {
+        for (let len = Math.min(6, hsBase.length); len >= 4; len--) {
+          const prefix = hsBase.substring(0, len);
+          const exioCodes = c.hsToExio[prefix];
+          if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "hs", prefix);
+        }
+      }
+    }
+    return null;
+  }
+
+  // T2: detect origin
+  if (taxonomy === "t2") {
+    if (node.id.startsWith("t2-hts-")) {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase) {
+        for (let len = Math.min(6, hsBase.length); len >= 4; len--) {
+          const prefix = hsBase.substring(0, len);
+          const exioCodes = c.hsToExio[prefix];
+          if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "hs", prefix);
+        }
+      }
+    } else {
+      const clean = stripCode(node.code);
+      for (let len = clean.length; len >= 2; len--) {
+        const prefix = clean.substring(0, len);
+        const exioCodes = c.cpaToExio[prefix];
+        if (exioCodes && exioCodes.length > 0) return toMatch(exioCodes, "cpa", prefix);
+      }
+    }
+    return null;
+  }
+
+  return null;
+}
+
+function ExiobaseProductDisplay({ match }: { match: ExiobaseProductMatch }) {
+  return (
+    <div className="emission-factor-card exiobase-products-card">
+      <h4>EXIOBASE Product Mapping</h4>
+      <div className="exiobase-match-via">
+        Matched via {match.matchedVia.toUpperCase()} {match.matchedCode}
+      </div>
+      <div className="exiobase-product-list">
+        {match.products.slice(0, 8).map((p, i) => (
+          <div key={i} className="exiobase-product-item">
+            <span className="exiobase-product-code">{p.code}</span>
+            <span className="exiobase-product-name">{p.name}</span>
+          </div>
+        ))}
+        {match.products.length > 8 && (
+          <div className="exiobase-more">+{match.products.length - 8} more</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Look up BAFU chapter data for a selected node (keyed by HS 2-digit chapter)
 function getBafuChapterData(
   node: TreeNode,
@@ -998,10 +1157,83 @@ function computeExiobaseCoverage(
   tree: TreeNode[],
   taxonomy: TaxonomyType,
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null,
+  exiobaseConcordance: ExiobaseConcordance | null,
   concordance: ConcordanceData,
 ): Set<string> {
-  if (!exiobaseFactors) return new Set();
   const covered = new Set<string>();
+
+  // Use precise concordance if available
+  if (exiobaseConcordance) {
+    const hsKeys = new Set(Object.keys(exiobaseConcordance.hsToExio));
+    const hsAncestorSet = new Set(exiobaseConcordance.hsAncestors);
+    const cpaKeys = new Set(Object.keys(exiobaseConcordance.cpaToExio));
+    const cpaAncestorSet = new Set(exiobaseConcordance.cpaAncestors);
+    const isicKeys = new Set(Object.keys(exiobaseConcordance.isicToExio));
+    const naceKeys = new Set(Object.keys(exiobaseConcordance.naceToExio));
+
+    function walkPrecise(nodes: TreeNode[]) {
+      for (const node of nodes) {
+        const clean = stripCode(node.code);
+        let hasCoverage = false;
+
+        const isCpcOrigin = taxonomy === "cpc" || taxonomy === "cpa"
+          || (taxonomy === "t2" && getT2Origin(node.id) === "cpc")
+          || (taxonomy === "t1" && node.id.startsWith("t1-svc-"));
+        const isHsOrigin = HS_FAMILY.includes(taxonomy)
+          || (taxonomy === "t2" && getT2Origin(node.id) === "hts")
+          || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"));
+
+        if (isHsOrigin) {
+          // Check precise HS-6, then HS-4 heading
+          if (/^\d+$/.test(clean) && clean.length >= 4) {
+            if (clean.length >= 6 && hsKeys.has(clean.substring(0, 6))) hasCoverage = true;
+            else if (hsKeys.has(clean.substring(0, 4))) hasCoverage = true;
+            else if (hsAncestorSet.has(clean.substring(0, Math.min(clean.length, 4)))) hasCoverage = true;
+          }
+        } else if (isCpcOrigin) {
+          // CPA bridge (CPC ~ CPA at 2-4 digit level)
+          for (let len = clean.length; len >= 2; len--) {
+            const prefix = clean.substring(0, len);
+            if (cpaKeys.has(prefix) || cpaAncestorSet.has(prefix)) { hasCoverage = true; break; }
+          }
+          // Fallback: chain CPC -> HS -> hsToExio
+          if (!hasCoverage) {
+            for (let len = clean.length; len >= 4; len--) {
+              const hsMappings = concordance.cpcToHs[clean.substring(0, len)];
+              if (hsMappings) {
+                for (const m of hsMappings) {
+                  if (hsKeys.has(m.code) || hsKeys.has(m.code.substring(0, 4))) { hasCoverage = true; break; }
+                }
+                if (hasCoverage) break;
+              }
+            }
+          }
+        } else if (taxonomy === "isic") {
+          for (let len = clean.length; len >= 1; len--) {
+            if (isicKeys.has(clean.substring(0, len))) { hasCoverage = true; break; }
+          }
+        } else if (taxonomy === "nace") {
+          for (let len = clean.length; len >= 1; len--) {
+            const prefix = clean.substring(0, len);
+            if (naceKeys.has(prefix) || isicKeys.has(prefix)) { hasCoverage = true; break; }
+          }
+        } else if (taxonomy === "unspsc") {
+          // no direct EXIOBASE concordance for UNSPSC
+        } else if (taxonomy === "naics" || taxonomy === "bea") {
+          // no direct EXIOBASE concordance; could chain via HS but skip for now
+        }
+
+        if (hasCoverage) covered.add(node.id);
+        if (node.children) walkPrecise(node.children);
+      }
+    }
+
+    walkPrecise(tree);
+    return covered;
+  }
+
+  // Fallback: old HS-2 chapter logic
+  if (!exiobaseFactors) return covered;
   const exKeys = new Set(Object.keys(exiobaseFactors));
 
   function walk(nodes: TreeNode[]) {
@@ -1614,6 +1846,11 @@ function AppContent() {
     return getExiobaseFactor(selectedNode, selectedFrom, data.exiobaseFactors, data.concordance);
   }, [selectedNode, selectedFrom, data]);
 
+  const exiobaseProducts = useMemo(() => {
+    if (!selectedNode || !selectedFrom || !data) return null;
+    return getExiobaseProducts(selectedNode, selectedFrom, data.exiobaseConcordance, data.concordance);
+  }, [selectedNode, selectedFrom, data]);
+
   const bafuFactor = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return null;
     return getBafuChapterData(selectedNode, selectedFrom, data.bafuCoverage, data.concordance);
@@ -2111,11 +2348,11 @@ function AppContent() {
     [data, rightTaxonomy, getTreeData]
   );
   const leftExiobaseCoverage = useMemo(
-    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.concordance) : new Set<string>(),
+    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Set<string>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightExiobaseCoverage = useMemo(
-    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.concordance) : new Set<string>(),
+    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Set<string>(),
     [data, rightTaxonomy, getTreeData]
   );
   const leftUslciCoverage = useMemo(
@@ -2473,6 +2710,9 @@ function AppContent() {
             {exiobaseFactor && (
               <ExiobaseFactorDisplay entry={exiobaseFactor} />
             )}
+            {exiobaseProducts && (
+              <ExiobaseProductDisplay match={exiobaseProducts} />
+            )}
 
             {bafuFactor && bafuFactor.withGhgData > 0 && (
               <BafuFactorDisplay entry={bafuFactor} />
@@ -2491,7 +2731,7 @@ function AppContent() {
               />
             )}
 
-            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !(bafuFactor && bafuFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && (
+            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !exiobaseProducts && !(bafuFactor && bafuFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && (
               <div className="comparison-item no-mapping">
                 <p className="name">No mappings found at this level</p>
               </div>

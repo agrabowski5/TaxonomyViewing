@@ -561,11 +561,11 @@ function LcaDatabasesTab() {
           </path>
           <text x="510" y="125" textAnchor="middle" className="about-edge-label" fill="#2563eb">NAICS {"\u2192"} HS-6</text>
 
-          {/* EXIOBASE -> HS (orange dotted, chapter-level) */}
-          <path d="M 450 185 Q 442 140 430 92" fill="none" stroke="#d97706" strokeWidth="2.5" strokeDasharray="3,3">
-            <title>{"EXIOBASE \u2192 HS\nChapter-level approximate mapping\nResolution: HS-2 chapters"}</title>
+          {/* EXIOBASE -> HS (green solid, code-level via concordance) */}
+          <path d="M 450 185 Q 442 140 430 92" fill="none" stroke="#059669" strokeWidth="2.5">
+            <title>{"EXIOBASE \u2192 HS\nPrecise concordance mapping (5,085 HS-6 codes)\nResolution: HS-6 / CPA via official concordance"}</title>
           </path>
-          <text x="462" y="142" textAnchor="start" className="about-edge-label" fill="#d97706">HS-2 chapters</text>
+          <text x="462" y="142" textAnchor="start" className="about-edge-label" fill="#059669">HS-6 / CPA</text>
 
           {/* USLCI -> NAICS (blue dashed, first hop) */}
           <path d="M 660 185 Q 678 140 695 93" fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="7,4">
@@ -588,12 +588,12 @@ function LcaDatabasesTab() {
           <text x="260" y="340" textAnchor="middle" fontSize="10" fontWeight="600" fill="#166534">Code-level (CPC / HS-6)</text>
           <text x="80" y="360" fontSize="9" fill="#6b7280">ecoinvent (individual product codes)</text>
           <text x="80" y="372" fontSize="9" fill="#6b7280">EPA/USEEIO, US LCI (HS-6 via NAICS)</text>
+          <text x="80" y="384" fontSize="9" fill="#6b7280">EXIOBASE (HS-6 + CPA via official concordance)</text>
 
           {/* Coarse-grained bar */}
           <rect x="480" y="325" width="360" height="22" rx="4" fill="#fef9c3" stroke="#d97706" strokeWidth="1" />
           <text x="660" y="340" textAnchor="middle" fontSize="10" fontWeight="600" fill="#854d0e">Chapter-level (HS-2)</text>
-          <text x="480" y="360" fontSize="9" fill="#6b7280">EXIOBASE (sector {"\u2192"} HS-2 chapter mapping)</text>
-          <text x="480" y="372" fontSize="9" fill="#6b7280">BAFU (category {"\u2192"} HS-2 chapter mapping)</text>
+          <text x="480" y="360" fontSize="9" fill="#6b7280">BAFU (category {"\u2192"} HS-2 chapter mapping)</text>
 
         </svg>
       </div>
@@ -642,8 +642,8 @@ function LcaDatabasesTab() {
             </tr>
             <tr>
               <td><strong>EXIOBASE 3.8.2</strong></td>
-              <td><span className="about-conc-badge fuzzy">HS-2 chapter</span></td>
-              <td>Sector {"\u2192"} HS chapter mapping</td>
+              <td><span className="about-conc-badge official">HS-6 / CPA</span></td>
+              <td>Official concordance (5,085 HS + 2,608 CPA codes)</td>
               <td>Carbon intensity (kg CO&#8322;e / 2022 EUR)</td>
             </tr>
             <tr>
@@ -677,7 +677,7 @@ function LcaDatabasesTab() {
           </div>
           <div className="about-detail-card" style={{ borderLeftColor: "#6d28d9" }}>
             <strong>EXIOBASE 3.8.2</strong>
-            <p>Multi-regional input-output database. Carbon intensity factors (kg CO&#8322;e per 2022 EUR) mapped to HS-2 chapters via manual sector correspondence.</p>
+            <p>Multi-regional input-output database. Carbon intensity factors (kg CO&#8322;e per 2022 EUR) with official concordance tables mapping 5,085 HS-6 codes, 2,608 CPA codes, 502 ISIC codes, and 664 NACE codes to 190 EXIOBASE product categories.</p>
             <ExtLink href={URLS.exiobase}>Data source</ExtLink>
           </div>
           <div className="about-detail-card" style={{ borderLeftColor: "#0369a1" }}>
@@ -885,6 +885,21 @@ function isEpaCovered(resolved: ResolvedLeaf, data: AppData): boolean {
 }
 
 function isExiobaseCovered(resolved: ResolvedLeaf, data: AppData): boolean {
+  // Prefer precise concordance if available
+  if (data.exiobaseConcordance) {
+    const c = data.exiobaseConcordance;
+    for (const hs of resolved.hsCodes) {
+      if (c.hsToExio[hs]) return true;
+      if (hs.length >= 4 && c.hsToExio[hs.substring(0, 4)]) return true;
+    }
+    for (const cpc of resolved.cpcCodes) {
+      for (let len = cpc.length; len >= 2; len--) {
+        if (c.cpaToExio[cpc.substring(0, len)]) return true;
+      }
+    }
+    return false;
+  }
+  // Fallback: old HS-2 chapter logic
   if (!data.exiobaseFactors) return false;
   for (const hs of resolved.hsCodes) {
     if (data.exiobaseFactors[hs.substring(0, 2)]) return true;
@@ -1047,7 +1062,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
           <li><strong>Leaf nodes</strong> are the most specific codes in each hierarchy (no children).</li>
           <li><strong>ecoinvent</strong> is checked via direct CPC/HS code mapping (with parent-code inheritance).</li>
           <li><strong>EPA/USEEIO</strong> and <strong>US LCI</strong> are checked at HS-6 resolution (via NAICS concordance).</li>
-          <li><strong>EXIOBASE</strong> and <strong>BAFU</strong> are checked at HS-2 chapter level &mdash; high coverage reflects coarse mapping granularity.</li>
+          <li><strong>EXIOBASE</strong> uses precise HS-6/CPA concordance tables; <strong>BAFU</strong> is checked at HS-2 chapter level.</li>
           <li><strong>UNSPSC</strong> uses fuzzy text matching (~4.4% of codes have HS mappings).</li>
           <li><strong>ISIC/NACE</strong> resolve through CPC (ISIC&rarr;CPC concordance), then CPC&rarr;HS.</li>
         </ul>

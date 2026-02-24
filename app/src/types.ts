@@ -135,6 +135,24 @@ export interface BafuCoverage {
   };
 }
 
+export interface ExiobaseConcordance {
+  products: Record<string, string>;
+  hsToExio: Record<string, string[]>;
+  cpaToExio: Record<string, string[]>;
+  isicToExio: Record<string, string[]>;
+  naceToExio: Record<string, string[]>;
+  hsAncestors: string[];
+  cpaAncestors: string[];
+  stats: {
+    hsCodesMatched: number;
+    cpaCodesMatched: number;
+    isicCodesMatched: number;
+    naceCodesMatched: number;
+    uniqueExioProducts: number;
+    totalExioProducts: number;
+  };
+}
+
 export interface GenericConcordance {
   forward: Record<string, { code: string; partial?: boolean }[]>;
   reverse: Record<string, { code: string; partial?: boolean }[]>;
@@ -179,6 +197,7 @@ export interface AppData {
   beaNaicsConcordance: GenericConcordance | null;
   emissionFactors: Record<string, EmissionFactorEntry> | null;
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null;
+  exiobaseConcordance: ExiobaseConcordance | null;
   ecoinventMapping: EcoinventMapping | null;
   uslciCoverage: UslciCoverage | null;
   bafuCoverage: BafuCoverage | null;

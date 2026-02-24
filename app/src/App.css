@@ -1207,6 +1207,47 @@
   white-space: nowrap;
 }
 
+/* EXIOBASE Product Mapping card */
+.exiobase-products-card {
+  border-color: #7c3aed;
+  background: linear-gradient(135deg, #faf5ff, #ede9fe);
+}
+.exiobase-products-card h4 {
+  color: #6d28d9;
+}
+.exiobase-match-via {
+  font-size: 10px;
+  color: #7c3aed;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.exiobase-product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.exiobase-product-item {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  align-items: baseline;
+}
+.exiobase-product-code {
+  font-weight: 600;
+  color: #6d28d9;
+  min-width: 50px;
+  font-size: 10px;
+}
+.exiobase-product-name {
+  color: #4b5563;
+}
+.exiobase-more {
+  font-size: 10px;
+  color: #9ca3af;
+  font-style: italic;
+  margin-top: 2px;
+}
+
 /* Shared LCI factor card styles (BAFU, USLCI) */
 .lci-summary {
   margin-bottom: 6px;
