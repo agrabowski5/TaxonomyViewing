@@ -514,7 +514,7 @@ function LcaDatabasesTab() {
               <text x="450" y="224" textAnchor="middle" style={{ fontSize: "8.5px", fill: "#ede9fe" }}>3.8.2</text>
             </g>
           </a>
-          <text x="450" y="253" textAnchor="middle" className="about-node-detail">Carbon intensity</text>
+          <text x="450" y="253" textAnchor="middle" className="about-node-detail">190 products</text>
           <text x="450" y="265" textAnchor="middle" className="about-node-source">Zenodo</text>
 
           {/* USLCI */}
@@ -563,9 +563,15 @@ function LcaDatabasesTab() {
 
           {/* EXIOBASE -> HS (green solid, code-level via concordance) */}
           <path d="M 450 185 Q 442 140 430 92" fill="none" stroke="#059669" strokeWidth="2.5">
-            <title>{"EXIOBASE \u2192 HS\nPrecise concordance mapping (5,085 HS-6 codes)\nResolution: HS-6 / CPA via official concordance"}</title>
+            <title>{"EXIOBASE \u2192 HS\nPrecise concordance (5,085 HS-6 codes)\nResolution: HS-6 via official concordance"}</title>
           </path>
-          <text x="462" y="142" textAnchor="start" className="about-edge-label" fill="#059669">HS-6 / CPA</text>
+          <text x="462" y="148" textAnchor="start" className="about-edge-label" fill="#059669">5,085 HS-6</text>
+
+          {/* EXIOBASE -> CPC (green solid, via CPA concordance) */}
+          <path d="M 410 185 Q 300 140 200 93" fill="none" stroke="#7c3aed" strokeWidth="2" strokeDasharray="6,3">
+            <title>{"EXIOBASE \u2192 CPC (via CPA)\n2,608 CPA codes mapped to EXIOBASE products\nCPA 2002 \u2248 CPC at 2-4 digit level"}</title>
+          </path>
+          <text x="290" y="148" textAnchor="middle" className="about-edge-label" fill="#7c3aed">2,608 CPA</text>
 
           {/* USLCI -> NAICS (blue dashed, first hop) */}
           <path d="M 660 185 Q 678 140 695 93" fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="7,4">
@@ -604,6 +610,10 @@ function LcaDatabasesTab() {
           <div className="about-legend-item">
             <span className="about-legend-line solid" style={{ borderColor: "#059669" }}></span>
             <span>Direct code-level mapping</span>
+          </div>
+          <div className="about-legend-item">
+            <span className="about-legend-line dashed" style={{ borderColor: "#7c3aed" }}></span>
+            <span>CPA concordance (CPC bridge)</span>
           </div>
           <div className="about-legend-item">
             <span className="about-legend-line dashed" style={{ borderColor: "#2563eb" }}></span>
@@ -1124,41 +1134,3 @@ export function AboutSection({ data }: { data: AppData | null }) {
   );
 }
 
-/* =============================== Standalone Coverage Panel =============================== */
-
-export function CoveragePanel({ data }: { data: AppData | null }) {
-  const [open, setOpen] = useState(false);
-
-  if (!open) {
-    return (
-      <button className="coverage-toggle" onClick={() => setOpen(true)} title="Coverage Matrix">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <rect x="1" y="1" width="4" height="4" rx="0.5" opacity="0.3"/>
-          <rect x="6" y="1" width="4" height="4" rx="0.5" opacity="0.6"/>
-          <rect x="11" y="1" width="4" height="4" rx="0.5" opacity="0.9"/>
-          <rect x="1" y="6" width="4" height="4" rx="0.5" opacity="0.5"/>
-          <rect x="6" y="6" width="4" height="4" rx="0.5" opacity="0.8"/>
-          <rect x="11" y="6" width="4" height="4" rx="0.5" opacity="0.4"/>
-          <rect x="1" y="11" width="4" height="4" rx="0.5" opacity="0.7"/>
-          <rect x="6" y="11" width="4" height="4" rx="0.5" opacity="0.3"/>
-          <rect x="11" y="11" width="4" height="4" rx="0.5" opacity="0.6"/>
-        </svg>
-        Coverage
-      </button>
-    );
-  }
-
-  return (
-    <div className="about-overlay" onClick={() => setOpen(false)}>
-      <div className="about-panel" onClick={(e) => e.stopPropagation()}>
-        <div className="about-header">
-          <h2>LCA Coverage Matrix</h2>
-          <button className="about-close" onClick={() => setOpen(false)}>&times;</button>
-        </div>
-        <div className="about-body">
-          <CoverageMatrixTab data={data} />
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -1516,32 +1516,6 @@
   }
 }
 
-/* ===== Coverage Panel Toggle ===== */
-.coverage-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border: 1px solid #059669;
-  border-radius: 8px;
-  background: white;
-  color: #047857;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.coverage-toggle:hover {
-  background: #ecfdf5;
-  border-color: #10b981;
-}
-
-.coverage-toggle svg {
-  flex-shrink: 0;
-}
-
 /* ===== About Section ===== */
 .about-toggle {
   display: flex;
