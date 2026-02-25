@@ -2033,6 +2033,14 @@
   background: linear-gradient(to right, #f8fafc, #fef2f2, #fef9c3, #dbeafe, #93c5fd, #3b82f6);
 }
 
+.cm-gradient-purple {
+  width: 240px;
+  height: 14px;
+  border-radius: 7px;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(to right, #f8fafc, #fef2f2, #fef9c3, #ede9fe, #c4b5fd, #8b5cf6);
+}
+
 .cm-mode-toggle {
   display: flex;
   gap: 4px;

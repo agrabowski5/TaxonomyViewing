@@ -1044,7 +1044,16 @@ function specificityColor(pct: number): string {
   return "#3b82f6";
 }
 
-type MatrixMode = "coverage" | "specificity";
+type MatrixMode = "coverage" | "specificity" | "density";
+
+function densityColor(pct: number): string {
+  if (pct === 0) return "#f8fafc";
+  if (pct < 2) return "#fef2f2";
+  if (pct < 5) return "#fef9c3";
+  if (pct < 15) return "#ede9fe";
+  if (pct < 35) return "#c4b5fd";
+  return "#8b5cf6";
+}
 
 function CoverageMatrixTab({ data }: { data: AppData | null }) {
   const [mode, setMode] = useState<MatrixMode>("coverage");
@@ -1058,29 +1067,29 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
     return <p style={{ textAlign: "center", padding: 32, color: "#6b7280" }}>Loading data&hellip;</p>;
   }
 
-  const isCoverage = mode === "coverage";
-
   return (
     <>
       <p className="about-intro">
-        {isCoverage
-          ? <>This matrix shows what percentage of each taxonomy&rsquo;s leaf nodes can be resolved to LCA data from each database, via the concordance chains described in the other tabs.</>
-          : <>This matrix shows the <strong>specificity</strong> of each mapping: what ratio of unique source-level data entries back the covered leaf nodes. High specificity means each leaf resolves to its own distinct data; low means many leaves share the same broad sector or category data.</>
-        }
+        {mode === "coverage" && (
+          <>This matrix shows what percentage of each taxonomy&rsquo;s leaf nodes can be resolved to LCA data from each database, via the concordance chains described in the other tabs.</>
+        )}
+        {mode === "specificity" && (
+          <>This matrix shows the <strong>specificity</strong> of each mapping: what ratio of unique source-level data entries back the covered leaf nodes. High specificity means each leaf resolves to its own distinct data; low means many leaves share the same broad sector or category data.</>
+        )}
+        {mode === "density" && (
+          <>This matrix shows <strong>unique data density</strong>: how many distinct source-level data entries exist relative to the total leaf nodes in each taxonomy. This reveals which database provides the most differentiated data for each classification system.</>
+        )}
       </p>
 
       <div className="cm-mode-toggle">
-        <button
-          className={`cm-mode-btn ${isCoverage ? "cm-mode-active" : ""}`}
-          onClick={() => setMode("coverage")}
-        >
+        <button className={`cm-mode-btn ${mode === "coverage" ? "cm-mode-active" : ""}`} onClick={() => setMode("coverage")}>
           Coverage
         </button>
-        <button
-          className={`cm-mode-btn ${!isCoverage ? "cm-mode-active" : ""}`}
-          onClick={() => setMode("specificity")}
-        >
+        <button className={`cm-mode-btn ${mode === "specificity" ? "cm-mode-active" : ""}`} onClick={() => setMode("specificity")}>
           Specificity
+        </button>
+        <button className={`cm-mode-btn ${mode === "density" ? "cm-mode-active" : ""}`} onClick={() => setMode("density")}>
+          Density
         </button>
       </div>
 
@@ -1111,7 +1120,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
                       {DB_COLUMNS.map(db => {
                         const cell = row.cells[db.key];
                         if (!cell) return <td key={db.key} className="cm-cell" />;
-                        if (isCoverage) {
+                        if (mode === "coverage") {
                           return (
                             <td
                               key={db.key}
@@ -1124,17 +1133,31 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
                             </td>
                           );
                         }
-                        // Specificity mode
-                        const sp = cell.specificPct;
+                        if (mode === "specificity") {
+                          const sp = cell.specificPct;
+                          return (
+                            <td
+                              key={db.key}
+                              className="cm-cell"
+                              style={{ backgroundColor: cell.covered === 0 ? "#f8fafc" : specificityColor(sp) }}
+                              title={`${item.label} \u00d7 ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.covered.toLocaleString()} covered leaves (${sp.toFixed(1)}% specificity)`}
+                            >
+                              <div className="cm-pct">{cell.covered === 0 ? "n/a" : `${sp.toFixed(1)}%`}</div>
+                              <div className="cm-count">{cell.uniqueKeys.toLocaleString()} / {cell.covered.toLocaleString()}</div>
+                            </td>
+                          );
+                        }
+                        // Density mode: unique keys / total leaves
+                        const dp = cell.total > 0 ? (cell.uniqueKeys / cell.total) * 100 : 0;
                         return (
                           <td
                             key={db.key}
                             className="cm-cell"
-                            style={{ backgroundColor: cell.covered === 0 ? "#f8fafc" : specificityColor(sp) }}
-                            title={`${item.label} \u00d7 ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.covered.toLocaleString()} covered leaves (${sp.toFixed(1)}% specificity)`}
+                            style={{ backgroundColor: cell.uniqueKeys === 0 ? "#f8fafc" : densityColor(dp) }}
+                            title={`${item.label} \u00d7 ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.total.toLocaleString()} total leaves (${dp.toFixed(1)}% density)`}
                           >
-                            <div className="cm-pct">{cell.covered === 0 ? "n/a" : `${sp.toFixed(1)}%`}</div>
-                            <div className="cm-count">{cell.uniqueKeys.toLocaleString()} / {cell.covered.toLocaleString()}</div>
+                            <div className="cm-pct">{cell.uniqueKeys === 0 ? "0%" : `${dp.toFixed(1)}%`}</div>
+                            <div className="cm-count">{cell.uniqueKeys.toLocaleString()} / {cell.total.toLocaleString()}</div>
                           </td>
                         );
                       })}
@@ -1149,7 +1172,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
 
       <div className="cm-legend">
         <span className="cm-legend-label">0%</span>
-        <div className={isCoverage ? "cm-gradient" : "cm-gradient-blue"} />
+        <div className={mode === "coverage" ? "cm-gradient" : mode === "specificity" ? "cm-gradient-blue" : "cm-gradient-purple"} />
         <span className="cm-legend-label">100%</span>
       </div>
 
@@ -1157,7 +1180,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
         <h4>Notes</h4>
         <ul style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.6, paddingLeft: 20 }}>
           <li><strong>Leaf nodes</strong> are the most specific codes in each hierarchy (no children).</li>
-          {isCoverage ? (
+          {mode === "coverage" && (
             <>
               <li><strong>ecoinvent</strong> is checked via direct CPC/HS/ISIC code mapping (with parent-code inheritance).</li>
               <li><strong>EPA/USEEIO</strong> and <strong>US LCI</strong> are checked at HS-6 resolution (via NAICS concordance).</li>
@@ -1165,13 +1188,21 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
               <li><strong>UNSPSC</strong> uses fuzzy text matching (~4.4% of codes have HS mappings).</li>
               <li><strong>ISIC/NACE</strong> resolve through CPC (ISIC&rarr;CPC concordance), then CPC&rarr;HS.</li>
             </>
-          ) : (
+          )}
+          {mode === "specificity" && (
             <>
-              <li><strong>Specificity</strong> = unique source data entries / covered leaves. 100% means every leaf has its own distinct data entry.</li>
+              <li><strong>Specificity</strong> = unique source data entries / covered leaves. 100% means every covered leaf has its own distinct data entry.</li>
               <li><strong>ecoinvent</strong>: source key is the matched CPC/HS/ISIC code (product-level).</li>
               <li><strong>EPA/USEEIO</strong> and <strong>US LCI</strong>: source key is the underlying NAICS sector (~400 and ~59 sectors respectively). Multiple HS-6 codes share the same sector factor.</li>
               <li><strong>EXIOBASE</strong>: source key is the EXIOBASE product category (~190 categories). Many HS codes map to the same category.</li>
               <li><strong>BAFU</strong>: source key is the HS-2 chapter (~81 chapters). Very coarse &mdash; each chapter covers hundreds of leaf codes.</li>
+            </>
+          )}
+          {mode === "density" && (
+            <>
+              <li><strong>Density</strong> = unique source data entries / total leaves in taxonomy. Shows what fraction of the taxonomy gets a distinct data point.</li>
+              <li>Density combines coverage breadth with data granularity &mdash; a database scores high only if it both covers many leaves <em>and</em> provides distinct data for them.</li>
+              <li>Compare with <strong>Coverage</strong> (how many leaves match anything) and <strong>Specificity</strong> (how unique the data is among matched leaves).</li>
             </>
           )}
         </ul>
