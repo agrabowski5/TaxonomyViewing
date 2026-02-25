@@ -70,14 +70,18 @@ export interface EcoinventCodeMapping {
 export interface EcoinventMapping {
   cpc: Record<string, EcoinventCodeMapping>;
   hs: Record<string, EcoinventCodeMapping>;
+  isic: Record<string, EcoinventCodeMapping>;
   cpcAncestors: string[];
   hsAncestors: string[];
+  isicAncestors: string[];
   stats: {
     totalProducts: number;
     productsWithCpc: number;
     productsWithHs: number;
+    productsWithIsic: number;
     uniqueCpcCodes: number;
     uniqueHsCodes: number;
+    uniqueIsicCodes: number;
   };
 }
 

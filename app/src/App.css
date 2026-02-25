@@ -2025,6 +2025,46 @@
   background: linear-gradient(to right, #f8fafc, #fef2f2, #fef9c3, #d9f99d, #86efac, #22c55e);
 }
 
+.cm-gradient-blue {
+  width: 240px;
+  height: 14px;
+  border-radius: 7px;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(to right, #f8fafc, #fef2f2, #fef9c3, #dbeafe, #93c5fd, #3b82f6);
+}
+
+.cm-mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 3px;
+  width: fit-content;
+}
+
+.cm-mode-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+
+.cm-mode-btn:hover {
+  color: #374151;
+}
+
+.cm-mode-active {
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
 /* Responsive About */
 @media (max-width: 768px) {
   .about-overlay {

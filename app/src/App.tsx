@@ -998,13 +998,23 @@ function LciFactorDisplay({ entry, title, source, cardClass }: {
 }
 
 // Look up ecoinvent mapping for a selected node
+type EcoinventInfo = {
+  cpc: EcoinventCodeMapping | null;
+  hs: EcoinventCodeMapping | null;
+  isic: EcoinventCodeMapping | null;
+  cpcCode: string | null;
+  hsCode: string | null;
+  isicCode: string | null;
+};
+
 function getEcoinventInfo(
   node: TreeNode,
   taxonomy: TaxonomyType,
   ecoinventMapping: EcoinventMapping | null,
   concordance: ConcordanceData,
-): { cpc: EcoinventCodeMapping | null; hs: EcoinventCodeMapping | null; cpcCode: string | null; hsCode: string | null } {
-  if (!ecoinventMapping) return { cpc: null, hs: null, cpcCode: null, hsCode: null };
+): EcoinventInfo {
+  const empty: EcoinventInfo = { cpc: null, hs: null, isic: null, cpcCode: null, hsCode: null, isicCode: null };
+  if (!ecoinventMapping) return empty;
 
   const clean = stripCode(node.code);
 
@@ -1023,13 +1033,13 @@ function getEcoinventInfo(
         break;
       }
     }
-    return { cpc: cpcMatch, hs: hsMatch, cpcCode: cpcMatch ? clean : null, hsCode };
+    return { cpc: cpcMatch, hs: hsMatch, isic: null, cpcCode: cpcMatch ? clean : null, hsCode, isicCode: null };
   }
 
   // HS-family: direct HS lookup + chain to CPC via concordance
   if (HS_FAMILY.includes(taxonomy)) {
     const hsBase = getHsBase(node.code, taxonomy);
-    if (!hsBase) return { cpc: null, hs: null, cpcCode: null, hsCode: null };
+    if (!hsBase) return empty;
     // Try progressively shorter HS prefixes
     let hsMatch: EcoinventCodeMapping | null = null;
     let matchedHsCode: string | null = null;
@@ -1053,7 +1063,40 @@ function getEcoinventInfo(
         break;
       }
     }
-    return { cpc: cpcMatch, hs: hsMatch, cpcCode, hsCode: matchedHsCode };
+    return { cpc: cpcMatch, hs: hsMatch, isic: null, cpcCode, hsCode: matchedHsCode, isicCode: null };
+  }
+
+  // ISIC / NACE: direct ISIC lookup (NACE numeric codes = ISIC codes)
+  if (taxonomy === "isic" || taxonomy === "nace") {
+    let isicMatch: EcoinventCodeMapping | null = null;
+    let isicCode: string | null = null;
+    // Try progressively shorter ISIC prefixes (4 -> 3 -> 2 digit)
+    for (let len = Math.min(4, clean.length); len >= 2; len--) {
+      const prefix = clean.substring(0, len);
+      if (ecoinventMapping.isic[prefix]) {
+        isicMatch = ecoinventMapping.isic[prefix];
+        isicCode = prefix;
+        break;
+      }
+    }
+    return { cpc: null, hs: null, isic: isicMatch, cpcCode: null, hsCode: null, isicCode };
+  }
+
+  // NAICS: chain via NAICS→HS concordance, then HS lookup + direct ISIC check
+  if (taxonomy === "naics") {
+    // NAICS doesn't have direct ecoinvent mapping, but try ISIC prefix match
+    // (NAICS codes overlap somewhat with ISIC at 2-digit level)
+    return empty;
+  }
+
+  // CPA: chain via CPA→HS concordance
+  if (taxonomy === "cpa") {
+    // CPA codes mirror CPC structure, try direct CPC lookup
+    const cpcMatch = ecoinventMapping.cpc[clean] ?? null;
+    if (cpcMatch) {
+      return { cpc: cpcMatch, hs: null, isic: null, cpcCode: clean, hsCode: null, isicCode: null };
+    }
+    return empty;
   }
 
   // T1: detect origin
@@ -1078,7 +1121,7 @@ function getEcoinventInfo(
     }
   }
 
-  return { cpc: null, hs: null, cpcCode: null, hsCode: null };
+  return empty;
 }
 
 // Compute ecoinvent coverage for tree nodes (for overlay)
@@ -1101,6 +1144,12 @@ function computeEcoinventCoverage(
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         const hsBase = clean.substring(0, Math.min(6, clean.length));
         hasCoverage = !!em.hs[hsBase];
+      } else if (taxonomy === "isic" || taxonomy === "nace") {
+        // Direct ISIC lookup (NACE numeric codes = ISIC codes)
+        hasCoverage = !!em.isic[clean] || em.isicAncestors.includes(clean);
+      } else if (taxonomy === "cpa") {
+        // CPA codes mirror CPC structure
+        hasCoverage = !!em.cpc[clean] || em.cpcAncestors.includes(clean);
       }
 
       if (hasCoverage) covered.add(node.id);
@@ -1347,13 +1396,15 @@ function computeBafuCoverage(
   return covered;
 }
 
-function EcoinventDisplay({ cpc, hs, cpcCode, hsCode }: {
+function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode }: {
   cpc: EcoinventCodeMapping | null;
   hs: EcoinventCodeMapping | null;
+  isic: EcoinventCodeMapping | null;
   cpcCode: string | null;
   hsCode: string | null;
+  isicCode: string | null;
 }) {
-  if (!cpc && !hs) return null;
+  if (!cpc && !hs && !isic) return null;
 
   return (
     <div className="ecoinvent-card">
@@ -1392,6 +1443,25 @@ function EcoinventDisplay({ cpc, hs, cpcCode, hsCode }: {
             ))}
             {hs.products.length > 5 && (
               <span className="ecoinvent-more">+{hs.products.length - 5} more</span>
+            )}
+          </div>
+        </div>
+      )}
+      {isic && (
+        <div className="ecoinvent-section">
+          <div className="ecoinvent-header">
+            <span className="ecoinvent-label">ISIC {isicCode}</span>
+            <span className={`ecoinvent-type ${isic.mappingType === "1:1" ? "type-one" : "type-many"}`}>
+              {isic.mappingType}
+            </span>
+            <span className="ecoinvent-count">{isic.count} product{isic.count !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="ecoinvent-products">
+            {isic.products.slice(0, 5).map((p, i) => (
+              <span key={i} className="ecoinvent-product">{p}</span>
+            ))}
+            {isic.products.length > 5 && (
+              <span className="ecoinvent-more">+{isic.products.length - 5} more</span>
             )}
           </div>
         </div>
@@ -2373,8 +2443,8 @@ function AppContent() {
   );
 
   // Ecoinvent info for selected node
-  const ecoinventInfo = useMemo(() => {
-    if (!selectedNode || !selectedFrom || !data) return { cpc: null, hs: null, cpcCode: null, hsCode: null };
+  const ecoinventInfo = useMemo((): EcoinventInfo => {
+    if (!selectedNode || !selectedFrom || !data) return { cpc: null, hs: null, isic: null, cpcCode: null, hsCode: null, isicCode: null };
     return getEcoinventInfo(selectedNode, selectedFrom, data.ecoinventMapping, data.concordance);
   }, [selectedNode, selectedFrom, data]);
 
@@ -2721,16 +2791,18 @@ function AppContent() {
               <UslciFactorDisplay entry={uslciFactor} />
             )}
 
-            {(ecoinventInfo.cpc || ecoinventInfo.hs) && (
+            {(ecoinventInfo.cpc || ecoinventInfo.hs || ecoinventInfo.isic) && (
               <EcoinventDisplay
                 cpc={ecoinventInfo.cpc}
                 hs={ecoinventInfo.hs}
+                isic={ecoinventInfo.isic}
                 cpcCode={ecoinventInfo.cpcCode}
                 hsCode={ecoinventInfo.hsCode}
+                isicCode={ecoinventInfo.isicCode}
               />
             )}
 
-            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !exiobaseProducts && !(bafuFactor && bafuFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && (
+            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !exiobaseProducts && !(bafuFactor && bafuFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && !ecoinventInfo.isic && (
               <div className="comparison-item no-mapping">
                 <p className="name">No mappings found at this level</p>
               </div>
