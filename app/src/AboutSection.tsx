@@ -555,11 +555,8 @@ function LcaDatabasesTab() {
           </path>
           <text x="255" y="128" textAnchor="middle" className="about-edge-label" fill="#059669">966 HS codes</text>
 
-          {/* ecoinvent -> ISIC (direct, amber solid) */}
-          <path d="M 100 237 Q 140 310 240 385" fill="none" stroke="#b45309" strokeWidth="2">
-            <title>{"ecoinvent \u2192 ISIC\nDirect ISIC classification from activity data\n182 ISIC codes matched"}</title>
-          </path>
-          <text x="145" y="318" textAnchor="start" className="about-edge-label" fill="#b45309">182 ISIC codes</text>
+          {/* ecoinvent ISIC note (no line — ISIC node is in the taxonomy diagram above) */}
+          <text x="100" y="277" textAnchor="middle" className="about-node-source" fill="#b45309">+ 182 ISIC codes</text>
 
           {/* EPA -> NAICS (blue dashed, first hop) */}
           <path d="M 310 185 Q 500 120 695 93" fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="7,4">
@@ -598,7 +595,7 @@ function LcaDatabasesTab() {
           {/* Fine-grained bar */}
           <rect x="80" y="325" width="360" height="22" rx="4" fill="#dcfce7" stroke="#059669" strokeWidth="1" />
           <text x="260" y="340" textAnchor="middle" fontSize="10" fontWeight="600" fill="#166534">Code-level (CPC / HS-6)</text>
-          <text x="80" y="360" fontSize="9" fill="#6b7280">ecoinvent (individual product codes)</text>
+          <text x="80" y="360" fontSize="9" fill="#6b7280">ecoinvent (individual CPC/HS/ISIC product codes)</text>
           <text x="80" y="372" fontSize="9" fill="#6b7280">EPA/USEEIO, US LCI (HS-6 via NAICS)</text>
           <text x="80" y="384" fontSize="9" fill="#6b7280">EXIOBASE (HS-6 + CPA via official concordance)</text>
 
