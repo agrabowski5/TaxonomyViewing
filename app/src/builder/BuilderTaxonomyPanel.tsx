@@ -143,6 +143,15 @@ export function BuilderTaxonomyPanel({ onShowBaseTaxonomyDialog, onShowLibrary, 
         >
           + Quick Add
         </button>
+        <button
+          className="builder-wizard-add-btn"
+          onClick={() => {
+            dispatch({ type: "WIZARD_START", parentNodeId: state.selectedCustomNodeId });
+            if (!state.guideSidebarOpen) dispatch({ type: "TOGGLE_GUIDE_SIDEBAR" });
+          }}
+        >
+          Wizard Add
+        </button>
         <span className="builder-actions-spacer" />
         {state.customTree.length > 0 && (
           <button className="builder-save-btn" onClick={handleQuickSave}>

@@ -453,11 +453,28 @@ export function NodeCreationGuide() {
       </div>
 
       <div className="builder-guide-content">
+        {wizard.active && wizard.parentNodeId && (() => {
+          const parentNode = findNodeInTree(state.customTree, wizard.parentNodeId!);
+          return parentNode ? (
+            <div className="wizard-context-banner">
+              Adding relative to: <strong>{parentNode.code} — {parentNode.name}</strong>
+            </div>
+          ) : null;
+        })()}
         {!wizard.active ? (
           <>
             {/* When wizard is inactive, show selected node editor or start prompt */}
             {state.selectedCustomNodeId ? (
-              <SelectedNodeEditor />
+              <>
+                <SelectedNodeEditor />
+                <button
+                  className="wizard-start-btn"
+                  style={{ marginTop: 12 }}
+                  onClick={() => dispatch({ type: "WIZARD_START", parentNodeId: state.selectedCustomNodeId })}
+                >
+                  Start Wizard for Selected Node
+                </button>
+              </>
             ) : (
               <div className="wizard-inactive">
                 <p>Select a node in the tree to edit it, or start the wizard to create a new node.</p>
