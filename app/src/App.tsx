@@ -1323,7 +1323,11 @@ function computeUslciCoverage(
 ): Set<string> {
   if (!uslciCoverage) return new Set();
   const covered = new Set<string>();
-  const coverageKeys = new Set(Object.keys(uslciCoverage.coverage));
+  const coverageKeys = new Set(
+    Object.entries(uslciCoverage.coverage)
+      .filter(([, entry]) => entry.withGhgData > 0)
+      .map(([key]) => key)
+  );
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
@@ -1364,7 +1368,12 @@ function computeBafuCoverage(
 ): Set<string> {
   if (!bafuCoverage) return new Set();
   const covered = new Set<string>();
-  const coverageKeys = new Set(Object.keys(bafuCoverage.coverage));
+  // Only count chapters that actually have GHG data, not just process entries
+  const coverageKeys = new Set(
+    Object.entries(bafuCoverage.coverage)
+      .filter(([, entry]) => entry.withGhgData > 0)
+      .map(([key]) => key)
+  );
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
