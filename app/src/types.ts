@@ -165,20 +165,6 @@ export interface GenericConcordance {
 export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2"
   | "naics" | "isic" | "nace" | "cpa" | "bea";
 
-/** Compact LCA summary for inline tree node detail card */
-export interface LcaSummaryItem {
-  db: string;           // "ecoinvent" | "epa" | "exiobase" | "uslci" | "bafu"
-  label: string;        // Display label
-  value: string;        // Primary value (e.g. "0.342 kg CO2e/$")
-  detail: string;       // Secondary info (e.g. "NAICS 311: Food manufacturing")
-  products?: string[];  // Product/process names (up to 3)
-}
-
-export interface LcaSummary {
-  nodeId: string;
-  items: LcaSummaryItem[];
-}
-
 export interface AppData {
   hsTree: TreeNode[];
   cpcTree: TreeNode[];
