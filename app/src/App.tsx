@@ -13,7 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
-import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance } from "./types";
+import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance, LcaSummary, LcaSummaryItem } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
@@ -2470,6 +2470,74 @@ function AppContent() {
     return getEcoinventInfo(selectedNode, selectedFrom, data.ecoinventMapping, data.concordance);
   }, [selectedNode, selectedFrom, data]);
 
+  // Bundle LCA data into compact summary for inline tree detail card
+  const lcaSummary = useMemo((): LcaSummary | null => {
+    if (!selectedNode) return null;
+    const items: LcaSummaryItem[] = [];
+
+    // ecoinvent
+    const eco = ecoinventInfo;
+    const ecoMapping = eco.cpc || eco.hs || eco.isic;
+    if (ecoMapping) {
+      const via = eco.cpc ? `CPC ${eco.cpcCode}` : eco.hs ? `HS ${eco.hsCode}` : `ISIC ${eco.isicCode}`;
+      items.push({
+        db: "ecoinvent", label: "ecoinvent",
+        value: `${ecoMapping.count} product${ecoMapping.count !== 1 ? "s" : ""}`,
+        detail: `${ecoMapping.mappingType} via ${via}`,
+        products: ecoMapping.products.slice(0, 3),
+      });
+    }
+
+    // EPA/USEEIO
+    if (emissionFactor) {
+      items.push({
+        db: "epa", label: "EPA/USEEIO",
+        value: `${emissionFactor.factor.toFixed(3)} ${emissionFactor.unit}`,
+        detail: `NAICS ${emissionFactor.naicsCode}: ${emissionFactor.naicsDescription}`,
+      });
+    }
+
+    // EXIOBASE
+    if (exiobaseProducts && exiobaseProducts.products.length > 0) {
+      const ep = exiobaseProducts;
+      items.push({
+        db: "exiobase", label: "EXIOBASE",
+        value: `${ep.products.length} product${ep.products.length !== 1 ? "s" : ""}`,
+        detail: `Matched via ${ep.matchedVia} ${ep.matchedCode}`,
+        products: ep.products.slice(0, 3).map(p => p.name),
+      });
+    } else if (exiobaseFactor) {
+      items.push({
+        db: "exiobase", label: "EXIOBASE",
+        value: `${exiobaseFactor.factor.toFixed(3)} ${exiobaseFactor.unit}`,
+        detail: exiobaseFactor.sectors.slice(0, 2).join(", "),
+      });
+    }
+
+    // US LCI
+    if (uslciFactor && uslciFactor.withGhgData > 0) {
+      items.push({
+        db: "uslci", label: "US LCI",
+        value: `${uslciFactor.processCount} process${uslciFactor.processCount !== 1 ? "es" : ""}`,
+        detail: `${uslciFactor.withGhgData} with GHG data`,
+        products: uslciFactor.topProcesses.slice(0, 3).map(p => p.name),
+      });
+    }
+
+    // BAFU
+    if (bafuFactor && bafuFactor.withGhgData > 0) {
+      items.push({
+        db: "bafu", label: "BAFU",
+        value: `${bafuFactor.processCount} process${bafuFactor.processCount !== 1 ? "es" : ""}`,
+        detail: `${bafuFactor.withGhgData} with GHG data`,
+        products: bafuFactor.topProcesses.slice(0, 3).map(p => p.name),
+      });
+    }
+
+    if (items.length === 0) return null;
+    return { nodeId: selectedNode.id, items };
+  }, [selectedNode, ecoinventInfo, emissionFactor, exiobaseProducts, exiobaseFactor, uslciFactor, bafuFactor]);
+
   if (loading) {
     return (
       <div className="loading">
@@ -2608,6 +2676,7 @@ function AppContent() {
               exiobaseCoverage={leftExiobaseCoverage}
               uslciCoverage={leftUslciCoverage}
               bafuCoverage={leftBafuCoverage}
+              lcaSummary={selectedFrom === leftTaxonomy ? lcaSummary : null}
             />
           </>
         </div>
@@ -2685,6 +2754,7 @@ function AppContent() {
                 exiobaseCoverage={rightExiobaseCoverage}
                 uslciCoverage={rightUslciCoverage}
                 bafuCoverage={rightBafuCoverage}
+                lcaSummary={selectedFrom === rightTaxonomy ? lcaSummary : null}
               />
             </>
           )}
