@@ -1492,6 +1492,65 @@
   padding: 2px 4px;
 }
 
+/* ===== Descendant EF Range Card ===== */
+.descendant-range-card {
+  flex: 1 1 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border-radius: 6px;
+  border-left: 4px solid #10b981;
+}
+
+.descendant-range-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #065f46;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dr-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dr-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dr-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  min-width: 70px;
+  text-align: center;
+}
+
+.dr-ecoinvent { background: #fef3c7; color: #92400e; }
+.dr-epa { background: #d1fae5; color: #065f46; }
+.dr-exiobase { background: #ede9fe; color: #5b21b6; }
+.dr-uslci { background: #dbeafe; color: #1e40af; }
+.dr-bafu { background: #fce7f3; color: #9d174d; }
+
+.dr-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+}
+
+.dr-count {
+  font-size: 10px;
+  color: #6b7280;
+}
+
 /* ===== Responsive Design ===== */
 @media (max-width: 1200px) {
   .main-content.two-pane {

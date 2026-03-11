@@ -13,7 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
-import type { TreeNode, LookupEntry, TaxonomyType, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance } from "./types";
+import type { TreeNode, LookupEntry, TaxonomyType, AppData, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
@@ -952,6 +952,148 @@ function getUslciData(
   }
 
   return null;
+}
+
+/* ===== Descendant EF Range Aggregation ===== */
+
+interface DbRange {
+  min: number;
+  max: number;
+  count: number;
+  unit: string;
+}
+
+interface DescendantRanges {
+  epa: DbRange | null;
+  exiobase: DbRange | null;
+  bafu: DbRange | null;
+  uslci: DbRange | null;
+  ecoinventCount: number;
+  totalLeaves: number;
+}
+
+function collectLeafNodes(node: TreeNode): TreeNode[] {
+  if (!node.children || node.children.length === 0) return [node];
+  const leaves: TreeNode[] = [];
+  for (const child of node.children) {
+    leaves.push(...collectLeafNodes(child));
+  }
+  return leaves;
+}
+
+function computeDescendantRanges(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  data: AppData,
+): DescendantRanges {
+  const leaves = collectLeafNodes(node);
+  const ranges: DescendantRanges = {
+    epa: null, exiobase: null, bafu: null, uslci: null,
+    ecoinventCount: 0, totalLeaves: leaves.length,
+  };
+
+  const epaVals: number[] = [];
+  const exioVals: number[] = [];
+  const bafuVals: number[] = [];
+  const uslciVals: number[] = [];
+
+  for (const leaf of leaves) {
+    // EPA
+    const ef = getEmissionFactor(leaf, taxonomy, data.emissionFactors, data.concordance);
+    if (ef) epaVals.push(ef.factor);
+
+    // EXIOBASE
+    const exf = getExiobaseFactor(leaf, taxonomy, data.exiobaseFactors, data.concordance);
+    if (exf) exioVals.push(exf.factor);
+
+    // BAFU
+    const bf = getBafuChapterData(leaf, taxonomy, data.bafuCoverage, data.concordance);
+    if (bf && bf.withGhgData > 0) {
+      const kgStats = bf.unitStats["kg"];
+      if (kgStats) bafuVals.push(kgStats.median);
+    }
+
+    // USLCI
+    const uf = getUslciData(leaf, taxonomy, data.uslciCoverage, data.concordance);
+    if (uf && uf.withGhgData > 0) {
+      const kgStats = uf.unitStats["kg"];
+      if (kgStats) uslciVals.push(kgStats.median);
+    }
+
+    // ecoinvent (just count)
+    const eco = getEcoinventInfo(leaf, taxonomy, data.ecoinventMapping, data.concordance);
+    if (eco.cpc || eco.hs || eco.isic) ranges.ecoinventCount++;
+  }
+
+  if (epaVals.length > 0) {
+    ranges.epa = { min: Math.min(...epaVals), max: Math.max(...epaVals), count: epaVals.length, unit: "kg CO₂e / $" };
+  }
+  if (exioVals.length > 0) {
+    ranges.exiobase = { min: Math.min(...exioVals), max: Math.max(...exioVals), count: exioVals.length, unit: "kg CO₂e / EUR" };
+  }
+  if (bafuVals.length > 0) {
+    ranges.bafu = { min: Math.min(...bafuVals), max: Math.max(...bafuVals), count: bafuVals.length, unit: "kg CO₂e / kg" };
+  }
+  if (uslciVals.length > 0) {
+    ranges.uslci = { min: Math.min(...uslciVals), max: Math.max(...uslciVals), count: uslciVals.length, unit: "kg CO₂e / kg" };
+  }
+
+  return ranges;
+}
+
+function DescendantRangeDisplay({ ranges }: { ranges: DescendantRanges }) {
+  const hasAny = ranges.epa || ranges.exiobase || ranges.bafu || ranges.uslci || ranges.ecoinventCount > 0;
+  if (!hasAny) return null;
+
+  return (
+    <div className="descendant-range-card">
+      <h4>Emission Factor Range ({ranges.totalLeaves.toLocaleString()} descendant leaves)</h4>
+      <div className="dr-rows">
+        {ranges.ecoinventCount > 0 && (
+          <div className="dr-row">
+            <span className="dr-badge dr-ecoinvent">ecoinvent</span>
+            <span className="dr-value">{ranges.ecoinventCount} leaf{ranges.ecoinventCount !== 1 ? "s" : ""} with product data</span>
+          </div>
+        )}
+        {ranges.epa && (
+          <div className="dr-row">
+            <span className="dr-badge dr-epa">EPA/USEEIO</span>
+            <span className="dr-value">
+              {formatGhg(ranges.epa.min)} – {formatGhg(ranges.epa.max)} {ranges.epa.unit}
+            </span>
+            <span className="dr-count">({ranges.epa.count} leaves)</span>
+          </div>
+        )}
+        {ranges.exiobase && (
+          <div className="dr-row">
+            <span className="dr-badge dr-exiobase">EXIOBASE</span>
+            <span className="dr-value">
+              {formatGhg(ranges.exiobase.min)} – {formatGhg(ranges.exiobase.max)} {ranges.exiobase.unit}
+            </span>
+            <span className="dr-count">({ranges.exiobase.count} leaves)</span>
+          </div>
+        )}
+        {ranges.uslci && (
+          <div className="dr-row">
+            <span className="dr-badge dr-uslci">US LCI</span>
+            <span className="dr-value">
+              {formatGhg(ranges.uslci.min)} – {formatGhg(ranges.uslci.max)} {ranges.uslci.unit}
+            </span>
+            <span className="dr-count">({ranges.uslci.count} leaves)</span>
+          </div>
+        )}
+        {ranges.bafu && (
+          <div className="dr-row">
+            <span className="dr-badge dr-bafu">BAFU</span>
+            <span className="dr-value">
+              {formatGhg(ranges.bafu.min)} – {formatGhg(ranges.bafu.max)} {ranges.bafu.unit}
+            </span>
+            <span className="dr-count">({ranges.bafu.count} leaves)</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** Format a number with at least 2 significant digits, avoiding "0.000" for small values */
@@ -2489,6 +2631,13 @@ function AppContent() {
     return getEcoinventInfo(selectedNode, selectedFrom, data.ecoinventMapping, data.concordance);
   }, [selectedNode, selectedFrom, data]);
 
+  // Aggregate EF ranges across all descendants when a parent node is selected
+  const descendantRanges = useMemo((): DescendantRanges | null => {
+    if (!selectedNode || !selectedFrom || !data) return null;
+    if (!selectedNode.children || selectedNode.children.length === 0) return null;
+    return computeDescendantRanges(selectedNode, selectedFrom, data);
+  }, [selectedNode, selectedFrom, data]);
+
   if (loading) {
     return (
       <div className="loading">
@@ -2851,6 +3000,10 @@ function AppContent() {
                 hsCode={ecoinventInfo.hsCode}
                 isicCode={ecoinventInfo.isicCode}
               />
+            )}
+
+            {descendantRanges && (
+              <DescendantRangeDisplay ranges={descendantRanges} />
             )}
 
             {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !exiobaseProducts && !(bafuFactor && bafuFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && !ecoinventInfo.isic && (
