@@ -954,6 +954,16 @@ function getUslciData(
   return null;
 }
 
+/** Format a number with at least 2 significant digits, avoiding "0.000" for small values */
+function formatGhg(v: number): string {
+  if (v === 0) return "0";
+  const abs = Math.abs(v);
+  if (abs >= 0.01) return v.toFixed(3);
+  // For very small values, use enough decimals to show 2 significant digits
+  const digits = Math.max(3, Math.ceil(-Math.log10(abs)) + 1);
+  return v.toFixed(digits);
+}
+
 function LciFactorDisplay({ entry, title, source, cardClass }: {
   entry: { withGhgData: number; unitStats: Record<string, LciUnitStats>; topProcesses: { name: string; ghg: number; unit: string }[] };
   title: string;
@@ -973,12 +983,12 @@ function LciFactorDisplay({ entry, title, source, cardClass }: {
       {primaryStats && (
         <div className="lci-summary">
           <div className="emission-main">
-            <span className="emission-value">{primaryStats.median.toFixed(3)}</span>
+            <span className="emission-value">{formatGhg(primaryStats.median)}</span>
             <span className="emission-unit">kg CO₂e / {primaryUnit}</span>
           </div>
           <div className="lci-range">
             <span className="lci-range-label">Range:</span>{" "}
-            {primaryStats.min.toFixed(3)} – {primaryStats.max.toFixed(3)} ({primaryStats.count} processes)
+            {formatGhg(primaryStats.min)} – {formatGhg(primaryStats.max)} ({primaryStats.count} processes)
           </div>
         </div>
       )}
@@ -987,7 +997,7 @@ function LciFactorDisplay({ entry, title, source, cardClass }: {
           {entry.topProcesses.slice(0, 5).map((p, i) => (
             <div key={i} className="lci-process">
               <span className="lci-process-name">{p.name}</span>
-              <span className="lci-process-value">{p.ghg.toFixed(3)} kg CO₂e/{p.unit}</span>
+              <span className="lci-process-value">{formatGhg(p.ghg)} kg CO₂e/{p.unit}</span>
             </div>
           ))}
         </div>
