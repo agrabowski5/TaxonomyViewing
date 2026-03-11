@@ -960,8 +960,19 @@ interface MatrixCell {
 }
 
 interface MatrixRow {
+  totalNodes: number;
   leafCount: number;
   cells: Record<string, MatrixCell>;
+}
+
+function countAllNodes(nodes: TreeNode[]): number {
+  let count = 0;
+  function walk(n: TreeNode) {
+    count++;
+    if (n.children) for (const c of n.children) walk(c);
+  }
+  for (const n of nodes) walk(n);
+  return count;
 }
 
 function computeMatrix(data: AppData): Record<string, MatrixRow> {
@@ -1017,7 +1028,7 @@ function computeMatrix(data: AppData): Record<string, MatrixRow> {
       };
     }
 
-    result[taxKey] = { leafCount: leaves.length, cells };
+    result[taxKey] = { totalNodes: countAllNodes(tree), leafCount: leaves.length, cells };
   }
 
   return result;
@@ -1410,6 +1421,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
           <thead>
             <tr>
               <th className="cm-tax-header">Taxonomy</th>
+              <th className="cm-leaf-header">Nodes</th>
               <th className="cm-leaf-header">Leaves</th>
               {DB_COLUMNS.map(db => (
                 <th key={db.key} className="cm-db-header">{db.label}</th>
@@ -1420,7 +1432,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
             {TAXONOMY_GROUPS.map(group => (
               <Fragment key={group.group}>
                 <tr className="cm-group-row">
-                  <td colSpan={2 + DB_COLUMNS.length}>{group.group}</td>
+                  <td colSpan={3 + DB_COLUMNS.length}>{group.group}</td>
                 </tr>
                 {group.items.map(item => {
                   const row = matrix[item.key];
@@ -1428,6 +1440,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
                   return (
                     <tr key={item.key} className="cm-data-row">
                       <td className="cm-tax-name">{item.label}</td>
+                      <td className="cm-leaf-count">{row.totalNodes.toLocaleString()}</td>
                       <td className="cm-leaf-count">{row.leafCount.toLocaleString()}</td>
                       {DB_COLUMNS.map(db => {
                         const cell = row.cells[db.key];
