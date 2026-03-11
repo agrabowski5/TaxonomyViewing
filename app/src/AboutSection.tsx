@@ -1052,6 +1052,194 @@ function leafCoverageColor(pct: number): string {
   return "#8b5cf6";
 }
 
+/* =============================== Resolution Methods Tab =============================== */
+
+type MethodTag = "direct" | "hs6" | "hs2" | "conc" | "2hop" | "fuzzy" | "none";
+
+interface MethodCell {
+  tag: MethodTag;
+  chain: string;   // e.g. "CPC → HS-6 → NAICS"
+  note: string;    // e.g. "~400 NAICS sectors"
+}
+
+const METHOD_LABELS: Record<MethodTag, { label: string; color: string; bg: string }> = {
+  direct: { label: "Direct", color: "#065f46", bg: "#d1fae5" },
+  hs6:    { label: "HS-6",   color: "#1e40af", bg: "#dbeafe" },
+  hs2:    { label: "HS-2",   color: "#92400e", bg: "#fef3c7" },
+  conc:   { label: "1-hop",  color: "#5b21b6", bg: "#ede9fe" },
+  "2hop": { label: "2-hop",  color: "#9d174d", bg: "#fce7f3" },
+  fuzzy:  { label: "Fuzzy",  color: "#6b7280", bg: "#f3f4f6" },
+  none:   { label: "—",      color: "#9ca3af", bg: "#f9fafb" },
+};
+
+/* Build the full taxonomy × database method matrix.
+   Each cell describes the concordance chain used. */
+function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
+  const m: Record<string, Record<string, MethodCell>> = {};
+
+  const hsFamily = ["hs", "cn", "hts", "ca"];
+  const noSupport: MethodCell = { tag: "none", chain: "—", note: "No concordance path" };
+
+  for (const tx of hsFamily) {
+    m[tx] = {
+      ecoinvent: { tag: "hs6", chain: "HS-6 lookup + ancestor fallback", note: "966 HS codes; inherits parent if exact miss" },
+      epa:       { tag: "hs6", chain: "HS-6 → NAICS → factor", note: "~400 NAICS sectors; no fallback" },
+      exiobase:  { tag: "hs6", chain: "HS-6 → EXIO product (HS-4 fallback)", note: "~190 product categories" },
+      uslci:     { tag: "hs6", chain: "HS-6 → NAICS → process", note: "~59 NAICS sectors" },
+      bafu:      { tag: "hs2", chain: "HS-2 chapter lookup", note: "81 chapters; very coarse" },
+    };
+  }
+
+  m["cpc"] = {
+    ecoinvent: { tag: "direct", chain: "Direct CPC lookup + ancestors", note: "661 CPC codes; best fit (native)" },
+    epa:       { tag: "conc", chain: "CPC → HS-6 → NAICS → factor", note: "CPC-to-HS concordance table" },
+    exiobase:  { tag: "conc", chain: "CPC ≈ CPA → EXIO; fallback CPC → HS → EXIO", note: "CPA bridge at 2-4 digits" },
+    uslci:     { tag: "conc", chain: "CPC → HS-6 → NAICS → process", note: "Same concordance as EPA path" },
+    bafu:      { tag: "conc", chain: "CPC → HS-6 → HS-2 chapter", note: "First HS match → chapter" },
+  };
+
+  m["cpa"] = {
+    ecoinvent: { tag: "direct", chain: "CPA treated as CPC → lookup + ancestors", note: "CPA ≈ CPC at 2-4 digits" },
+    epa:       { tag: "conc", chain: "CPA → HS-6 → NAICS → factor", note: "CPA-to-HS concordance" },
+    exiobase:  { tag: "direct", chain: "CPA → EXIO (direct concordance)", note: "2,608 CPA codes mapped" },
+    uslci:     { tag: "conc", chain: "CPA → HS-6 → NAICS → process", note: "Via CPA-to-HS concordance" },
+    bafu:      { tag: "conc", chain: "CPA → HS-6 → HS-2 chapter", note: "Via CPA-to-HS concordance" },
+  };
+
+  m["unspsc"] = {
+    ecoinvent: noSupport,
+    epa:       { tag: "fuzzy", chain: "Fuzzy text → HS-6 → NAICS", note: "Jaccard similarity; ~4.4% match rate" },
+    exiobase:  { tag: "fuzzy", chain: "Fuzzy text → HS-6 → EXIO", note: "Same fuzzy HS path" },
+    uslci:     { tag: "fuzzy", chain: "Fuzzy text → HS-6 → NAICS", note: "Same fuzzy HS path" },
+    bafu:      { tag: "fuzzy", chain: "Fuzzy text → HS-6 → HS-2", note: "Same fuzzy HS path" },
+  };
+
+  m["naics"] = {
+    ecoinvent: noSupport,
+    epa:       { tag: "conc", chain: "NAICS → HS-6 → NAICS → factor", note: "Round-trip via Census concordance" },
+    exiobase:  { tag: "conc", chain: "NAICS → HS-6 → EXIO product", note: "Via NAICS-to-HS concordance" },
+    uslci:     { tag: "conc", chain: "NAICS → HS-6 → NAICS → process", note: "Round-trip via Census concordance" },
+    bafu:      { tag: "conc", chain: "NAICS → HS-6 → HS-2 chapter", note: "Via NAICS-to-HS concordance" },
+  };
+
+  m["isic"] = {
+    ecoinvent: { tag: "direct", chain: "Direct ISIC lookup + ancestors", note: "182 ISIC codes" },
+    epa:       { tag: "2hop", chain: "ISIC → CPC → HS-6 → NAICS", note: "Two concordance hops" },
+    exiobase:  { tag: "direct", chain: "Direct ISIC → EXIO concordance", note: "502 ISIC codes mapped" },
+    uslci:     { tag: "2hop", chain: "ISIC → CPC → HS-6 → NAICS", note: "Two concordance hops" },
+    bafu:      { tag: "2hop", chain: "ISIC → CPC → HS-6 → HS-2", note: "Two concordance hops" },
+  };
+
+  m["nace"] = {
+    ecoinvent: { tag: "direct", chain: "NACE numeric = ISIC → lookup + ancestors", note: "Reuses ISIC codes" },
+    epa:       { tag: "2hop", chain: "NACE → CPC → HS-6 → NAICS", note: "Via ISIC-CPC concordance" },
+    exiobase:  { tag: "direct", chain: "NACE → EXIO (direct + ISIC fallback)", note: "664 NACE codes mapped" },
+    uslci:     { tag: "2hop", chain: "NACE → CPC → HS-6 → NAICS", note: "Via ISIC-CPC concordance" },
+    bafu:      { tag: "2hop", chain: "NACE → CPC → HS-6 → HS-2", note: "Via ISIC-CPC concordance" },
+  };
+
+  m["bea"] = {
+    ecoinvent: noSupport,
+    epa:       { tag: "conc", chain: "BEA → HS-6 → NAICS → factor", note: "Via BEA-to-HS concordance" },
+    exiobase:  { tag: "conc", chain: "BEA → HS-6 → EXIO product", note: "Via BEA-to-HS concordance" },
+    uslci:     { tag: "conc", chain: "BEA → HS-6 → NAICS → process", note: "Via BEA-to-HS concordance" },
+    bafu:      { tag: "conc", chain: "BEA → HS-6 → HS-2 chapter", note: "Via BEA-to-HS concordance" },
+  };
+
+  for (const tk of ["t1", "t2"]) {
+    m[tk] = {
+      ecoinvent: { tag: "hs6", chain: "HTS-origin → HS-6; CPC-origin → CPC direct", note: "Split by node origin" },
+      epa:       { tag: "hs6", chain: "HTS-origin → HS-6 → NAICS; CPC → HS-6 → NAICS", note: "Split by node origin" },
+      exiobase:  { tag: "hs6", chain: "HTS-origin → HS-6 → EXIO; CPC → CPA/HS → EXIO", note: "Split by node origin" },
+      uslci:     { tag: "hs6", chain: "HTS-origin → HS-6 → NAICS; CPC → HS-6 → NAICS", note: "Split by node origin" },
+      bafu:      { tag: "hs2", chain: "HTS-origin → HS-2; CPC → HS → HS-2", note: "Split by node origin" },
+    };
+  }
+
+  return m;
+}
+
+const METHOD_MATRIX = buildMethodMatrix();
+
+function ResolutionMethodsTab() {
+  return (
+    <>
+      <p className="about-intro">
+        How each taxonomy resolves to each LCA database. Each cell shows the <strong>concordance chain</strong> and
+        resolution granularity. Hover for details.
+      </p>
+
+      <div className="rm-legend">
+        {(Object.entries(METHOD_LABELS) as [MethodTag, { label: string; color: string; bg: string }][])
+          .filter(([k]) => k !== "none")
+          .map(([tag, { label, color, bg }]) => (
+            <span key={tag} className="rm-badge" style={{ color, backgroundColor: bg }}>{label}</span>
+          ))}
+      </div>
+
+      <div className="coverage-matrix-wrapper">
+        <table className="coverage-matrix rm-table">
+          <thead>
+            <tr>
+              <th className="cm-tax-header">Taxonomy</th>
+              {DB_COLUMNS.map(db => (
+                <th key={db.key} className="cm-db-header">{db.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {TAXONOMY_GROUPS.map(group => (
+              <Fragment key={group.group}>
+                <tr className="cm-group-row">
+                  <td colSpan={1 + DB_COLUMNS.length}>{group.group}</td>
+                </tr>
+                {group.items.map(item => {
+                  const row = METHOD_MATRIX[item.key];
+                  if (!row) return null;
+                  return (
+                    <tr key={item.key} className="cm-data-row">
+                      <td className="cm-tax-name">{item.label}</td>
+                      {DB_COLUMNS.map(db => {
+                        const cell = row[db.key];
+                        if (!cell) return <td key={db.key} className="cm-cell" />;
+                        const style = METHOD_LABELS[cell.tag];
+                        return (
+                          <td
+                            key={db.key}
+                            className="rm-cell"
+                            title={`${cell.chain}\n${cell.note}`}
+                          >
+                            <span className="rm-badge" style={{ color: style.color, backgroundColor: style.bg }}>
+                              {style.label}
+                            </span>
+                            <div className="rm-chain">{cell.chain}</div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="about-details" style={{ marginTop: 16 }}>
+        <h4>Method Legend</h4>
+        <ul style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.8, paddingLeft: 20 }}>
+          <li><strong>Direct</strong> &mdash; Code exists natively in the database (e.g., ecoinvent uses CPC). Ancestor inheritance walks up the hierarchy if the exact code is missing.</li>
+          <li><strong>HS-6</strong> &mdash; Extract the 6-digit HS base code and look it up. CN/HTS/CA 8-digit detail is truncated. No fallback if the HS-6 is absent.</li>
+          <li><strong>HS-2</strong> &mdash; Match at 2-digit chapter level only. Very broad: all codes under chapter &ldquo;01&rdquo; share one data point.</li>
+          <li><strong>1-hop</strong> &mdash; One concordance table bridges the taxonomy to HS (e.g., CPC&rarr;HS, NAICS&rarr;HS, CPA&rarr;HS), then HS resolves to the database.</li>
+          <li><strong>2-hop</strong> &mdash; Two concordance tables chained (e.g., ISIC&rarr;CPC&rarr;HS). Fan-out at each hop can reduce specificity.</li>
+          <li><strong>Fuzzy</strong> &mdash; Jaccard text similarity matching (threshold 0.3, top 3). Only ~4.4% of UNSPSC codes match anything.</li>
+        </ul>
+      </div>
+    </>
+  );
+}
+
 function CoverageMatrixTab({ data }: { data: AppData | null }) {
   const [mode, setMode] = useState<MatrixMode>("coverage");
 
@@ -1223,7 +1411,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
 
 export function AboutSection({ data }: { data: AppData | null }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"taxonomies" | "lca" | "matrix">("taxonomies");
+  const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix">("taxonomies");
 
   if (!open) {
     return (
@@ -1256,6 +1444,12 @@ export function AboutSection({ data }: { data: AppData | null }) {
               LCA Databases
             </button>
             <button
+              className={`about-tab ${tab === "methods" ? "active" : ""}`}
+              onClick={() => setTab("methods")}
+            >
+              Resolution Methods
+            </button>
+            <button
               className={`about-tab ${tab === "matrix" ? "active" : ""}`}
               onClick={() => setTab("matrix")}
             >
@@ -1265,6 +1459,7 @@ export function AboutSection({ data }: { data: AppData | null }) {
 
           {tab === "taxonomies" && <TaxonomyMapTab />}
           {tab === "lca" && <LcaDatabasesTab />}
+          {tab === "methods" && <ResolutionMethodsTab />}
           {tab === "matrix" && <CoverageMatrixTab data={data} />}
         </div>
       </div>
