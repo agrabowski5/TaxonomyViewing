@@ -1521,6 +1521,28 @@ function AppContent() {
   const [showBaseTaxonomyDialog, setShowBaseTaxonomyDialog] = useState(false);
   const [showLibraryDialog, setShowLibraryDialog] = useState(false);
   const [mappingPanelCollapsed, setMappingPanelCollapsed] = useState(false);
+  const [panelHeight, setPanelHeight] = useState(200);
+  const panelDragging = useRef(false);
+
+  // Resizable bottom panel drag handler
+  const handlePanelDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    panelDragging.current = true;
+    const startY = e.clientY;
+    const startH = panelHeight;
+    const onMove = (ev: MouseEvent) => {
+      if (!panelDragging.current) return;
+      const delta = startY - ev.clientY;
+      setPanelHeight(Math.max(80, Math.min(window.innerHeight * 0.7, startH + delta)));
+    };
+    const onUp = () => {
+      panelDragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [panelHeight]);
 
   // Debounced search for performance with large trees
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -2547,7 +2569,11 @@ function AppContent() {
 
       <BuilderBanner />
 
-      <div className="main-content two-pane">
+      <div className="main-content two-pane" style={{
+        paddingBottom: (selectedNode && selectedFrom) || (builderState.active && builderState.selectedCustomNodeId)
+          ? (mappingPanelCollapsed ? 40 : panelHeight)
+          : 0
+      }}>
         {/* Left Pane */}
         <div className="pane-wrapper left-pane">
           <div className="pane-header">
@@ -2667,7 +2693,13 @@ function AppContent() {
 
       {/* Mapping Panel */}
       {selectedNode && selectedFrom && (
-        <div className={`comparison-panel ${mappingPanelCollapsed ? "collapsed" : ""}`}>
+        <div
+          className={`comparison-panel ${mappingPanelCollapsed ? "collapsed" : ""}`}
+          style={mappingPanelCollapsed ? undefined : { height: panelHeight }}
+        >
+          {!mappingPanelCollapsed && (
+            <div className="panel-resize-handle" onMouseDown={handlePanelDragStart} />
+          )}
           <h3
             className="comparison-panel-header"
             onClick={() => setMappingPanelCollapsed(!mappingPanelCollapsed)}
@@ -2822,7 +2854,13 @@ function AppContent() {
 
       {/* Builder: Show custom node mappings when a custom node is selected */}
       {builderState.active && builderState.selectedCustomNodeId && (
-        <div className={`comparison-panel ${mappingPanelCollapsed ? "collapsed" : ""}`}>
+        <div
+          className={`comparison-panel ${mappingPanelCollapsed ? "collapsed" : ""}`}
+          style={mappingPanelCollapsed ? undefined : { height: panelHeight }}
+        >
+          {!mappingPanelCollapsed && (
+            <div className="panel-resize-handle" onMouseDown={handlePanelDragStart} />
+          )}
           <h3
             className="comparison-panel-header"
             onClick={() => setMappingPanelCollapsed(!mappingPanelCollapsed)}

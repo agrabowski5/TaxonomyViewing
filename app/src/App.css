@@ -94,7 +94,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding-bottom: 200px;
+  padding-bottom: 0;
 }
 
 .main-content.two-pane {
@@ -907,16 +907,43 @@
   background: var(--surface);
   border-top: 2px solid var(--border);
   padding: 16px 24px;
-  max-height: 200px;
+  padding-top: 0;
   overflow-y: auto;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   z-index: 100;
+  display: flex;
+  flex-direction: column;
 }
 
 .comparison-panel.collapsed {
-  max-height: none;
+  height: auto !important;
   overflow: hidden;
   padding: 0 24px;
+}
+
+.panel-resize-handle {
+  height: 6px;
+  cursor: ns-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.panel-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+
+.panel-resize-handle:hover::after {
+  background: var(--text-secondary);
 }
 
 .comparison-panel-header {
@@ -964,6 +991,9 @@
   display: flex;
   gap: 24px;
   flex-wrap: wrap;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .comparison-item {
@@ -1502,8 +1532,8 @@
   }
 
   .comparison-panel {
-    max-height: 150px;
     padding: 12px;
+    padding-top: 0;
   }
 
   .comparison-content {

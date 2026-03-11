@@ -1041,9 +1041,9 @@ function specificityColor(pct: number): string {
   return "#3b82f6";
 }
 
-type MatrixMode = "coverage" | "specificity" | "density";
+type MatrixMode = "coverage" | "specificity" | "leafCoverage";
 
-function densityColor(pct: number): string {
+function leafCoverageColor(pct: number): string {
   if (pct === 0) return "#f8fafc";
   if (pct < 2) return "#fef2f2";
   if (pct < 5) return "#fef9c3";
@@ -1068,13 +1068,24 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
     <>
       <p className="about-intro">
         {mode === "coverage" && (
-          <>This matrix shows what percentage of each taxonomy&rsquo;s leaf nodes can be resolved to LCA data from each database, via the concordance chains described in the other tabs.</>
+          <>
+            <strong>Coverage</strong> = covered leaves / total leaves.
+            {" "}The percentage of each taxonomy&rsquo;s leaf nodes that can be resolved to at least one LCA data entry, via the concordance chains described in the other tabs.
+          </>
         )}
         {mode === "specificity" && (
-          <>This matrix shows the <strong>specificity</strong> of each mapping: what ratio of unique source-level data entries back the covered leaf nodes. High specificity means each leaf resolves to its own distinct data; low means many leaves share the same broad sector or category data.</>
+          <>
+            <strong>Specificity</strong> = unique source-level data entries / covered leaves.
+            {" "}Among the leaf nodes that have a match, how many distinct database records back them. 100% means every covered leaf resolves to its own unique record; low values mean many leaves share the same broad sector or category.
+            {" "}<em>Source-level data entries</em> are the distinct records in each LCA database (e.g., an ecoinvent product, a NAICS sector in EPA/USEEIO, an EXIOBASE product category, or an HS-2 chapter in BAFU).
+          </>
         )}
-        {mode === "density" && (
-          <>This matrix shows <strong>unique data density</strong>: how many distinct source-level data entries exist relative to the total leaf nodes in each taxonomy. This reveals which database provides the most differentiated data for each classification system.</>
+        {mode === "leafCoverage" && (
+          <>
+            <strong>Leaf Coverage</strong> = unique source-level data entries / total leaves.
+            {" "}How many distinct database records exist relative to the full set of leaf nodes. This combines breadth (are leaves matched?) with granularity (are matches unique?). A database scores high only if it covers many leaves <em>and</em> provides differentiated data for them.
+            {" "}<em>Source-level data entries</em> are the distinct records in each LCA database (e.g., an ecoinvent product, a NAICS sector in EPA/USEEIO, an EXIOBASE product category, or an HS-2 chapter in BAFU).
+          </>
         )}
       </p>
 
@@ -1085,8 +1096,8 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
         <button className={`cm-mode-btn ${mode === "specificity" ? "cm-mode-active" : ""}`} onClick={() => setMode("specificity")}>
           Specificity
         </button>
-        <button className={`cm-mode-btn ${mode === "density" ? "cm-mode-active" : ""}`} onClick={() => setMode("density")}>
-          Density
+        <button className={`cm-mode-btn ${mode === "leafCoverage" ? "cm-mode-active" : ""}`} onClick={() => setMode("leafCoverage")}>
+          Leaf Coverage
         </button>
       </div>
 
@@ -1144,14 +1155,14 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
                             </td>
                           );
                         }
-                        // Density mode: unique keys / total leaves
+                        // Leaf Coverage mode: unique keys / total leaves
                         const dp = cell.total > 0 ? (cell.uniqueKeys / cell.total) * 100 : 0;
                         return (
                           <td
                             key={db.key}
                             className="cm-cell"
-                            style={{ backgroundColor: cell.uniqueKeys === 0 ? "#f8fafc" : densityColor(dp) }}
-                            title={`${item.label} \u00d7 ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.total.toLocaleString()} total leaves (${dp.toFixed(1)}% density)`}
+                            style={{ backgroundColor: cell.uniqueKeys === 0 ? "#f8fafc" : leafCoverageColor(dp) }}
+                            title={`${item.label} \u00d7 ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.total.toLocaleString()} total leaves (${dp.toFixed(1)}% leaf coverage)`}
                           >
                             <div className="cm-pct">{cell.uniqueKeys === 0 ? "0%" : `${dp.toFixed(1)}%`}</div>
                             <div className="cm-count">{cell.uniqueKeys.toLocaleString()} / {cell.total.toLocaleString()}</div>
@@ -1195,10 +1206,10 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
               <li><strong>BAFU</strong>: source key is the HS-2 chapter (~81 chapters). Very coarse &mdash; each chapter covers hundreds of leaf codes.</li>
             </>
           )}
-          {mode === "density" && (
+          {mode === "leafCoverage" && (
             <>
-              <li><strong>Density</strong> = unique source data entries / total leaves in taxonomy. Shows what fraction of the taxonomy gets a distinct data point.</li>
-              <li>Density combines coverage breadth with data granularity &mdash; a database scores high only if it both covers many leaves <em>and</em> provides distinct data for them.</li>
+              <li><strong>Leaf Coverage</strong> = unique source-level data entries / total leaves. Shows what fraction of the taxonomy gets a distinct data point.</li>
+              <li>Leaf Coverage combines coverage breadth with data granularity &mdash; a database scores high only if it both covers many leaves <em>and</em> provides distinct data for them.</li>
               <li>Compare with <strong>Coverage</strong> (how many leaves match anything) and <strong>Specificity</strong> (how unique the data is among matched leaves).</li>
             </>
           )}
