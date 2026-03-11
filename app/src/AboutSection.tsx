@@ -1254,28 +1254,144 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
 
   return (
     <>
-      <p className="about-intro">
-        {mode === "coverage" && (
-          <>
-            <strong>Coverage</strong> = covered leaves / total leaves.
-            {" "}The percentage of each taxonomy&rsquo;s leaf nodes that can be resolved to at least one LCA data entry, via the concordance chains described in the other tabs.
-          </>
-        )}
-        {mode === "specificity" && (
-          <>
-            <strong>Specificity</strong> = unique source-level data entries / covered leaves.
-            {" "}Among the leaf nodes that have a match, how many distinct database records back them. 100% means every covered leaf resolves to its own unique record; low values mean many leaves share the same broad sector or category.
-            {" "}<em>Source-level data entries</em> are the distinct records in each LCA database (e.g., an ecoinvent product, a NAICS sector in EPA/USEEIO, an EXIOBASE product category, or an HS-2 chapter in BAFU).
-          </>
-        )}
-        {mode === "leafCoverage" && (
-          <>
-            <strong>Leaf Coverage</strong> = unique source-level data entries / total leaves.
-            {" "}How many distinct database records exist relative to the full set of leaf nodes. This combines breadth (are leaves matched?) with granularity (are matches unique?). A database scores high only if it covers many leaves <em>and</em> provides differentiated data for them.
-            {" "}<em>Source-level data entries</em> are the distinct records in each LCA database (e.g., an ecoinvent product, a NAICS sector in EPA/USEEIO, an EXIOBASE product category, or an HS-2 chapter in BAFU).
-          </>
-        )}
-      </p>
+      {/* ---- Metric explanation with equation + diagram ---- */}
+      <div className="cm-metric-explainer">
+        {mode === "coverage" && (<>
+          <div className="cm-equation-block">
+            <span className="cm-equation-label">Coverage</span>
+            <span className="cm-equation">=</span>
+            <span className="cm-equation-frac">
+              <span className="cm-frac-num">covered leaves</span>
+              <span className="cm-frac-den">total leaves</span>
+            </span>
+          </div>
+          <p className="cm-metric-desc">
+            What percentage of a taxonomy&rsquo;s most-specific codes (leaf nodes) can be resolved to <em>at least one</em> LCA data entry. A leaf counts as &ldquo;covered&rdquo; regardless of how many entries match or how specific they are.
+          </p>
+          {/* Mini tree diagram */}
+          <svg className="cm-tree-diagram" viewBox="0 0 340 150" aria-label="Coverage diagram">
+            {/* Root */}
+            <circle cx="170" cy="20" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+            <text x="170" y="24" textAnchor="middle" fontSize="9" fill="#6b7280">root</text>
+            {/* Branches */}
+            <line x1="170" y1="30" x2="80" y2="60" stroke="#d1d5db" strokeWidth="1.5" />
+            <line x1="170" y1="30" x2="260" y2="60" stroke="#d1d5db" strokeWidth="1.5" />
+            {/* Internal nodes */}
+            <circle cx="80" cy="68" r="9" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+            <circle cx="260" cy="68" r="9" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+            {/* Leaf branches */}
+            <line x1="80" y1="77" x2="40" y2="110" stroke="#d1d5db" strokeWidth="1.5" />
+            <line x1="80" y1="77" x2="120" y2="110" stroke="#d1d5db" strokeWidth="1.5" />
+            <line x1="260" y1="77" x2="220" y2="110" stroke="#d1d5db" strokeWidth="1.5" />
+            <line x1="260" y1="77" x2="300" y2="110" stroke="#d1d5db" strokeWidth="1.5" />
+            {/* Leaves: 3 covered (green), 1 uncovered (red) */}
+            <circle cx="40" cy="118" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="40" y="122" textAnchor="middle" fontSize="8" fontWeight="700" fill="#16a34a">&#x2713;</text>
+            <circle cx="120" cy="118" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="120" y="122" textAnchor="middle" fontSize="8" fontWeight="700" fill="#16a34a">&#x2713;</text>
+            <circle cx="220" cy="118" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="220" y="122" textAnchor="middle" fontSize="8" fontWeight="700" fill="#16a34a">&#x2713;</text>
+            <circle cx="300" cy="118" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+            <text x="300" y="122" textAnchor="middle" fontSize="8" fontWeight="700" fill="#ef4444">&#x2717;</text>
+            {/* Labels */}
+            <text x="170" y="147" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Coverage = 3 / 4 = 75%</text>
+          </svg>
+        </>)}
+
+        {mode === "specificity" && (<>
+          <div className="cm-equation-block">
+            <span className="cm-equation-label">Specificity</span>
+            <span className="cm-equation">=</span>
+            <span className="cm-equation-frac">
+              <span className="cm-frac-num">unique source-level data entries</span>
+              <span className="cm-frac-den">covered leaves</span>
+            </span>
+          </div>
+          <p className="cm-metric-desc">
+            Among the leaves that matched, how many <em>distinct</em> database records back them. 100% means every covered leaf maps to its own unique record. Low values mean many leaves share the same broad sector or category.
+          </p>
+          <p className="cm-metric-note">
+            <strong>Source-level data entry</strong> = the distinct record in each database that a leaf resolves to. Examples: an ecoinvent CPC/HS product code, a NAICS sector (EPA, USLCI), an EXIOBASE product category, or an HS-2 chapter (BAFU).
+          </p>
+          {/* Specificity diagram: 4 covered leaves mapping to 2 unique DB records */}
+          <svg className="cm-tree-diagram" viewBox="0 0 340 170" aria-label="Specificity diagram">
+            {/* Taxonomy side label */}
+            <text x="80" y="12" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY LEAVES</text>
+            {/* Database side label */}
+            <text x="260" y="12" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">DATABASE RECORDS</text>
+            {/* Leaf nodes */}
+            <circle cx="80" cy="40" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="55" y="44" textAnchor="end" fontSize="8" fill="#374151">leaf A</text>
+            <circle cx="80" cy="70" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="55" y="74" textAnchor="end" fontSize="8" fill="#374151">leaf B</text>
+            <circle cx="80" cy="100" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="55" y="104" textAnchor="end" fontSize="8" fill="#374151">leaf C</text>
+            <circle cx="80" cy="130" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="55" y="134" textAnchor="end" fontSize="8" fill="#374151">leaf D</text>
+            {/* DB records */}
+            <rect x="240" y="45" width="50" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+            <text x="265" y="60" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">rec #1</text>
+            <rect x="240" y="95" width="50" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+            <text x="265" y="110" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">rec #2</text>
+            {/* Arrows: A,B,C → rec #1; D → rec #2 */}
+            <line x1="90" y1="40" x2="238" y2="54" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+            <line x1="90" y1="70" x2="238" y2="56" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+            <line x1="90" y1="100" x2="238" y2="58" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+            <line x1="90" y1="130" x2="238" y2="106" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+            <defs><marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#9ca3af" /></marker></defs>
+            {/* Result */}
+            <text x="170" y="163" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Specificity = 2 unique / 4 covered = 50%</text>
+          </svg>
+        </>)}
+
+        {mode === "leafCoverage" && (<>
+          <div className="cm-equation-block">
+            <span className="cm-equation-label">Leaf Coverage</span>
+            <span className="cm-equation">=</span>
+            <span className="cm-equation-frac">
+              <span className="cm-frac-num">unique source-level data entries</span>
+              <span className="cm-frac-den">total leaves</span>
+            </span>
+          </div>
+          <p className="cm-metric-desc">
+            How many distinct database records exist relative to <em>all</em> leaf nodes. Combines breadth and granularity &mdash; a database scores high only if it covers many leaves <strong>and</strong> provides unique data for each.
+          </p>
+          <p className="cm-metric-note">
+            Leaf Coverage = Coverage &times; Specificity. It penalizes both gaps (uncovered leaves) and coarseness (many leaves sharing one record).
+          </p>
+          {/* Leaf Coverage diagram: 5 total leaves, 4 covered, 2 unique records */}
+          <svg className="cm-tree-diagram" viewBox="0 0 340 170" aria-label="Leaf Coverage diagram">
+            <text x="80" y="12" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ALL LEAVES</text>
+            <text x="260" y="12" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">DATABASE RECORDS</text>
+            {/* Leaf nodes: 4 covered, 1 uncovered */}
+            <circle cx="80" cy="35" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="55" y="39" textAnchor="end" fontSize="8" fill="#374151">leaf A</text>
+            <circle cx="80" cy="62" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="55" y="66" textAnchor="end" fontSize="8" fill="#374151">leaf B</text>
+            <circle cx="80" cy="89" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="55" y="93" textAnchor="end" fontSize="8" fill="#374151">leaf C</text>
+            <circle cx="80" cy="116" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="55" y="120" textAnchor="end" fontSize="8" fill="#374151">leaf D</text>
+            <circle cx="80" cy="143" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+            <text x="55" y="147" textAnchor="end" fontSize="8" fill="#9ca3af">leaf E</text>
+            {/* DB records */}
+            <rect x="240" y="38" width="50" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+            <text x="265" y="53" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">rec #1</text>
+            <rect x="240" y="88" width="50" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+            <text x="265" y="103" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">rec #2</text>
+            {/* Arrows */}
+            <line x1="90" y1="35" x2="238" y2="47" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+            <line x1="90" y1="62" x2="238" y2="49" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+            <line x1="90" y1="89" x2="238" y2="51" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+            <line x1="90" y1="116" x2="238" y2="99" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+            {/* No arrow from leaf E */}
+            <line x1="90" y1="143" x2="130" y2="143" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
+            <text x="138" y="147" fontSize="8" fill="#ef4444">no match</text>
+            {/* Result */}
+            <text x="170" y="167" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Leaf Coverage = 2 unique / 5 total = 40%</text>
+          </svg>
+        </>)}
+      </div>
 
       <div className="cm-mode-toggle">
         <button className={`cm-mode-btn ${mode === "coverage" ? "cm-mode-active" : ""}`} onClick={() => setMode("coverage")}>
