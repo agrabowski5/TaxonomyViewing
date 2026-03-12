@@ -1281,30 +1281,30 @@ function computeEcoinventCoverage(
   tree: TreeNode[],
   taxonomy: TaxonomyType,
   ecoinventMapping: EcoinventMapping | null,
-): Set<string> {
-  if (!ecoinventMapping) return new Set();
-  const covered = new Set<string>();
+): Map<string, number> {
+  if (!ecoinventMapping) return new Map();
+  const covered = new Map<string, number>();
   const em = ecoinventMapping;
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
       const clean = stripCode(node.code);
-      let hasCoverage = false;
+      let count = 0;
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
-        hasCoverage = !!em.cpc[clean];
+        if (em.cpc[clean]) count = em.cpc[clean].count;
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         const hsBase = clean.substring(0, Math.min(6, clean.length));
-        hasCoverage = !!em.hs[hsBase];
+        if (em.hs[hsBase]) count = em.hs[hsBase].count;
       } else if (taxonomy === "isic" || taxonomy === "nace") {
-        // Direct ISIC lookup (NACE numeric codes = ISIC codes)
-        hasCoverage = !!em.isic[clean] || em.isicAncestors.includes(clean);
+        if (em.isic[clean]) count = em.isic[clean].count;
+        else if (em.isicAncestors.includes(clean)) count = 1;
       } else if (taxonomy === "cpa") {
-        // CPA codes mirror CPC structure
-        hasCoverage = !!em.cpc[clean] || em.cpcAncestors.includes(clean);
+        if (em.cpc[clean]) count = em.cpc[clean].count;
+        else if (em.cpcAncestors.includes(clean)) count = 1;
       }
 
-      if (hasCoverage) covered.add(node.id);
+      if (count > 0) covered.set(node.id, count);
       if (node.children) walk(node.children);
     }
   }
@@ -1318,15 +1318,15 @@ function computeEpaCoverage(
   taxonomy: TaxonomyType,
   emissionFactors: Record<string, EmissionFactorEntry> | null,
   concordance: ConcordanceData,
-): Set<string> {
-  if (!emissionFactors) return new Set();
-  const covered = new Set<string>();
+): Map<string, number> {
+  if (!emissionFactors) return new Map();
+  const covered = new Map<string, number>();
   const efKeys = new Set(Object.keys(emissionFactors));
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
       const clean = stripCode(node.code);
-      let hasCoverage = false;
+      let matchCount = 0;
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
         for (let len = clean.length; len >= 4; len--) {
@@ -1334,18 +1334,18 @@ function computeEpaCoverage(
           const hsMappings = concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
             for (const m of hsMappings) {
-              if (efKeys.has(m.code)) { hasCoverage = true; break; }
+              if (efKeys.has(m.code)) matchCount++;
             }
-            if (hasCoverage) break;
+            if (matchCount > 0) break;
           }
         }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 6) {
-          hasCoverage = efKeys.has(clean.substring(0, 6));
+          if (efKeys.has(clean.substring(0, 6))) matchCount = 1;
         }
       }
 
-      if (hasCoverage) covered.add(node.id);
+      if (matchCount > 0) covered.set(node.id, matchCount);
       if (node.children) walk(node.children);
     }
   }
@@ -1360,22 +1360,26 @@ function computeExiobaseCoverage(
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null,
   exiobaseConcordance: ExiobaseConcordance | null,
   concordance: ConcordanceData,
-): Set<string> {
-  const covered = new Set<string>();
+): Map<string, number> {
+  const covered = new Map<string, number>();
 
   // Use precise concordance if available
   if (exiobaseConcordance) {
-    const hsKeys = new Set(Object.keys(exiobaseConcordance.hsToExio));
+    const hsToExio = exiobaseConcordance.hsToExio;
+    const hsKeys = new Set(Object.keys(hsToExio));
     const hsAncestorSet = new Set(exiobaseConcordance.hsAncestors);
-    const cpaKeys = new Set(Object.keys(exiobaseConcordance.cpaToExio));
+    const cpaToExio = exiobaseConcordance.cpaToExio;
+    const cpaKeys = new Set(Object.keys(cpaToExio));
     const cpaAncestorSet = new Set(exiobaseConcordance.cpaAncestors);
-    const isicKeys = new Set(Object.keys(exiobaseConcordance.isicToExio));
-    const naceKeys = new Set(Object.keys(exiobaseConcordance.naceToExio));
+    const isicToExio = exiobaseConcordance.isicToExio;
+    const isicKeys = new Set(Object.keys(isicToExio));
+    const naceToExio = exiobaseConcordance.naceToExio;
+    const naceKeys = new Set(Object.keys(naceToExio));
 
     function walkPrecise(nodes: TreeNode[]) {
       for (const node of nodes) {
         const clean = stripCode(node.code);
-        let hasCoverage = false;
+        let count = 0;
 
         const isCpcOrigin = taxonomy === "cpc" || taxonomy === "cpa"
           || (taxonomy === "t2" && getT2Origin(node.id) === "cpc")
@@ -1385,46 +1389,45 @@ function computeExiobaseCoverage(
           || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"));
 
         if (isHsOrigin) {
-          // Check precise HS-6, then HS-4 heading
           if (/^\d+$/.test(clean) && clean.length >= 4) {
-            if (clean.length >= 6 && hsKeys.has(clean.substring(0, 6))) hasCoverage = true;
-            else if (hsKeys.has(clean.substring(0, 4))) hasCoverage = true;
-            else if (hsAncestorSet.has(clean.substring(0, Math.min(clean.length, 4)))) hasCoverage = true;
+            const hs6 = clean.substring(0, 6);
+            const hs4 = clean.substring(0, 4);
+            if (clean.length >= 6 && hsKeys.has(hs6)) count = hsToExio[hs6].length;
+            else if (hsKeys.has(hs4)) count = hsToExio[hs4].length;
+            else if (hsAncestorSet.has(clean.substring(0, Math.min(clean.length, 4)))) count = 1;
           }
         } else if (isCpcOrigin) {
-          // CPA bridge (CPC ~ CPA at 2-4 digit level)
           for (let len = clean.length; len >= 2; len--) {
             const prefix = clean.substring(0, len);
-            if (cpaKeys.has(prefix) || cpaAncestorSet.has(prefix)) { hasCoverage = true; break; }
+            if (cpaKeys.has(prefix)) { count = cpaToExio[prefix].length; break; }
+            if (cpaAncestorSet.has(prefix)) { count = 1; break; }
           }
-          // Fallback: chain CPC -> HS -> hsToExio
-          if (!hasCoverage) {
+          if (count === 0) {
             for (let len = clean.length; len >= 4; len--) {
               const hsMappings = concordance.cpcToHs[clean.substring(0, len)];
               if (hsMappings) {
                 for (const m of hsMappings) {
-                  if (hsKeys.has(m.code) || hsKeys.has(m.code.substring(0, 4))) { hasCoverage = true; break; }
+                  if (hsKeys.has(m.code)) count += hsToExio[m.code].length;
+                  else if (hsKeys.has(m.code.substring(0, 4))) count += hsToExio[m.code.substring(0, 4)].length;
                 }
-                if (hasCoverage) break;
+                if (count > 0) break;
               }
             }
           }
         } else if (taxonomy === "isic") {
           for (let len = clean.length; len >= 1; len--) {
-            if (isicKeys.has(clean.substring(0, len))) { hasCoverage = true; break; }
+            const prefix = clean.substring(0, len);
+            if (isicKeys.has(prefix)) { count = isicToExio[prefix].length; break; }
           }
         } else if (taxonomy === "nace") {
           for (let len = clean.length; len >= 1; len--) {
             const prefix = clean.substring(0, len);
-            if (naceKeys.has(prefix) || isicKeys.has(prefix)) { hasCoverage = true; break; }
+            if (naceKeys.has(prefix)) { count = naceToExio[prefix].length; break; }
+            if (isicKeys.has(prefix)) { count = isicToExio[prefix].length; break; }
           }
-        } else if (taxonomy === "unspsc") {
-          // no direct EXIOBASE concordance for UNSPSC
-        } else if (taxonomy === "naics" || taxonomy === "bea") {
-          // no direct EXIOBASE concordance; could chain via HS but skip for now
         }
 
-        if (hasCoverage) covered.add(node.id);
+        if (count > 0) covered.set(node.id, count);
         if (node.children) walkPrecise(node.children);
       }
     }
@@ -1458,7 +1461,7 @@ function computeExiobaseCoverage(
         }
       }
 
-      if (hasCoverage) covered.add(node.id);
+      if (hasCoverage) covered.set(node.id, 1);
       if (node.children) walk(node.children);
     }
   }
@@ -1472,19 +1475,19 @@ function computeUslciCoverage(
   taxonomy: TaxonomyType,
   uslciCoverage: UslciCoverage | null,
   concordance: ConcordanceData,
-): Set<string> {
-  if (!uslciCoverage) return new Set();
-  const covered = new Set<string>();
-  const coverageKeys = new Set(
+): Map<string, number> {
+  if (!uslciCoverage) return new Map();
+  const covered = new Map<string, number>();
+  const coverageMap = new Map(
     Object.entries(uslciCoverage.coverage)
       .filter(([, entry]) => entry.withGhgData > 0)
-      .map(([key]) => key)
+      .map(([key, entry]) => [key, entry.processCount] as const)
   );
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
       const clean = stripCode(node.code);
-      let hasCoverage = false;
+      let count = 0;
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
         for (let len = clean.length; len >= 4; len--) {
@@ -1492,18 +1495,20 @@ function computeUslciCoverage(
           const hsMappings = concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
             for (const m of hsMappings) {
-              if (coverageKeys.has(m.code)) { hasCoverage = true; break; }
+              const pc = coverageMap.get(m.code);
+              if (pc) count += pc;
             }
-            if (hasCoverage) break;
+            if (count > 0) break;
           }
         }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 6) {
-          hasCoverage = coverageKeys.has(clean.substring(0, 6));
+          const pc = coverageMap.get(clean.substring(0, 6));
+          if (pc) count = pc;
         }
       }
 
-      if (hasCoverage) covered.add(node.id);
+      if (count > 0) covered.set(node.id, count);
       if (node.children) walk(node.children);
     }
   }
@@ -1517,20 +1522,20 @@ function computeBafuCoverage(
   taxonomy: TaxonomyType,
   bafuCoverage: BafuCoverage | null,
   concordance: ConcordanceData,
-): Set<string> {
-  if (!bafuCoverage) return new Set();
-  const covered = new Set<string>();
+): Map<string, number> {
+  if (!bafuCoverage) return new Map();
+  const covered = new Map<string, number>();
   // Only count chapters that actually have GHG data, not just process entries
-  const coverageKeys = new Set(
+  const coverageMap = new Map(
     Object.entries(bafuCoverage.coverage)
       .filter(([, entry]) => entry.withGhgData > 0)
-      .map(([key]) => key)
+      .map(([key, entry]) => [key, entry.processCount] as const)
   );
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
       const clean = stripCode(node.code);
-      let hasCoverage = false;
+      let count = 0;
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
         for (let len = clean.length; len >= 4; len--) {
@@ -1538,17 +1543,19 @@ function computeBafuCoverage(
           const hsMappings = concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
             const chapter = hsMappings[0].code.substring(0, 2);
-            if (coverageKeys.has(chapter)) { hasCoverage = true; }
+            const pc = coverageMap.get(chapter);
+            if (pc) count = pc;
             break;
           }
         }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 2) {
-          hasCoverage = coverageKeys.has(clean.substring(0, 2));
+          const pc = coverageMap.get(clean.substring(0, 2));
+          if (pc) count = pc;
         }
       }
 
-      if (hasCoverage) covered.add(node.id);
+      if (count > 0) covered.set(node.id, count);
       if (node.children) walk(node.children);
     }
   }
@@ -1569,7 +1576,7 @@ function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode }: {
 
   return (
     <div className="ecoinvent-card">
-      <h4>ecoinvent v3.10 Mapping</h4>
+      <h4>ecoinvent v3.12 Mapping</h4>
       {cpc && (
         <div className="ecoinvent-section">
           <div className="ecoinvent-header">
@@ -2593,35 +2600,35 @@ function AppContent() {
     [data, rightTaxonomy, getTreeData]
   );
   const leftEpaCoverage = useMemo(
-    () => data ? computeEpaCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.emissionFactors, data.concordance) : new Set<string>(),
+    () => data ? computeEpaCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.emissionFactors, data.concordance) : new Map<string, number>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightEpaCoverage = useMemo(
-    () => data ? computeEpaCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.emissionFactors, data.concordance) : new Set<string>(),
+    () => data ? computeEpaCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.emissionFactors, data.concordance) : new Map<string, number>(),
     [data, rightTaxonomy, getTreeData]
   );
   const leftExiobaseCoverage = useMemo(
-    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Set<string>(),
+    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Map<string, number>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightExiobaseCoverage = useMemo(
-    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Set<string>(),
+    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Map<string, number>(),
     [data, rightTaxonomy, getTreeData]
   );
   const leftUslciCoverage = useMemo(
-    () => data ? computeUslciCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.uslciCoverage, data.concordance) : new Set<string>(),
+    () => data ? computeUslciCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.uslciCoverage, data.concordance) : new Map<string, number>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightUslciCoverage = useMemo(
-    () => data ? computeUslciCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.uslciCoverage, data.concordance) : new Set<string>(),
+    () => data ? computeUslciCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.uslciCoverage, data.concordance) : new Map<string, number>(),
     [data, rightTaxonomy, getTreeData]
   );
   const leftBafuCoverage = useMemo(
-    () => data ? computeBafuCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.bafuCoverage, data.concordance) : new Set<string>(),
+    () => data ? computeBafuCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.bafuCoverage, data.concordance) : new Map<string, number>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightBafuCoverage = useMemo(
-    () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance) : new Set<string>(),
+    () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance) : new Map<string, number>(),
     [data, rightTaxonomy, getTreeData]
   );
 

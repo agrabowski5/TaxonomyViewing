@@ -12,7 +12,7 @@ def generate_ecoinvent_mapping():
     import openpyxl
 
     excel_path = os.path.join(os.path.dirname(__file__), '..', 'raw-data',
-                              'Database-Overview-for-ecoinvent-v3.10.xlsx')
+                              'Database-Overview-for-ecoinvent-v3.12.xlsx')
     output_path = os.path.join(os.path.dirname(__file__), '..', 'app', 'public', 'data',
                                'ecoinvent-mapping.json')
 

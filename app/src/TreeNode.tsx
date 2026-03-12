@@ -5,11 +5,11 @@ interface Props extends NodeRendererProps<TNode> {
   mappingInfo?: Record<string, MappingInfo>;
   onNodeSelect?: (node: TNode) => void;
   colorMap?: Record<string, string>;
-  ecoinventCoverage?: Set<string>;
-  epaCoverage?: Set<string>;
-  exiobaseCoverage?: Set<string>;
-  uslciCoverage?: Set<string>;
-  bafuCoverage?: Set<string>;
+  ecoinventCoverage?: Map<string, number>;
+  epaCoverage?: Map<string, number>;
+  exiobaseCoverage?: Map<string, number>;
+  uslciCoverage?: Map<string, number>;
+  bafuCoverage?: Map<string, number>;
 }
 
 function countDescendants(n: TNode): number {
@@ -24,11 +24,11 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
   const descendantCount = !node.isLeaf ? countDescendants(data) : 0;
-  const hasEcoinvent = ecoinventCoverage?.has(data.id);
-  const hasEpa = epaCoverage?.has(data.id);
-  const hasExiobase = exiobaseCoverage?.has(data.id);
-  const hasUslci = uslciCoverage?.has(data.id);
-  const hasBafu = bafuCoverage?.has(data.id);
+  const ecoinventCount = ecoinventCoverage?.get(data.id);
+  const epaCount = epaCoverage?.get(data.id);
+  const exiobaseCount = exiobaseCoverage?.get(data.id);
+  const uslciCount = uslciCoverage?.get(data.id);
+  const bafuCount = bafuCoverage?.get(data.id);
 
   return (
     <div
@@ -66,13 +66,13 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
           {descendantCount.toLocaleString()}
         </span>
       )}
-      {(hasEcoinvent || hasEpa || hasExiobase || hasUslci || hasBafu) && (
+      {(ecoinventCount || epaCount || exiobaseCount || uslciCount || bafuCount) && (
         <span className="ef-badges">
-          {hasEcoinvent && <span className="ef-badge ef-ecoinvent" title="ecoinvent v3.10">e</span>}
-          {hasEpa && <span className="ef-badge ef-epa" title="EPA/USEEIO">U</span>}
-          {hasExiobase && <span className="ef-badge ef-exiobase" title="EXIOBASE 3.8.2">X</span>}
-          {hasUslci && <span className="ef-badge ef-uslci" title="US LCI (NREL)">L</span>}
-          {hasBafu && <span className="ef-badge ef-bafu" title="BAFU:2025 (Swiss FOEN)">B</span>}
+          {ecoinventCount && <span className="ef-badge ef-ecoinvent" title={`ecoinvent v3.12 — 1:${ecoinventCount}`}>{ecoinventCount === 1 ? "e" : `e ${ecoinventCount}`}</span>}
+          {epaCount && <span className="ef-badge ef-epa" title={`EPA/USEEIO — 1:${epaCount}`}>{epaCount === 1 ? "U" : `U ${epaCount}`}</span>}
+          {exiobaseCount && <span className="ef-badge ef-exiobase" title={`EXIOBASE 3.8.2 — 1:${exiobaseCount}`}>{exiobaseCount === 1 ? "X" : `X ${exiobaseCount}`}</span>}
+          {uslciCount && <span className="ef-badge ef-uslci" title={`US LCI (NREL) — 1:${uslciCount}`}>{uslciCount === 1 ? "L" : `L ${uslciCount}`}</span>}
+          {bafuCount && <span className="ef-badge ef-bafu" title={`BAFU:2025 (Swiss FOEN) — 1:${bafuCount}`}>{bafuCount === 1 ? "B" : `B ${bafuCount}`}</span>}
         </span>
       )}
       {info && (

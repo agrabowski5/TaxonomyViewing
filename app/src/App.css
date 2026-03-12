@@ -1363,13 +1363,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
+  min-width: 14px;
   height: 14px;
   border-radius: 3px;
   font-size: 9px;
   font-weight: 700;
   flex-shrink: 0;
   line-height: 1;
+  padding: 0 2px;
+  white-space: nowrap;
   font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
 }
 

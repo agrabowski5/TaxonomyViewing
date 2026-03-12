@@ -484,13 +484,13 @@ function LcaDatabasesTab() {
           {/* ecoinvent */}
           <a href={URLS.ecoinvent} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"ecoinvent v3.10\n4,057 products · 661 CPC codes · 966 HS codes · 182 ISIC codes\nLife cycle inventory database\nClick to open data source"}</title>
+              <title>{"ecoinvent v3.12\n4,399 products · 677 CPC codes · 993 HS codes · 180 ISIC codes\nLife cycle inventory database\nClick to open data source"}</title>
               <rect x="35" y="185" width="130" height="52" rx="8" fill="#b45309" />
               <text x="100" y="207" textAnchor="middle" className="about-node-text-sm">ecoinvent</text>
-              <text x="100" y="224" textAnchor="middle" style={{ fontSize: "8.5px", fill: "#fef3c7" }}>v3.10</text>
+              <text x="100" y="224" textAnchor="middle" style={{ fontSize: "8.5px", fill: "#fef3c7" }}>v3.12</text>
             </g>
           </a>
-          <text x="100" y="253" textAnchor="middle" className="about-node-detail">4,057 products</text>
+          <text x="100" y="253" textAnchor="middle" className="about-node-detail">4,399 products</text>
           <text x="100" y="265" textAnchor="middle" className="about-node-source">ecoinvent.org</text>
 
           {/* EPA / USEEIO */}
@@ -545,18 +545,18 @@ function LcaDatabasesTab() {
 
           {/* ecoinvent -> CPC (direct, green solid) */}
           <path d="M 100 185 Q 130 140 175 93" fill="none" stroke="#059669" strokeWidth="2.5">
-            <title>{"ecoinvent \u2192 CPC\nDirect code-level mapping\n661 CPC codes matched"}</title>
+            <title>{"ecoinvent \u2192 CPC\nDirect code-level mapping\n677 CPC codes matched"}</title>
           </path>
-          <text x="115" y="138" textAnchor="start" className="about-edge-label" fill="#059669">661 CPC codes</text>
+          <text x="115" y="138" textAnchor="start" className="about-edge-label" fill="#059669">677 CPC codes</text>
 
           {/* ecoinvent -> HS (direct, green solid) */}
           <path d="M 140 185 Q 270 140 400 92" fill="none" stroke="#059669" strokeWidth="2.5">
-            <title>{"ecoinvent \u2192 HS\nDirect code-level mapping\n966 HS codes matched"}</title>
+            <title>{"ecoinvent \u2192 HS\nDirect code-level mapping\n993 HS codes matched"}</title>
           </path>
-          <text x="255" y="128" textAnchor="middle" className="about-edge-label" fill="#059669">966 HS codes</text>
+          <text x="255" y="128" textAnchor="middle" className="about-edge-label" fill="#059669">993 HS codes</text>
 
           {/* ecoinvent ISIC note (no line — ISIC node is in the taxonomy diagram above) */}
-          <text x="100" y="277" textAnchor="middle" className="about-node-source" fill="#b45309">+ 182 ISIC codes</text>
+          <text x="100" y="277" textAnchor="middle" className="about-node-source" fill="#b45309">+ 180 ISIC codes</text>
 
           {/* EPA -> NAICS (blue dashed, first hop) */}
           <path d="M 310 185 Q 500 120 695 93" fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="7,4">
@@ -642,10 +642,10 @@ function LcaDatabasesTab() {
           </thead>
           <tbody>
             <tr>
-              <td><strong>ecoinvent v3.10</strong></td>
+              <td><strong>ecoinvent v3.12</strong></td>
               <td><span className="about-conc-badge official">Code-level</span></td>
-              <td>661 CPC + 966 HS + 182 ISIC codes</td>
-              <td>Product inventory (4,057 products)</td>
+              <td>677 CPC + 993 HS + 180 ISIC codes</td>
+              <td>Product inventory (4,399 products)</td>
             </tr>
             <tr>
               <td><strong>EPA / USEEIO v2.1</strong></td>
@@ -679,8 +679,8 @@ function LcaDatabasesTab() {
         <h4>Database Sources</h4>
         <div className="about-details-grid">
           <div className="about-detail-card" style={{ borderLeftColor: "#b45309" }}>
-            <strong>ecoinvent v3.10</strong>
-            <p>The most comprehensive LCI database. 4,057 products mapped directly to CPC, HS, and ISIC codes. Provides product-level inventory data for environmental assessment.</p>
+            <strong>ecoinvent v3.12</strong>
+            <p>The most comprehensive LCI database. 4,399 products mapped directly to CPC, HS, and ISIC codes. Provides product-level inventory data for environmental assessment.</p>
             <ExtLink href={URLS.ecoinvent}>Data source</ExtLink>
           </div>
           <div className="about-detail-card" style={{ borderLeftColor: "#15803d" }}>
@@ -1093,7 +1093,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
 
   for (const tx of hsFamily) {
     m[tx] = {
-      ecoinvent: { tag: "hs6", chain: "HS-6 lookup + ancestor fallback", note: "966 HS codes; inherits parent if exact miss" },
+      ecoinvent: { tag: "hs6", chain: "HS-6 lookup + ancestor fallback", note: "993 HS codes; inherits parent if exact miss" },
       epa:       { tag: "hs6", chain: "HS-6 → NAICS → factor", note: "~400 NAICS sectors; no fallback" },
       exiobase:  { tag: "hs6", chain: "HS-6 → EXIO product (HS-4 fallback)", note: "~190 product categories" },
       uslci:     { tag: "hs6", chain: "HS-6 → NAICS → process", note: "~59 NAICS sectors" },
@@ -1102,7 +1102,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
   }
 
   m["cpc"] = {
-    ecoinvent: { tag: "direct", chain: "Direct CPC lookup + ancestors", note: "661 CPC codes; best fit (native)" },
+    ecoinvent: { tag: "direct", chain: "Direct CPC lookup + ancestors", note: "677 CPC codes; best fit (native)" },
     epa:       { tag: "conc", chain: "CPC → HS-6 → NAICS → factor", note: "CPC-to-HS concordance table" },
     exiobase:  { tag: "conc", chain: "CPC ≈ CPA → EXIO; fallback CPC → HS → EXIO", note: "CPA bridge at 2-4 digits" },
     uslci:     { tag: "conc", chain: "CPC → HS-6 → NAICS → process", note: "Same concordance as EPA path" },
@@ -1134,7 +1134,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
   };
 
   m["isic"] = {
-    ecoinvent: { tag: "direct", chain: "Direct ISIC lookup + ancestors", note: "182 ISIC codes" },
+    ecoinvent: { tag: "direct", chain: "Direct ISIC lookup + ancestors", note: "180 ISIC codes" },
     epa:       { tag: "2hop", chain: "ISIC → CPC → HS-6 → NAICS", note: "Two concordance hops" },
     exiobase:  { tag: "direct", chain: "Direct ISIC → EXIO concordance", note: "502 ISIC codes mapped" },
     uslci:     { tag: "2hop", chain: "ISIC → CPC → HS-6 → NAICS", note: "Two concordance hops" },

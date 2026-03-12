@@ -15,11 +15,11 @@ interface Props {
   legend: string;
   colorMap: Record<string, string>;
   treeRef?: React.RefObject<TreeApi<TreeNode> | null>;
-  ecoinventCoverage?: Set<string>;
-  epaCoverage?: Set<string>;
-  exiobaseCoverage?: Set<string>;
-  uslciCoverage?: Set<string>;
-  bafuCoverage?: Set<string>;
+  ecoinventCoverage?: Map<string, number>;
+  epaCoverage?: Map<string, number>;
+  exiobaseCoverage?: Map<string, number>;
+  uslciCoverage?: Map<string, number>;
+  bafuCoverage?: Map<string, number>;
 }
 
 export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function TaxonomyTree(
