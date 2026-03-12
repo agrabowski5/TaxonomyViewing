@@ -1478,10 +1478,11 @@ function computeUslciCoverage(
 ): Map<string, number> {
   if (!uslciCoverage) return new Map();
   const covered = new Map<string, number>();
+  // Use kg-unit process count to match what the comparison panel displays
   const coverageMap = new Map(
     Object.entries(uslciCoverage.coverage)
       .filter(([, entry]) => entry.withGhgData > 0)
-      .map(([key, entry]) => [key, entry.withGhgData] as const)
+      .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.withGhgData] as const)
   );
 
   function walk(nodes: TreeNode[]) {
@@ -1525,12 +1526,11 @@ function computeBafuCoverage(
 ): Map<string, number> {
   if (!bafuCoverage) return new Map();
   const covered = new Map<string, number>();
-  // Only count chapters that actually have GHG data; use withGhgData as the count
-  // (processCount includes processes without GHG data and is ~same for every chapter)
+  // Use kg-unit process count to match what the comparison panel displays
   const coverageMap = new Map(
     Object.entries(bafuCoverage.coverage)
       .filter(([, entry]) => entry.withGhgData > 0)
-      .map(([key, entry]) => [key, entry.withGhgData] as const)
+      .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.withGhgData] as const)
   );
 
   function walk(nodes: TreeNode[]) {
