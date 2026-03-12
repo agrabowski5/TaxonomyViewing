@@ -384,7 +384,7 @@ function findMappedEntry(
           };
         }
       }
-      // Try 4-digit dotted
+      // Try 4-digit heading with .00.00 suffix (e.g., "2606" → "2606.00.00")
       if (prefix.length >= 4) {
         const four = prefix.substring(0, 4);
         if (lookup[four]) {
@@ -393,6 +393,15 @@ function findMappedEntry(
             code: four,
             description: lookup[four].description,
             nodeId: `hts-${four}`,
+          };
+        }
+        const dotted4 = `${four}.00.00`;
+        if (lookup[dotted4]) {
+          return {
+            taxonomy: targetTaxonomy,
+            code: dotted4,
+            description: lookup[dotted4].description,
+            nodeId: `hts-${stripCode(dotted4)}`,
           };
         }
       }
