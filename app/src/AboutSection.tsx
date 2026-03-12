@@ -1127,9 +1127,9 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
 
   m["naics"] = {
     ecoinvent: noSupport,
-    epa:       { tag: "conc", chain: "NAICS → HS-6 → NAICS → factor", note: "Round-trip via Census concordance" },
+    epa:       { tag: "direct", chain: "Direct NAICS → factor (prefix match)", note: "343 NAICS sectors in EPA/USEEIO" },
     exiobase:  { tag: "conc", chain: "NAICS → HS-6 → EXIO product", note: "Via NAICS-to-HS concordance" },
-    uslci:     { tag: "conc", chain: "NAICS → HS-6 → NAICS → process", note: "Round-trip via Census concordance" },
+    uslci:     { tag: "direct", chain: "Direct NAICS → process (prefix match)", note: "38 NAICS sectors in USLCI" },
     bafu:      { tag: "conc", chain: "NAICS → HS-6 → HS-2 chapter", note: "Via NAICS-to-HS concordance" },
   };
 

@@ -1361,6 +1361,17 @@ function computeEpaCoverage(
             if (matchCount > 0) { matchKey = matched.join(","); break; }
           }
         }
+      } else if (taxonomy === "naics") {
+        // Direct NAICS match: build reverse index naicsCode → HS keys
+        for (let len = clean.length; len >= 4; len--) {
+          const prefix = clean.substring(0, len);
+          const matches = naicsToEf.get(prefix);
+          if (matches && matches.length > 0) {
+            matchCount = matches.length;
+            matchKey = prefix;
+            break;
+          }
+        }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 6) {
           const hs6 = clean.substring(0, 6);
@@ -1370,6 +1381,18 @@ function computeEpaCoverage(
 
       if (matchCount > 0) raw.set(node.id, { count: matchCount, key: matchKey });
       if (node.children) walk(node.children);
+    }
+  }
+
+  // Build NAICS reverse index: naicsCode → list of HS keys that map to it
+  const naicsToEf = new Map<string, string[]>();
+  if (taxonomy === "naics") {
+    for (const [hsKey, entry] of Object.entries(emissionFactors)) {
+      if (entry.naicsCode) {
+        const list = naicsToEf.get(entry.naicsCode) ?? [];
+        list.push(hsKey);
+        naicsToEf.set(entry.naicsCode, list);
+      }
     }
   }
 
@@ -1530,6 +1553,19 @@ function computeUslciCoverage(
             if (count > 0) { matchKey = matched.join(","); break; }
           }
         }
+      } else if (taxonomy === "naics") {
+        // Direct NAICS match via reverse index
+        for (let len = clean.length; len >= 4; len--) {
+          const prefix = clean.substring(0, len);
+          const matches = naicsToUslci.get(prefix);
+          if (matches) {
+            for (const m of matches) {
+              const pc = coverageMap.get(m);
+              if (pc) { count += pc; matchKey = prefix; }
+            }
+            if (count > 0) break;
+          }
+        }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 6) {
           const hs6 = clean.substring(0, 6);
@@ -1540,6 +1576,18 @@ function computeUslciCoverage(
 
       if (count > 0) raw.set(node.id, { count, key: matchKey });
       if (node.children) walk(node.children);
+    }
+  }
+
+  // Build NAICS reverse index: naicsCode → list of HS keys
+  const naicsToUslci = new Map<string, string[]>();
+  if (taxonomy === "naics") {
+    for (const [hsKey, entry] of Object.entries(uslciCoverage.coverage)) {
+      for (const nc of entry.naicsCodes) {
+        const list = naicsToUslci.get(nc) ?? [];
+        list.push(hsKey);
+        naicsToUslci.set(nc, list);
+      }
     }
   }
 
