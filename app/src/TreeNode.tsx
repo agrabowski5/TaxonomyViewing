@@ -1,15 +1,21 @@
 import type { NodeRendererProps } from "react-arborist";
-import type { TreeNode as TNode, MappingInfo } from "./types";
+import type { TreeNode as TNode, MappingInfo, CoverageInfo } from "./types";
 
 interface Props extends NodeRendererProps<TNode> {
   mappingInfo?: Record<string, MappingInfo>;
   onNodeSelect?: (node: TNode) => void;
   colorMap?: Record<string, string>;
-  ecoinventCoverage?: Map<string, number>;
-  epaCoverage?: Map<string, number>;
-  exiobaseCoverage?: Map<string, number>;
-  uslciCoverage?: Map<string, number>;
-  bafuCoverage?: Map<string, number>;
+  ecoinventCoverage?: Map<string, CoverageInfo>;
+  epaCoverage?: Map<string, CoverageInfo>;
+  exiobaseCoverage?: Map<string, CoverageInfo>;
+  bafuCoverage?: Map<string, CoverageInfo>;
+  uslciCoverage?: Map<string, CoverageInfo>;
+}
+
+function fmtBadge(letter: string, info: CoverageInfo): string {
+  if (info.dir === "1:1") return `${letter} 1:1`;
+  if (info.dir === "1:N") return `${letter} 1:${info.count}`;
+  return `${letter} N:1`; // N:1 — many taxonomy entries share this DB entry
 }
 
 function countDescendants(n: TNode): number {
@@ -24,11 +30,11 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
   const descendantCount = !node.isLeaf ? countDescendants(data) : 0;
-  const ecoinventCount = ecoinventCoverage?.get(data.id);
-  const epaCount = epaCoverage?.get(data.id);
-  const exiobaseCount = exiobaseCoverage?.get(data.id);
-  const uslciCount = uslciCoverage?.get(data.id);
-  const bafuCount = bafuCoverage?.get(data.id);
+  const ei = ecoinventCoverage?.get(data.id);
+  const ep = epaCoverage?.get(data.id);
+  const ex = exiobaseCoverage?.get(data.id);
+  const us = uslciCoverage?.get(data.id);
+  const ba = bafuCoverage?.get(data.id);
 
   return (
     <div
@@ -66,13 +72,13 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
           {descendantCount.toLocaleString()}
         </span>
       )}
-      {(ecoinventCount || epaCount || exiobaseCount || uslciCount || bafuCount) && (
+      {(ei || ep || ex || us || ba) && (
         <span className="ef-badges">
-          {ecoinventCount && <span className="ef-badge ef-ecoinvent" title={`ecoinvent v3.12: ${ecoinventCount} product${ecoinventCount > 1 ? "s" : ""}`}>e {ecoinventCount === 1 ? "1:1" : `1:${ecoinventCount}`}</span>}
-          {epaCount && <span className="ef-badge ef-epa" title={`EPA/USEEIO: ${epaCount} emission factor${epaCount > 1 ? "s" : ""}`}>U {epaCount === 1 ? "1:1" : `1:${epaCount}`}</span>}
-          {exiobaseCount && <span className="ef-badge ef-exiobase" title={`EXIOBASE 3.8.2: ${exiobaseCount} product categor${exiobaseCount > 1 ? "ies" : "y"}`}>X {exiobaseCount === 1 ? "1:1" : `1:${exiobaseCount}`}</span>}
-          {uslciCount && <span className="ef-badge ef-uslci" title={`US LCI (NREL): ${uslciCount} process${uslciCount > 1 ? "es" : ""}`}>L {uslciCount === 1 ? "1:1" : `1:${uslciCount}`}</span>}
-          {bafuCount && <span className="ef-badge ef-bafu" title={`BAFU:2025: ${bafuCount} process${bafuCount > 1 ? "es" : ""} with GHG data`}>B {bafuCount === 1 ? "1:1" : `1:${bafuCount}`}</span>}
+          {ei && <span className="ef-badge ef-ecoinvent" title={`ecoinvent v3.12: ${ei.dir} (${ei.count} product${ei.count > 1 ? "s" : ""})`}>{fmtBadge("e", ei)}</span>}
+          {ep && <span className="ef-badge ef-epa" title={`EPA/USEEIO: ${ep.dir} (${ep.count} factor${ep.count > 1 ? "s" : ""})`}>{fmtBadge("U", ep)}</span>}
+          {ex && <span className="ef-badge ef-exiobase" title={`EXIOBASE 3.8.2: ${ex.dir} (${ex.count} categor${ex.count > 1 ? "ies" : "y"})`}>{fmtBadge("X", ex)}</span>}
+          {us && <span className="ef-badge ef-uslci" title={`US LCI (NREL): ${us.dir} (${us.count} process${us.count > 1 ? "es" : ""})`}>{fmtBadge("L", us)}</span>}
+          {ba && <span className="ef-badge ef-bafu" title={`BAFU:2025: ${ba.dir} (${ba.count} process${ba.count > 1 ? "es" : ""})`}>{fmtBadge("B", ba)}</span>}
         </span>
       )}
       {info && (

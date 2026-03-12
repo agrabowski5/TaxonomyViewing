@@ -13,7 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
-import type { TreeNode, LookupEntry, TaxonomyType, AppData, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance } from "./types";
+import type { TreeNode, LookupEntry, TaxonomyType, AppData, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance, CoverageInfo } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
@@ -1276,41 +1276,60 @@ function getEcoinventInfo(
   return empty;
 }
 
+// Convert raw {nodeId -> {count, key}} into final Map with directionality
+function assignDirectionality(raw: Map<string, { count: number; key: string }>): Map<string, CoverageInfo> {
+  // Build reverse: DB key -> number of nodes that use it
+  const keyUsage = new Map<string, number>();
+  for (const { key } of raw.values()) {
+    keyUsage.set(key, (keyUsage.get(key) ?? 0) + 1);
+  }
+  const result = new Map<string, CoverageInfo>();
+  for (const [nodeId, { count, key }] of raw) {
+    let dir: "1:1" | "1:N" | "N:1";
+    if (count > 1) dir = "1:N";
+    else if ((keyUsage.get(key) ?? 1) > 1) dir = "N:1";
+    else dir = "1:1";
+    result.set(nodeId, { count, dir });
+  }
+  return result;
+}
+
 // Compute ecoinvent coverage for tree nodes (for overlay)
 function computeEcoinventCoverage(
   tree: TreeNode[],
   taxonomy: TaxonomyType,
   ecoinventMapping: EcoinventMapping | null,
-): Map<string, number> {
+): Map<string, CoverageInfo> {
   if (!ecoinventMapping) return new Map();
-  const covered = new Map<string, number>();
+  const raw = new Map<string, { count: number; key: string }>();
   const em = ecoinventMapping;
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
       const clean = stripCode(node.code);
       let count = 0;
+      let key = "";
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
-        if (em.cpc[clean]) count = em.cpc[clean].count;
+        if (em.cpc[clean]) { count = em.cpc[clean].count; key = `cpc:${clean}`; }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         const hsBase = clean.substring(0, Math.min(6, clean.length));
-        if (em.hs[hsBase]) count = em.hs[hsBase].count;
+        if (em.hs[hsBase]) { count = em.hs[hsBase].count; key = `hs:${hsBase}`; }
       } else if (taxonomy === "isic" || taxonomy === "nace") {
-        if (em.isic[clean]) count = em.isic[clean].count;
-        else if (em.isicAncestors.includes(clean)) count = 1;
+        if (em.isic[clean]) { count = em.isic[clean].count; key = `isic:${clean}`; }
+        else if (em.isicAncestors.includes(clean)) { count = 1; key = `isic-anc:${clean}`; }
       } else if (taxonomy === "cpa") {
-        if (em.cpc[clean]) count = em.cpc[clean].count;
-        else if (em.cpcAncestors.includes(clean)) count = 1;
+        if (em.cpc[clean]) { count = em.cpc[clean].count; key = `cpc:${clean}`; }
+        else if (em.cpcAncestors.includes(clean)) { count = 1; key = `cpc-anc:${clean}`; }
       }
 
-      if (count > 0) covered.set(node.id, count);
+      if (count > 0) raw.set(node.id, { count, key });
       if (node.children) walk(node.children);
     }
   }
 
   walk(tree);
-  return covered;
+  return assignDirectionality(raw);
 }
 
 function computeEpaCoverage(
@@ -1318,40 +1337,43 @@ function computeEpaCoverage(
   taxonomy: TaxonomyType,
   emissionFactors: Record<string, EmissionFactorEntry> | null,
   concordance: ConcordanceData,
-): Map<string, number> {
+): Map<string, CoverageInfo> {
   if (!emissionFactors) return new Map();
-  const covered = new Map<string, number>();
+  const raw = new Map<string, { count: number; key: string }>();
   const efKeys = new Set(Object.keys(emissionFactors));
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
       const clean = stripCode(node.code);
       let matchCount = 0;
+      let matchKey = "";
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
+        const matched: string[] = [];
         for (let len = clean.length; len >= 4; len--) {
           const prefix = clean.substring(0, len);
           const hsMappings = concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
             for (const m of hsMappings) {
-              if (efKeys.has(m.code)) matchCount++;
+              if (efKeys.has(m.code)) { matchCount++; matched.push(m.code); }
             }
-            if (matchCount > 0) break;
+            if (matchCount > 0) { matchKey = matched.join(","); break; }
           }
         }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 6) {
-          if (efKeys.has(clean.substring(0, 6))) matchCount = 1;
+          const hs6 = clean.substring(0, 6);
+          if (efKeys.has(hs6)) { matchCount = 1; matchKey = hs6; }
         }
       }
 
-      if (matchCount > 0) covered.set(node.id, matchCount);
+      if (matchCount > 0) raw.set(node.id, { count: matchCount, key: matchKey });
       if (node.children) walk(node.children);
     }
   }
 
   walk(tree);
-  return covered;
+  return assignDirectionality(raw);
 }
 
 function computeExiobaseCoverage(
@@ -1360,8 +1382,8 @@ function computeExiobaseCoverage(
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null,
   exiobaseConcordance: ExiobaseConcordance | null,
   concordance: ConcordanceData,
-): Map<string, number> {
-  const covered = new Map<string, number>();
+): Map<string, CoverageInfo> {
+  const raw = new Map<string, { count: number; key: string }>();
 
   // Use precise concordance if available
   if (exiobaseConcordance) {
@@ -1380,6 +1402,7 @@ function computeExiobaseCoverage(
       for (const node of nodes) {
         const clean = stripCode(node.code);
         let count = 0;
+        let key = "";
 
         const isCpcOrigin = taxonomy === "cpc" || taxonomy === "cpa"
           || (taxonomy === "t2" && getT2Origin(node.id) === "cpc")
@@ -1392,58 +1415,59 @@ function computeExiobaseCoverage(
           if (/^\d+$/.test(clean) && clean.length >= 4) {
             const hs6 = clean.substring(0, 6);
             const hs4 = clean.substring(0, 4);
-            if (clean.length >= 6 && hsKeys.has(hs6)) count = hsToExio[hs6].length;
-            else if (hsKeys.has(hs4)) count = hsToExio[hs4].length;
-            else if (hsAncestorSet.has(clean.substring(0, Math.min(clean.length, 4)))) count = 1;
+            if (clean.length >= 6 && hsKeys.has(hs6)) { count = hsToExio[hs6].length; key = hsToExio[hs6].join(","); }
+            else if (hsKeys.has(hs4)) { count = hsToExio[hs4].length; key = hsToExio[hs4].join(","); }
+            else if (hsAncestorSet.has(clean.substring(0, Math.min(clean.length, 4)))) { count = 1; key = `anc:${clean.substring(0, 4)}`; }
           }
         } else if (isCpcOrigin) {
           for (let len = clean.length; len >= 2; len--) {
             const prefix = clean.substring(0, len);
-            if (cpaKeys.has(prefix)) { count = cpaToExio[prefix].length; break; }
-            if (cpaAncestorSet.has(prefix)) { count = 1; break; }
+            if (cpaKeys.has(prefix)) { count = cpaToExio[prefix].length; key = cpaToExio[prefix].join(","); break; }
+            if (cpaAncestorSet.has(prefix)) { count = 1; key = `cpa-anc:${prefix}`; break; }
           }
           if (count === 0) {
+            const matched: string[] = [];
             for (let len = clean.length; len >= 4; len--) {
               const hsMappings = concordance.cpcToHs[clean.substring(0, len)];
               if (hsMappings) {
                 for (const m of hsMappings) {
-                  if (hsKeys.has(m.code)) count += hsToExio[m.code].length;
-                  else if (hsKeys.has(m.code.substring(0, 4))) count += hsToExio[m.code.substring(0, 4)].length;
+                  if (hsKeys.has(m.code)) { count += hsToExio[m.code].length; matched.push(...hsToExio[m.code]); }
+                  else if (hsKeys.has(m.code.substring(0, 4))) { count += hsToExio[m.code.substring(0, 4)].length; matched.push(...hsToExio[m.code.substring(0, 4)]); }
                 }
-                if (count > 0) break;
+                if (count > 0) { key = matched.join(","); break; }
               }
             }
           }
         } else if (taxonomy === "isic") {
           for (let len = clean.length; len >= 1; len--) {
             const prefix = clean.substring(0, len);
-            if (isicKeys.has(prefix)) { count = isicToExio[prefix].length; break; }
+            if (isicKeys.has(prefix)) { count = isicToExio[prefix].length; key = isicToExio[prefix].join(","); break; }
           }
         } else if (taxonomy === "nace") {
           for (let len = clean.length; len >= 1; len--) {
             const prefix = clean.substring(0, len);
-            if (naceKeys.has(prefix)) { count = naceToExio[prefix].length; break; }
-            if (isicKeys.has(prefix)) { count = isicToExio[prefix].length; break; }
+            if (naceKeys.has(prefix)) { count = naceToExio[prefix].length; key = naceToExio[prefix].join(","); break; }
+            if (isicKeys.has(prefix)) { count = isicToExio[prefix].length; key = isicToExio[prefix].join(","); break; }
           }
         }
 
-        if (count > 0) covered.set(node.id, count);
+        if (count > 0) raw.set(node.id, { count, key });
         if (node.children) walkPrecise(node.children);
       }
     }
 
     walkPrecise(tree);
-    return covered;
+    return assignDirectionality(raw);
   }
 
   // Fallback: old HS-2 chapter logic
-  if (!exiobaseFactors) return covered;
+  if (!exiobaseFactors) return new Map();
   const exKeys = new Set(Object.keys(exiobaseFactors));
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
       const clean = stripCode(node.code);
-      let hasCoverage = false;
+      let matchKey = "";
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
         for (let len = clean.length; len >= 4; len--) {
@@ -1451,23 +1475,24 @@ function computeExiobaseCoverage(
           const hsMappings = concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
             const chapter = hsMappings[0].code.substring(0, 2);
-            if (exKeys.has(chapter)) { hasCoverage = true; }
+            if (exKeys.has(chapter)) matchKey = chapter;
             break;
           }
         }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 2) {
-          hasCoverage = exKeys.has(clean.substring(0, 2));
+          const ch = clean.substring(0, 2);
+          if (exKeys.has(ch)) matchKey = ch;
         }
       }
 
-      if (hasCoverage) covered.set(node.id, 1);
+      if (matchKey) raw.set(node.id, { count: 1, key: matchKey });
       if (node.children) walk(node.children);
     }
   }
 
   walk(tree);
-  return covered;
+  return assignDirectionality(raw);
 }
 
 function computeUslciCoverage(
@@ -1475,9 +1500,9 @@ function computeUslciCoverage(
   taxonomy: TaxonomyType,
   uslciCoverage: UslciCoverage | null,
   concordance: ConcordanceData,
-): Map<string, number> {
+): Map<string, CoverageInfo> {
   if (!uslciCoverage) return new Map();
-  const covered = new Map<string, number>();
+  const raw = new Map<string, { count: number; key: string }>();
   // Use kg-unit process count to match what the comparison panel displays
   const coverageMap = new Map(
     Object.entries(uslciCoverage.coverage)
@@ -1489,33 +1514,36 @@ function computeUslciCoverage(
     for (const node of nodes) {
       const clean = stripCode(node.code);
       let count = 0;
+      let matchKey = "";
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
+        const matched: string[] = [];
         for (let len = clean.length; len >= 4; len--) {
           const prefix = clean.substring(0, len);
           const hsMappings = concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
             for (const m of hsMappings) {
               const pc = coverageMap.get(m.code);
-              if (pc) count += pc;
+              if (pc) { count += pc; matched.push(m.code); }
             }
-            if (count > 0) break;
+            if (count > 0) { matchKey = matched.join(","); break; }
           }
         }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 6) {
-          const pc = coverageMap.get(clean.substring(0, 6));
-          if (pc) count = pc;
+          const hs6 = clean.substring(0, 6);
+          const pc = coverageMap.get(hs6);
+          if (pc) { count = pc; matchKey = hs6; }
         }
       }
 
-      if (count > 0) covered.set(node.id, count);
+      if (count > 0) raw.set(node.id, { count, key: matchKey });
       if (node.children) walk(node.children);
     }
   }
 
   walk(tree);
-  return covered;
+  return assignDirectionality(raw);
 }
 
 function computeBafuCoverage(
@@ -1523,9 +1551,9 @@ function computeBafuCoverage(
   taxonomy: TaxonomyType,
   bafuCoverage: BafuCoverage | null,
   concordance: ConcordanceData,
-): Map<string, number> {
+): Map<string, CoverageInfo> {
   if (!bafuCoverage) return new Map();
-  const covered = new Map<string, number>();
+  const raw = new Map<string, { count: number; key: string }>();
   // Use kg-unit process count to match what the comparison panel displays
   const coverageMap = new Map(
     Object.entries(bafuCoverage.coverage)
@@ -1537,6 +1565,7 @@ function computeBafuCoverage(
     for (const node of nodes) {
       const clean = stripCode(node.code);
       let count = 0;
+      let matchKey = "";
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
         for (let len = clean.length; len >= 4; len--) {
@@ -1545,24 +1574,25 @@ function computeBafuCoverage(
           if (hsMappings && hsMappings.length > 0) {
             const chapter = hsMappings[0].code.substring(0, 2);
             const pc = coverageMap.get(chapter);
-            if (pc) count = pc;
+            if (pc) { count = pc; matchKey = chapter; }
             break;
           }
         }
       } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
         if (/^\d+$/.test(clean) && clean.length >= 2) {
-          const pc = coverageMap.get(clean.substring(0, 2));
-          if (pc) count = pc;
+          const ch = clean.substring(0, 2);
+          const pc = coverageMap.get(ch);
+          if (pc) { count = pc; matchKey = ch; }
         }
       }
 
-      if (count > 0) covered.set(node.id, count);
+      if (count > 0) raw.set(node.id, { count, key: matchKey });
       if (node.children) walk(node.children);
     }
   }
 
   walk(tree);
-  return covered;
+  return assignDirectionality(raw);
 }
 
 function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode }: {
@@ -2601,35 +2631,35 @@ function AppContent() {
     [data, rightTaxonomy, getTreeData]
   );
   const leftEpaCoverage = useMemo(
-    () => data ? computeEpaCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.emissionFactors, data.concordance) : new Map<string, number>(),
+    () => data ? computeEpaCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.emissionFactors, data.concordance) : new Map<string, CoverageInfo>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightEpaCoverage = useMemo(
-    () => data ? computeEpaCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.emissionFactors, data.concordance) : new Map<string, number>(),
+    () => data ? computeEpaCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.emissionFactors, data.concordance) : new Map<string, CoverageInfo>(),
     [data, rightTaxonomy, getTreeData]
   );
   const leftExiobaseCoverage = useMemo(
-    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Map<string, number>(),
+    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Map<string, CoverageInfo>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightExiobaseCoverage = useMemo(
-    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Map<string, number>(),
+    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Map<string, CoverageInfo>(),
     [data, rightTaxonomy, getTreeData]
   );
   const leftUslciCoverage = useMemo(
-    () => data ? computeUslciCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.uslciCoverage, data.concordance) : new Map<string, number>(),
+    () => data ? computeUslciCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.uslciCoverage, data.concordance) : new Map<string, CoverageInfo>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightUslciCoverage = useMemo(
-    () => data ? computeUslciCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.uslciCoverage, data.concordance) : new Map<string, number>(),
+    () => data ? computeUslciCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.uslciCoverage, data.concordance) : new Map<string, CoverageInfo>(),
     [data, rightTaxonomy, getTreeData]
   );
   const leftBafuCoverage = useMemo(
-    () => data ? computeBafuCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.bafuCoverage, data.concordance) : new Map<string, number>(),
+    () => data ? computeBafuCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.bafuCoverage, data.concordance) : new Map<string, CoverageInfo>(),
     [data, leftTaxonomy, getTreeData]
   );
   const rightBafuCoverage = useMemo(
-    () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance) : new Map<string, number>(),
+    () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance) : new Map<string, CoverageInfo>(),
     [data, rightTaxonomy, getTreeData]
   );
 

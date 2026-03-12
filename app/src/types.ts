@@ -1,3 +1,6 @@
+// Coverage info per node: count = matched DB entries, dir = mapping direction
+export type CoverageInfo = { count: number; dir: "1:1" | "1:N" | "N:1" };
+
 export interface TreeNode {
   id: string;
   code: string;

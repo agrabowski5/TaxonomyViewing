@@ -1351,6 +1351,22 @@
 .uslci-card .lci-process-name { color: #172554; }
 .uslci-card .lci-process-value { color: #1d4ed8; }
 
+/* ===== Badge Key (Panel Header) ===== */
+.panel-badge-key {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+.badge-key-label {
+  font-weight: 600;
+  color: #6b7280;
+}
+.badge-key-item {
+  font-style: italic;
+}
+
 /* ===== EF Database Coverage Badges (Tree Node) ===== */
 .ef-badges {
   display: inline-flex;

@@ -2,7 +2,7 @@ import React, { forwardRef } from "react";
 import { Tree, TreeApi } from "react-arborist";
 import { TreeNodeRenderer } from "./TreeNode";
 import { useContainerSize } from "./useContainerSize";
-import type { TreeNode, MappingInfo } from "./types";
+import type { TreeNode, MappingInfo, CoverageInfo } from "./types";
 
 interface Props {
   data: TreeNode[];
@@ -15,11 +15,11 @@ interface Props {
   legend: string;
   colorMap: Record<string, string>;
   treeRef?: React.RefObject<TreeApi<TreeNode> | null>;
-  ecoinventCoverage?: Map<string, number>;
-  epaCoverage?: Map<string, number>;
-  exiobaseCoverage?: Map<string, number>;
-  uslciCoverage?: Map<string, number>;
-  bafuCoverage?: Map<string, number>;
+  ecoinventCoverage?: Map<string, CoverageInfo>;
+  epaCoverage?: Map<string, CoverageInfo>;
+  exiobaseCoverage?: Map<string, CoverageInfo>;
+  uslciCoverage?: Map<string, CoverageInfo>;
+  bafuCoverage?: Map<string, CoverageInfo>;
 }
 
 export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function TaxonomyTree(
@@ -51,6 +51,12 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
           {fullName}
         </h2>
         <div className="panel-legend">{legend}</div>
+        <div className="panel-badge-key">
+          <span className="badge-key-label">LCA badges:</span>
+          <span className="badge-key-item">1:1 = exclusive match</span>
+          <span className="badge-key-item">1:N = one code → N entries</span>
+          <span className="badge-key-item">N:1 = many codes → one entry</span>
+        </div>
       </div>
       <div className="tree-container" ref={container.ref}>
         <Tree<TreeNode>
