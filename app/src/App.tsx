@@ -2818,15 +2818,20 @@ function AppContent() {
         >
           {builderState.active ? "Exit Builder" : "Build Custom"}
         </button>
-        <button
-          className={`match-mode-toggle ${strictMatch ? "strict" : ""}`}
-          onClick={() => setStrictMatch(s => !s)}
-          title={strictMatch
-            ? "Exact mode: only precise code-level matches (no ancestor fallback, prefix shortening, or chapter-level matching)"
-            : "Relaxed mode: includes ancestor fallback, prefix shortening, and chapter-level matching for broader coverage"}
-        >
-          {strictMatch ? "Exact Match" : "Relaxed Match"}
-        </button>
+        <div className="match-mode-slider-wrap">
+          <span className={`match-mode-label ${!strictMatch ? "active" : ""}`}>Relaxed</span>
+          <button
+            className={`match-mode-track ${strictMatch ? "strict" : ""}`}
+            onClick={() => setStrictMatch(s => !s)}
+            role="switch"
+            aria-checked={strictMatch}
+            aria-label="Toggle between relaxed and exact LCA matching"
+          >
+            <span className="match-mode-thumb" />
+          </button>
+          <span className={`match-mode-label ${strictMatch ? "active" : ""}`}>Exact</span>
+          <span className="match-mode-help" title={"Relaxed: broader coverage using ancestor fallback, prefix shortening, and chapter-level matching.\n\nExact: only precise code-level matches — disables ancestor fallback, prefix shortening, HS-4 fallback, and chapter-level (BAFU) matching.\n\nSee the Coverage Mapping Rules in the LCA Databases help tab for details."}>?</span>
+        </div>
         <div className="search-bar">
           <svg
             className="search-icon"
