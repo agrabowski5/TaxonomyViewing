@@ -1309,6 +1309,7 @@ function computeEcoinventCoverage(
   tree: TreeNode[],
   taxonomy: TaxonomyType,
   ecoinventMapping: EcoinventMapping | null,
+  strict: boolean,
 ): Map<string, CoverageInfo> {
   if (!ecoinventMapping) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
@@ -1327,10 +1328,10 @@ function computeEcoinventCoverage(
         if (em.hs[hsBase]) { count = em.hs[hsBase].count; key = `hs:${hsBase}`; }
       } else if (taxonomy === "isic" || taxonomy === "nace") {
         if (em.isic[clean]) { count = em.isic[clean].count; key = `isic:${clean}`; }
-        else if (em.isicAncestors.includes(clean)) { count = 1; key = `isic-anc:${clean}`; }
+        else if (!strict && em.isicAncestors.includes(clean)) { count = 1; key = `isic-anc:${clean}`; }
       } else if (taxonomy === "cpa") {
         if (em.cpc[clean]) { count = em.cpc[clean].count; key = `cpc:${clean}`; }
-        else if (em.cpcAncestors.includes(clean)) { count = 1; key = `cpc-anc:${clean}`; }
+        else if (!strict && em.cpcAncestors.includes(clean)) { count = 1; key = `cpc-anc:${clean}`; }
       }
 
       if (count > 0) raw.set(node.id, { count, key });
@@ -1347,6 +1348,7 @@ function computeEpaCoverage(
   taxonomy: TaxonomyType,
   emissionFactors: Record<string, EmissionFactorEntry> | null,
   concordance: ConcordanceData,
+  strict: boolean,
 ): Map<string, CoverageInfo> {
   if (!emissionFactors) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
@@ -1357,10 +1359,11 @@ function computeEpaCoverage(
       const clean = stripCode(node.code);
       let matchCount = 0;
       let matchKey = "";
+      const minPrefix = strict ? clean.length : 4;
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
         const matched: string[] = [];
-        for (let len = clean.length; len >= 4; len--) {
+        for (let len = clean.length; len >= minPrefix; len--) {
           const prefix = clean.substring(0, len);
           const hsMappings = concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
@@ -1372,7 +1375,7 @@ function computeEpaCoverage(
         }
       } else if (taxonomy === "naics") {
         // Direct NAICS match: build reverse index naicsCode → HS keys
-        for (let len = clean.length; len >= 4; len--) {
+        for (let len = clean.length; len >= minPrefix; len--) {
           const prefix = clean.substring(0, len);
           const matches = naicsToEf.get(prefix);
           if (matches && matches.length > 0) {
@@ -1415,6 +1418,7 @@ function computeExiobaseCoverage(
   exiobaseFactors: Record<string, ExiobaseFactorEntry> | null,
   exiobaseConcordance: ExiobaseConcordance | null,
   concordance: ConcordanceData,
+  strict: boolean,
 ): Map<string, CoverageInfo> {
   const raw = new Map<string, { count: number; key: string }>();
 
@@ -1449,35 +1453,40 @@ function computeExiobaseCoverage(
             const hs6 = clean.substring(0, 6);
             const hs4 = clean.substring(0, 4);
             if (clean.length >= 6 && hsKeys.has(hs6)) { count = hsToExio[hs6].length; key = hsToExio[hs6].join(","); }
-            else if (hsKeys.has(hs4)) { count = hsToExio[hs4].length; key = hsToExio[hs4].join(","); }
-            else if (hsAncestorSet.has(clean.substring(0, Math.min(clean.length, 4)))) { count = 1; key = `anc:${clean.substring(0, 4)}`; }
+            else if (!strict && hsKeys.has(hs4)) { count = hsToExio[hs4].length; key = hsToExio[hs4].join(","); }
+            else if (!strict && hsAncestorSet.has(clean.substring(0, Math.min(clean.length, 4)))) { count = 1; key = `anc:${clean.substring(0, 4)}`; }
           }
         } else if (isCpcOrigin) {
-          for (let len = clean.length; len >= 2; len--) {
+          // In strict mode, only try exact code length for CPA lookup
+          const cpaMin = strict ? clean.length : 2;
+          for (let len = clean.length; len >= cpaMin; len--) {
             const prefix = clean.substring(0, len);
             if (cpaKeys.has(prefix)) { count = cpaToExio[prefix].length; key = cpaToExio[prefix].join(","); break; }
-            if (cpaAncestorSet.has(prefix)) { count = 1; key = `cpa-anc:${prefix}`; break; }
+            if (!strict && cpaAncestorSet.has(prefix)) { count = 1; key = `cpa-anc:${prefix}`; break; }
           }
           if (count === 0) {
             const matched: string[] = [];
-            for (let len = clean.length; len >= 4; len--) {
+            const cpcMin = strict ? clean.length : 4;
+            for (let len = clean.length; len >= cpcMin; len--) {
               const hsMappings = concordance.cpcToHs[clean.substring(0, len)];
               if (hsMappings) {
                 for (const m of hsMappings) {
                   if (hsKeys.has(m.code)) { count += hsToExio[m.code].length; matched.push(...hsToExio[m.code]); }
-                  else if (hsKeys.has(m.code.substring(0, 4))) { count += hsToExio[m.code.substring(0, 4)].length; matched.push(...hsToExio[m.code.substring(0, 4)]); }
+                  else if (!strict && hsKeys.has(m.code.substring(0, 4))) { count += hsToExio[m.code.substring(0, 4)].length; matched.push(...hsToExio[m.code.substring(0, 4)]); }
                 }
                 if (count > 0) { key = matched.join(","); break; }
               }
             }
           }
         } else if (taxonomy === "isic") {
-          for (let len = clean.length; len >= 1; len--) {
+          const isicMin = strict ? clean.length : 1;
+          for (let len = clean.length; len >= isicMin; len--) {
             const prefix = clean.substring(0, len);
             if (isicKeys.has(prefix)) { count = isicToExio[prefix].length; key = isicToExio[prefix].join(","); break; }
           }
         } else if (taxonomy === "nace") {
-          for (let len = clean.length; len >= 1; len--) {
+          const naceMin = strict ? clean.length : 1;
+          for (let len = clean.length; len >= naceMin; len--) {
             const prefix = clean.substring(0, len);
             if (naceKeys.has(prefix)) { count = naceToExio[prefix].length; key = naceToExio[prefix].join(","); break; }
             if (isicKeys.has(prefix)) { count = isicToExio[prefix].length; key = isicToExio[prefix].join(","); break; }
@@ -1493,7 +1502,8 @@ function computeExiobaseCoverage(
     return assignDirectionality(raw);
   }
 
-  // Fallback: old HS-2 chapter logic
+  // Fallback: old HS-2 chapter logic — disabled in strict mode (chapter-level only)
+  if (strict) return new Map();
   if (!exiobaseFactors) return new Map();
   const exKeys = new Set(Object.keys(exiobaseFactors));
 
@@ -1533,6 +1543,7 @@ function computeUslciCoverage(
   taxonomy: TaxonomyType,
   uslciCoverage: UslciCoverage | null,
   concordance: ConcordanceData,
+  strict: boolean,
 ): Map<string, CoverageInfo> {
   if (!uslciCoverage) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
@@ -1548,10 +1559,11 @@ function computeUslciCoverage(
       const clean = stripCode(node.code);
       let count = 0;
       let matchKey = "";
+      const minPrefix = strict ? clean.length : 4;
 
       if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
         const matched: string[] = [];
-        for (let len = clean.length; len >= 4; len--) {
+        for (let len = clean.length; len >= minPrefix; len--) {
           const prefix = clean.substring(0, len);
           const hsMappings = concordance.cpcToHs[prefix];
           if (hsMappings && hsMappings.length > 0) {
@@ -1564,7 +1576,7 @@ function computeUslciCoverage(
         }
       } else if (taxonomy === "naics") {
         // Direct NAICS match via reverse index
-        for (let len = clean.length; len >= 4; len--) {
+        for (let len = clean.length; len >= minPrefix; len--) {
           const prefix = clean.substring(0, len);
           const matches = naicsToUslci.get(prefix);
           if (matches) {
@@ -1609,7 +1621,10 @@ function computeBafuCoverage(
   taxonomy: TaxonomyType,
   bafuCoverage: BafuCoverage | null,
   concordance: ConcordanceData,
+  strict: boolean,
 ): Map<string, CoverageInfo> {
+  // BAFU only has HS-2 chapter-level matching — disabled entirely in strict mode
+  if (strict) return new Map();
   if (!bafuCoverage) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
   // Use kg-unit process count to match what the comparison panel displays
@@ -1779,6 +1794,7 @@ function AppContent() {
   const [showLibraryDialog, setShowLibraryDialog] = useState(false);
   const [mappingPanelCollapsed, setMappingPanelCollapsed] = useState(false);
   const [panelHeight, setPanelHeight] = useState(200);
+  const [strictMatch, setStrictMatch] = useState(false);
   const panelDragging = useRef(false);
 
   // Resizable bottom panel drag handler
@@ -2681,44 +2697,44 @@ function AppContent() {
 
   // EF database coverage sets (always computed, shown as badges on tree nodes)
   const leftEcoinventCoverage = useMemo(
-    () => computeEcoinventCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data?.ecoinventMapping ?? null),
-    [data, leftTaxonomy, getTreeData]
+    () => computeEcoinventCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data?.ecoinventMapping ?? null, strictMatch),
+    [data, leftTaxonomy, getTreeData, strictMatch]
   );
   const rightEcoinventCoverage = useMemo(
-    () => computeEcoinventCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data?.ecoinventMapping ?? null),
-    [data, rightTaxonomy, getTreeData]
+    () => computeEcoinventCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data?.ecoinventMapping ?? null, strictMatch),
+    [data, rightTaxonomy, getTreeData, strictMatch]
   );
   const leftEpaCoverage = useMemo(
-    () => data ? computeEpaCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.emissionFactors, data.concordance) : new Map<string, CoverageInfo>(),
-    [data, leftTaxonomy, getTreeData]
+    () => data ? computeEpaCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.emissionFactors, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, leftTaxonomy, getTreeData, strictMatch]
   );
   const rightEpaCoverage = useMemo(
-    () => data ? computeEpaCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.emissionFactors, data.concordance) : new Map<string, CoverageInfo>(),
-    [data, rightTaxonomy, getTreeData]
+    () => data ? computeEpaCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.emissionFactors, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, rightTaxonomy, getTreeData, strictMatch]
   );
   const leftExiobaseCoverage = useMemo(
-    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Map<string, CoverageInfo>(),
-    [data, leftTaxonomy, getTreeData]
+    () => data ? computeExiobaseCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, leftTaxonomy, getTreeData, strictMatch]
   );
   const rightExiobaseCoverage = useMemo(
-    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance) : new Map<string, CoverageInfo>(),
-    [data, rightTaxonomy, getTreeData]
+    () => data ? computeExiobaseCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.exiobaseFactors, data.exiobaseConcordance, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, rightTaxonomy, getTreeData, strictMatch]
   );
   const leftUslciCoverage = useMemo(
-    () => data ? computeUslciCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.uslciCoverage, data.concordance) : new Map<string, CoverageInfo>(),
-    [data, leftTaxonomy, getTreeData]
+    () => data ? computeUslciCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.uslciCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, leftTaxonomy, getTreeData, strictMatch]
   );
   const rightUslciCoverage = useMemo(
-    () => data ? computeUslciCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.uslciCoverage, data.concordance) : new Map<string, CoverageInfo>(),
-    [data, rightTaxonomy, getTreeData]
+    () => data ? computeUslciCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.uslciCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, rightTaxonomy, getTreeData, strictMatch]
   );
   const leftBafuCoverage = useMemo(
-    () => data ? computeBafuCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.bafuCoverage, data.concordance) : new Map<string, CoverageInfo>(),
-    [data, leftTaxonomy, getTreeData]
+    () => data ? computeBafuCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.bafuCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, leftTaxonomy, getTreeData, strictMatch]
   );
   const rightBafuCoverage = useMemo(
-    () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance) : new Map<string, CoverageInfo>(),
-    [data, rightTaxonomy, getTreeData]
+    () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, rightTaxonomy, getTreeData, strictMatch]
   );
 
   // Ecoinvent info for selected node
@@ -2801,6 +2817,15 @@ function AppContent() {
           title={builderState.active ? "Exit Custom Taxonomy Builder" : "Build a custom taxonomy in the right pane"}
         >
           {builderState.active ? "Exit Builder" : "Build Custom"}
+        </button>
+        <button
+          className={`match-mode-toggle ${strictMatch ? "strict" : ""}`}
+          onClick={() => setStrictMatch(s => !s)}
+          title={strictMatch
+            ? "Exact mode: only precise code-level matches (no ancestor fallback, prefix shortening, or chapter-level matching)"
+            : "Relaxed mode: includes ancestor fallback, prefix shortening, and chapter-level matching for broader coverage"}
+        >
+          {strictMatch ? "Exact Match" : "Relaxed Match"}
         </button>
         <div className="search-bar">
           <svg

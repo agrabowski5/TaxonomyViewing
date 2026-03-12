@@ -609,6 +609,34 @@
   flex: 1;
 }
 
+.match-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid #6366f1;
+  border-radius: 8px;
+  background: white;
+  color: #4338ca;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.match-mode-toggle:hover {
+  background: #eef2ff;
+  border-color: #818cf8;
+}
+
+.match-mode-toggle.strict {
+  background: #eef2ff;
+  border-color: #818cf8;
+  color: #3730a3;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+}
+
 .panel-controls {
   display: flex;
   gap: 4px;
