@@ -1666,10 +1666,17 @@ const LCA_DB_OPTIONS: { key: LcaDb; label: string; color: string }[] = [
   { key: "bafu", label: "BAFU:2025", color: "#be123c" },
 ];
 
+// Multi-word search: every whitespace-separated term must appear somewhere in the text
+function matchesSearch(terms: string[], ...fields: string[]): boolean {
+  if (terms.length === 0) return true;
+  const joined = fields.join(" ").toLowerCase();
+  return terms.every(t => joined.includes(t));
+}
+
 function LcaDataBrowserTab({ data }: { data: AppData | null }) {
   const [db, setDb] = useState<LcaDb>("ecoinvent");
   const [search, setSearch] = useState("");
-  const lowerSearch = search.toLowerCase();
+  const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -1686,12 +1693,8 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
       for (const [code, info] of Object.entries(em.isic)) {
         out.push({ code, system: "ISIC", products: info.products, type: info.mappingType });
       }
-      if (lowerSearch) {
-        return out.filter(r =>
-          r.code.toLowerCase().includes(lowerSearch) ||
-          r.system.toLowerCase().includes(lowerSearch) ||
-          r.products.some(p => p.toLowerCase().includes(lowerSearch))
-        );
+      if (searchTerms.length) {
+        return out.filter(r => matchesSearch(searchTerms, r.code, r.system, ...r.products));
       }
       return out;
     }
@@ -1701,91 +1704,87 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
       for (const [hs, entry] of Object.entries(data.emissionFactors)) {
         out.push({ hs, naics: entry.naicsCode, desc: entry.naicsDescription, factor: entry.factor, unit: entry.unit });
       }
-      if (lowerSearch) {
-        return out.filter(r =>
-          r.hs.includes(lowerSearch) || r.naics.includes(lowerSearch) || r.desc.toLowerCase().includes(lowerSearch)
-        );
+      if (searchTerms.length) {
+        return out.filter(r => matchesSearch(searchTerms, r.hs, r.naics, r.desc));
       }
       return out;
     }
 
     if (db === "exiobase" && data.exiobaseConcordance) {
       const ec = data.exiobaseConcordance;
-      const out: { product: string; hsCodes: number; cpaCodes: number; isicCodes: number; naceCodes: number }[] = [];
-      const productNames = Object.values(ec.products);
-      // Build reverse: product name → how many codes map to it per system
-      const prodHs = new Map<string, number>();
-      const prodCpa = new Map<string, number>();
-      const prodIsic = new Map<string, number>();
-      const prodNace = new Map<string, number>();
-      for (const prods of Object.values(ec.hsToExio)) {
-        for (const p of prods) prodHs.set(p, (prodHs.get(p) ?? 0) + 1);
+      // Build product → mapped codes for searchability
+      const prodHsCodes = new Map<string, string[]>();
+      const prodCpaCodes = new Map<string, string[]>();
+      const prodIsicCodes = new Map<string, string[]>();
+      const prodNaceCodes = new Map<string, string[]>();
+      for (const [code, prods] of Object.entries(ec.hsToExio)) {
+        for (const p of prods) { const l = prodHsCodes.get(p) ?? []; l.push(code); prodHsCodes.set(p, l); }
       }
-      for (const prods of Object.values(ec.cpaToExio)) {
-        for (const p of prods) prodCpa.set(p, (prodCpa.get(p) ?? 0) + 1);
+      for (const [code, prods] of Object.entries(ec.cpaToExio)) {
+        for (const p of prods) { const l = prodCpaCodes.get(p) ?? []; l.push(code); prodCpaCodes.set(p, l); }
       }
-      for (const prods of Object.values(ec.isicToExio)) {
-        for (const p of prods) prodIsic.set(p, (prodIsic.get(p) ?? 0) + 1);
+      for (const [code, prods] of Object.entries(ec.isicToExio)) {
+        for (const p of prods) { const l = prodIsicCodes.get(p) ?? []; l.push(code); prodIsicCodes.set(p, l); }
       }
-      for (const prods of Object.values(ec.naceToExio)) {
-        for (const p of prods) prodNace.set(p, (prodNace.get(p) ?? 0) + 1);
+      for (const [code, prods] of Object.entries(ec.naceToExio)) {
+        for (const p of prods) { const l = prodNaceCodes.get(p) ?? []; l.push(code); prodNaceCodes.set(p, l); }
       }
-      const unique = [...new Set(productNames)].sort();
+      const unique = [...new Set(Object.values(ec.products))].sort();
+      const out: { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[] }[] = [];
       for (const name of unique) {
         out.push({
           product: name,
-          hsCodes: prodHs.get(name) ?? 0,
-          cpaCodes: prodCpa.get(name) ?? 0,
-          isicCodes: prodIsic.get(name) ?? 0,
-          naceCodes: prodNace.get(name) ?? 0,
+          hsCodes: prodHsCodes.get(name) ?? [],
+          cpaCodes: prodCpaCodes.get(name) ?? [],
+          isicCodes: prodIsicCodes.get(name) ?? [],
+          naceCodes: prodNaceCodes.get(name) ?? [],
         });
       }
-      if (lowerSearch) {
-        return out.filter(r => r.product.toLowerCase().includes(lowerSearch));
+      if (searchTerms.length) {
+        return out.filter(r => matchesSearch(searchTerms,
+          r.product,
+          ...r.hsCodes, ...r.cpaCodes, ...r.isicCodes, ...r.naceCodes,
+        ));
       }
       return out;
     }
 
     if (db === "uslci" && data.uslciCoverage) {
-      const out: { hs: string; naics: string; processes: number; withGhg: number; topProcess: string }[] = [];
+      const out: { hs: string; naics: string; processes: number; withGhg: number; allProcesses: string[] }[] = [];
       for (const [hs, entry] of Object.entries(data.uslciCoverage.coverage)) {
         out.push({
           hs,
           naics: entry.naicsCodes.join(", "),
           processes: entry.processCount,
           withGhg: entry.withGhgData,
-          topProcess: entry.topProcesses[0]?.name ?? "—",
+          allProcesses: entry.topProcesses.map(p => p.name),
         });
       }
-      if (lowerSearch) {
-        return out.filter(r =>
-          r.hs.includes(lowerSearch) || r.naics.includes(lowerSearch) || r.topProcess.toLowerCase().includes(lowerSearch)
-        );
+      if (searchTerms.length) {
+        return out.filter(r => matchesSearch(searchTerms, r.hs, r.naics, ...r.allProcesses));
       }
       return out;
     }
 
     if (db === "bafu" && data.bafuCoverage) {
-      const out: { chapter: string; processes: number; withGhg: number; units: string; topProcess: string }[] = [];
+      const out: { chapter: string; processes: number; withGhg: number; units: string; allProcesses: string[] }[] = [];
       for (const [ch, entry] of Object.entries(data.bafuCoverage.coverage)) {
         out.push({
           chapter: ch,
           processes: entry.processCount,
           withGhg: entry.withGhgData,
           units: Object.keys(entry.unitStats).join(", "),
-          topProcess: entry.topProcesses[0]?.name ?? "—",
+          allProcesses: entry.topProcesses.map(p => p.name),
         });
       }
-      if (lowerSearch) {
-        return out.filter(r =>
-          r.chapter.includes(lowerSearch) || r.topProcess.toLowerCase().includes(lowerSearch) || r.units.includes(lowerSearch)
-        );
+      if (searchTerms.length) {
+        return out.filter(r => matchesSearch(searchTerms, r.chapter, r.units, ...r.allProcesses));
       }
       return out;
     }
 
     return [];
-  }, [data, db, lowerSearch]);
+  }, [data, db, searchTerms]);
 
   const dbInfo = LCA_DB_OPTIONS.find(d => d.key === db)!;
 
@@ -1881,13 +1880,13 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               </tr>
             </thead>
             <tbody>
-              {(rows as { product: string; hsCodes: number; cpaCodes: number; isicCodes: number; naceCodes: number }[]).slice(0, 500).map((r, i) => (
+              {(rows as { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[] }[]).slice(0, 500).map((r, i) => (
                 <tr key={i}>
                   <td>{r.product}</td>
-                  <td className="lca-num">{r.hsCodes}</td>
-                  <td className="lca-num">{r.cpaCodes}</td>
-                  <td className="lca-num">{r.isicCodes}</td>
-                  <td className="lca-num">{r.naceCodes}</td>
+                  <td className="lca-num" title={r.hsCodes.join(", ")}>{r.hsCodes.length}</td>
+                  <td className="lca-num" title={r.cpaCodes.join(", ")}>{r.cpaCodes.length}</td>
+                  <td className="lca-num" title={r.isicCodes.join(", ")}>{r.isicCodes.length}</td>
+                  <td className="lca-num" title={r.naceCodes.join(", ")}>{r.naceCodes.length}</td>
                 </tr>
               ))}
             </tbody>
@@ -1902,17 +1901,17 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
                 <th>NAICS</th>
                 <th>Processes</th>
                 <th>w/ GHG</th>
-                <th>Top Process</th>
+                <th>Process Names</th>
               </tr>
             </thead>
             <tbody>
-              {(rows as { hs: string; naics: string; processes: number; withGhg: number; topProcess: string }[]).slice(0, 500).map((r, i) => (
+              {(rows as { hs: string; naics: string; processes: number; withGhg: number; allProcesses: string[] }[]).slice(0, 500).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.hs}</td>
                   <td className="lca-code">{r.naics}</td>
                   <td className="lca-num">{r.processes}</td>
                   <td className="lca-num">{r.withGhg}</td>
-                  <td className="lca-products">{r.topProcess}</td>
+                  <td className="lca-products" title={r.allProcesses.join("\n")}>{r.allProcesses.join("; ")}</td>
                 </tr>
               ))}
             </tbody>
@@ -1927,17 +1926,17 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
                 <th>Processes</th>
                 <th>w/ GHG</th>
                 <th>Units</th>
-                <th>Top Process</th>
+                <th>Process Names</th>
               </tr>
             </thead>
             <tbody>
-              {(rows as { chapter: string; processes: number; withGhg: number; units: string; topProcess: string }[]).slice(0, 500).map((r, i) => (
+              {(rows as { chapter: string; processes: number; withGhg: number; units: string; allProcesses: string[] }[]).slice(0, 500).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.chapter}</td>
                   <td className="lca-num">{r.processes}</td>
                   <td className="lca-num">{r.withGhg}</td>
                   <td className="lca-unit">{r.units}</td>
-                  <td className="lca-products">{r.topProcess}</td>
+                  <td className="lca-products" title={r.allProcesses.join("\n")}>{r.allProcesses.join("; ")}</td>
                 </tr>
               ))}
             </tbody>

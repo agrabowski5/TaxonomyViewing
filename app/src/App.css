@@ -2444,12 +2444,11 @@
 }
 
 .lca-products {
-  max-width: 360px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 400px;
   font-size: 11px;
   color: #4b5563;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .lca-system-badge {
