@@ -1536,11 +1536,308 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
   );
 }
 
+/* =============================== LCA Data Browser Tab =============================== */
+
+type LcaDb = "ecoinvent" | "epa" | "exiobase" | "uslci" | "bafu";
+const LCA_DB_OPTIONS: { key: LcaDb; label: string; color: string }[] = [
+  { key: "ecoinvent", label: "ecoinvent v3.12", color: "#b45309" },
+  { key: "epa", label: "EPA / USEEIO v2.1", color: "#15803d" },
+  { key: "exiobase", label: "EXIOBASE 3.8.2", color: "#6d28d9" },
+  { key: "uslci", label: "US LCI (NREL)", color: "#0369a1" },
+  { key: "bafu", label: "BAFU:2025", color: "#be123c" },
+];
+
+function LcaDataBrowserTab({ data }: { data: AppData | null }) {
+  const [db, setDb] = useState<LcaDb>("ecoinvent");
+  const [search, setSearch] = useState("");
+  const lowerSearch = search.toLowerCase();
+
+  const rows = useMemo(() => {
+    if (!data) return [];
+
+    if (db === "ecoinvent" && data.ecoinventMapping) {
+      const em = data.ecoinventMapping;
+      const out: { code: string; system: string; products: string[]; type: string }[] = [];
+      for (const [code, info] of Object.entries(em.cpc)) {
+        out.push({ code, system: "CPC", products: info.products, type: info.mappingType });
+      }
+      for (const [code, info] of Object.entries(em.hs)) {
+        out.push({ code, system: "HS", products: info.products, type: info.mappingType });
+      }
+      for (const [code, info] of Object.entries(em.isic)) {
+        out.push({ code, system: "ISIC", products: info.products, type: info.mappingType });
+      }
+      if (lowerSearch) {
+        return out.filter(r =>
+          r.code.toLowerCase().includes(lowerSearch) ||
+          r.system.toLowerCase().includes(lowerSearch) ||
+          r.products.some(p => p.toLowerCase().includes(lowerSearch))
+        );
+      }
+      return out;
+    }
+
+    if (db === "epa" && data.emissionFactors) {
+      const out: { hs: string; naics: string; desc: string; factor: number; unit: string }[] = [];
+      for (const [hs, entry] of Object.entries(data.emissionFactors)) {
+        out.push({ hs, naics: entry.naicsCode, desc: entry.naicsDescription, factor: entry.factor, unit: entry.unit });
+      }
+      if (lowerSearch) {
+        return out.filter(r =>
+          r.hs.includes(lowerSearch) || r.naics.includes(lowerSearch) || r.desc.toLowerCase().includes(lowerSearch)
+        );
+      }
+      return out;
+    }
+
+    if (db === "exiobase" && data.exiobaseConcordance) {
+      const ec = data.exiobaseConcordance;
+      const out: { product: string; hsCodes: number; cpaCodes: number; isicCodes: number; naceCodes: number }[] = [];
+      const productNames = Object.values(ec.products);
+      // Build reverse: product name → how many codes map to it per system
+      const prodHs = new Map<string, number>();
+      const prodCpa = new Map<string, number>();
+      const prodIsic = new Map<string, number>();
+      const prodNace = new Map<string, number>();
+      for (const prods of Object.values(ec.hsToExio)) {
+        for (const p of prods) prodHs.set(p, (prodHs.get(p) ?? 0) + 1);
+      }
+      for (const prods of Object.values(ec.cpaToExio)) {
+        for (const p of prods) prodCpa.set(p, (prodCpa.get(p) ?? 0) + 1);
+      }
+      for (const prods of Object.values(ec.isicToExio)) {
+        for (const p of prods) prodIsic.set(p, (prodIsic.get(p) ?? 0) + 1);
+      }
+      for (const prods of Object.values(ec.naceToExio)) {
+        for (const p of prods) prodNace.set(p, (prodNace.get(p) ?? 0) + 1);
+      }
+      const unique = [...new Set(productNames)].sort();
+      for (const name of unique) {
+        out.push({
+          product: name,
+          hsCodes: prodHs.get(name) ?? 0,
+          cpaCodes: prodCpa.get(name) ?? 0,
+          isicCodes: prodIsic.get(name) ?? 0,
+          naceCodes: prodNace.get(name) ?? 0,
+        });
+      }
+      if (lowerSearch) {
+        return out.filter(r => r.product.toLowerCase().includes(lowerSearch));
+      }
+      return out;
+    }
+
+    if (db === "uslci" && data.uslciCoverage) {
+      const out: { hs: string; naics: string; processes: number; withGhg: number; topProcess: string }[] = [];
+      for (const [hs, entry] of Object.entries(data.uslciCoverage.coverage)) {
+        out.push({
+          hs,
+          naics: entry.naicsCodes.join(", "),
+          processes: entry.processCount,
+          withGhg: entry.withGhgData,
+          topProcess: entry.topProcesses[0]?.name ?? "—",
+        });
+      }
+      if (lowerSearch) {
+        return out.filter(r =>
+          r.hs.includes(lowerSearch) || r.naics.includes(lowerSearch) || r.topProcess.toLowerCase().includes(lowerSearch)
+        );
+      }
+      return out;
+    }
+
+    if (db === "bafu" && data.bafuCoverage) {
+      const out: { chapter: string; processes: number; withGhg: number; units: string; topProcess: string }[] = [];
+      for (const [ch, entry] of Object.entries(data.bafuCoverage.coverage)) {
+        out.push({
+          chapter: ch,
+          processes: entry.processCount,
+          withGhg: entry.withGhgData,
+          units: Object.keys(entry.unitStats).join(", "),
+          topProcess: entry.topProcesses[0]?.name ?? "—",
+        });
+      }
+      if (lowerSearch) {
+        return out.filter(r =>
+          r.chapter.includes(lowerSearch) || r.topProcess.toLowerCase().includes(lowerSearch) || r.units.includes(lowerSearch)
+        );
+      }
+      return out;
+    }
+
+    return [];
+  }, [data, db, lowerSearch]);
+
+  const dbInfo = LCA_DB_OPTIONS.find(d => d.key === db)!;
+
+  return (
+    <>
+      <p className="about-intro">
+        Browse the raw entries in each LCA database. Select a database and use the search box to filter.
+      </p>
+
+      <div className="lca-browser-controls">
+        <div className="lca-browser-tabs">
+          {LCA_DB_OPTIONS.map(opt => (
+            <button
+              key={opt.key}
+              className={`lca-db-tab ${db === opt.key ? "active" : ""}`}
+              style={db === opt.key ? { backgroundColor: opt.color, color: "#fff", borderColor: opt.color } : {}}
+              onClick={() => { setDb(opt.key); setSearch(""); }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="lca-browser-search">
+          <input
+            type="text"
+            placeholder={`Search ${dbInfo.label}...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="lca-search-input"
+          />
+          <span className="lca-result-count">{rows.length.toLocaleString()} entries</span>
+        </div>
+      </div>
+
+      <div className="lca-browser-table-wrapper">
+        {db === "ecoinvent" && (
+          <table className="lca-browser-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>System</th>
+                <th>Mapping</th>
+                <th>Products</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(rows as { code: string; system: string; products: string[]; type: string }[]).slice(0, 500).map((r, i) => (
+                <tr key={i}>
+                  <td className="lca-code">{r.code}</td>
+                  <td><span className="lca-system-badge" style={{ backgroundColor: r.system === "CPC" ? "#0891b2" : r.system === "HS" ? "#4f46e5" : "#0c4a6e" }}>{r.system}</span></td>
+                  <td><span className={`lca-mapping-badge ${r.type === "1:1" ? "lca-m-one" : "lca-m-many"}`}>{r.type}</span></td>
+                  <td className="lca-products">{r.products.join("; ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {db === "epa" && (
+          <table className="lca-browser-table">
+            <thead>
+              <tr>
+                <th>HS-6</th>
+                <th>NAICS</th>
+                <th>NAICS Description</th>
+                <th>Factor</th>
+                <th>Unit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(rows as { hs: string; naics: string; desc: string; factor: number; unit: string }[]).slice(0, 500).map((r, i) => (
+                <tr key={i}>
+                  <td className="lca-code">{r.hs}</td>
+                  <td className="lca-code">{r.naics}</td>
+                  <td>{r.desc}</td>
+                  <td className="lca-num">{r.factor.toFixed(3)}</td>
+                  <td className="lca-unit">{r.unit}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {db === "exiobase" && (
+          <table className="lca-browser-table">
+            <thead>
+              <tr>
+                <th>EXIOBASE Product</th>
+                <th>HS codes</th>
+                <th>CPA codes</th>
+                <th>ISIC codes</th>
+                <th>NACE codes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(rows as { product: string; hsCodes: number; cpaCodes: number; isicCodes: number; naceCodes: number }[]).slice(0, 500).map((r, i) => (
+                <tr key={i}>
+                  <td>{r.product}</td>
+                  <td className="lca-num">{r.hsCodes}</td>
+                  <td className="lca-num">{r.cpaCodes}</td>
+                  <td className="lca-num">{r.isicCodes}</td>
+                  <td className="lca-num">{r.naceCodes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {db === "uslci" && (
+          <table className="lca-browser-table">
+            <thead>
+              <tr>
+                <th>HS-6</th>
+                <th>NAICS</th>
+                <th>Processes</th>
+                <th>w/ GHG</th>
+                <th>Top Process</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(rows as { hs: string; naics: string; processes: number; withGhg: number; topProcess: string }[]).slice(0, 500).map((r, i) => (
+                <tr key={i}>
+                  <td className="lca-code">{r.hs}</td>
+                  <td className="lca-code">{r.naics}</td>
+                  <td className="lca-num">{r.processes}</td>
+                  <td className="lca-num">{r.withGhg}</td>
+                  <td className="lca-products">{r.topProcess}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {db === "bafu" && (
+          <table className="lca-browser-table">
+            <thead>
+              <tr>
+                <th>HS Chapter</th>
+                <th>Processes</th>
+                <th>w/ GHG</th>
+                <th>Units</th>
+                <th>Top Process</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(rows as { chapter: string; processes: number; withGhg: number; units: string; topProcess: string }[]).slice(0, 500).map((r, i) => (
+                <tr key={i}>
+                  <td className="lca-code">{r.chapter}</td>
+                  <td className="lca-num">{r.processes}</td>
+                  <td className="lca-num">{r.withGhg}</td>
+                  <td className="lca-unit">{r.units}</td>
+                  <td className="lca-products">{r.topProcess}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {rows.length > 500 && (
+          <p className="lca-truncation-note">Showing first 500 of {rows.length.toLocaleString()} entries. Use search to narrow results.</p>
+        )}
+      </div>
+    </>
+  );
+}
+
 /* =============================== Main Component =============================== */
 
 export function AboutSection({ data }: { data: AppData | null }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix">("taxonomies");
+  const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser">("taxonomies");
 
   if (!open) {
     return (
@@ -1584,12 +1881,19 @@ export function AboutSection({ data }: { data: AppData | null }) {
             >
               Coverage Matrix
             </button>
+            <button
+              className={`about-tab ${tab === "browser" ? "active" : ""}`}
+              onClick={() => setTab("browser")}
+            >
+              LCA Data Browser
+            </button>
           </div>
 
           {tab === "taxonomies" && <TaxonomyMapTab />}
           {tab === "lca" && <LcaDatabasesTab />}
           {tab === "methods" && <ResolutionMethodsTab />}
           {tab === "matrix" && <CoverageMatrixTab data={data} />}
+          {tab === "browser" && <LcaDataBrowserTab data={data} />}
         </div>
       </div>
     </div>

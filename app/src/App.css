@@ -2298,6 +2298,167 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
+/* ===== LCA Data Browser ===== */
+.lca-browser-controls {
+  margin-bottom: 12px;
+}
+
+.lca-browser-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.lca-db-tab {
+  padding: 5px 10px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.lca-db-tab:hover {
+  border-color: #9ca3af;
+}
+
+.lca-db-tab.active {
+  border-color: currentColor;
+  font-weight: 600;
+}
+
+.lca-browser-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lca-search-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.lca-search-input:focus {
+  border-color: #6366f1;
+}
+
+.lca-result-count {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.lca-browser-table-wrapper {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.lca-browser-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.lca-browser-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.lca-browser-table th {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.lca-browser-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: top;
+}
+
+.lca-browser-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.lca-code {
+  font-family: monospace;
+  font-size: 11px;
+  color: #4338ca;
+  white-space: nowrap;
+}
+
+.lca-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lca-unit {
+  font-size: 10.5px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.lca-products {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #4b5563;
+}
+
+.lca-system-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.lca-mapping-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.lca-m-one {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.lca-m-many {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.lca-truncation-note {
+  text-align: center;
+  padding: 8px;
+  font-size: 11px;
+  color: #6b7280;
+  font-style: italic;
+}
+
 /* Responsive About */
 @media (max-width: 768px) {
   .about-overlay {
