@@ -1,5 +1,6 @@
 // Coverage info per node: count = matched DB entries, dir = mapping direction
-export type CoverageInfo = { count: number; dir: "1:1" | "1:N" | "N:1" };
+// shared = how many taxonomy nodes map to the same DB entry (for N:1)
+export type CoverageInfo = { count: number; dir: "1:1" | "1:N" | "N:1"; shared: number };
 
 export interface TreeNode {
   id: string;

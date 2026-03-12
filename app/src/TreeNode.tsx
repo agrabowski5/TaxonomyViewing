@@ -15,7 +15,7 @@ interface Props extends NodeRendererProps<TNode> {
 function fmtBadge(letter: string, info: CoverageInfo): string {
   if (info.dir === "1:1") return `${letter} 1:1`;
   if (info.dir === "1:N") return `${letter} 1:${info.count}`;
-  return `${letter} N:1`; // N:1 — many taxonomy entries share this DB entry
+  return `${letter} ${info.shared}:1`; // N:1 — many taxonomy entries share this DB entry
 }
 
 function countDescendants(n: TNode): number {

@@ -1289,7 +1289,8 @@ function assignDirectionality(raw: Map<string, { count: number; key: string }>):
     if (count > 1) dir = "1:N";
     else if ((keyUsage.get(key) ?? 1) > 1) dir = "N:1";
     else dir = "1:1";
-    result.set(nodeId, { count, dir });
+    const shared = keyUsage.get(key) ?? 1;
+    result.set(nodeId, { count, dir, shared });
   }
   return result;
 }
