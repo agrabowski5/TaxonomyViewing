@@ -64,45 +64,45 @@ function TaxonomyMapTab() {
           {/* HS — hub node, gold border */}
           <a href={URLS.hs} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"HS \u2014 Harmonized System (International)\n6,940 codes · UN Comtrade\nClick to open data source"}</title>
+              <title>{"HS \u2014 Harmonized System (International)\n4 levels · 5,612 leaves · 6,957 nodes\nOwner: WCO (World Customs Organization)\nData: UN Comtrade\nClick to open data source"}</title>
               <rect x="340" y="50" width="120" height="52" rx="8" fill="#4f46e5" stroke="#f59e0b" strokeWidth="3" />
               <text x="400" y="82" textAnchor="middle" className="about-node-text">HS</text>
             </g>
           </a>
-          <text x="400" y="118" textAnchor="middle" className="about-node-detail">6,940 codes</text>
-          <text x="400" y="130" textAnchor="middle" className="about-node-source">UN Comtrade (hub)</text>
+          <text x="400" y="118" textAnchor="middle" className="about-node-detail">4 lvl · 5,612 leaves · 6,957 nodes</text>
+          <text x="400" y="130" textAnchor="middle" className="about-node-source">WCO · Data: UN Comtrade</text>
 
           {/* CN */}
           <a href={URLS.cn} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"CN \u2014 Combined Nomenclature (EU)\n12,113 codes · Finnish Customs\nClick to open data source"}</title>
+              <title>{"CN \u2014 Combined Nomenclature (EU)\n5 lvl · 9,308 leaves · 12,113 nodes\nOwner: European Commission\nData: Finnish Customs\nClick to open data source"}</title>
               <rect x="65" y="85" width="110" height="48" rx="8" fill="#1e40af" />
               <text x="120" y="114" textAnchor="middle" className="about-node-text">CN (EU)</text>
             </g>
           </a>
-          <text x="120" y="149" textAnchor="middle" className="about-node-detail">12,113 codes</text>
-          <text x="120" y="161" textAnchor="middle" className="about-node-source">Finnish Customs</text>
+          <text x="120" y="149" textAnchor="middle" className="about-node-detail">5 lvl · 9,308 leaves · 12,113 nodes</text>
+          <text x="120" y="161" textAnchor="middle" className="about-node-source">EU Commission · Data: Finnish Customs</text>
 
           {/* HTS */}
           <a href={URLS.hts} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"HTS \u2014 Harmonized Tariff Schedule (US)\n29,675 codes · USITC\nClick to open data source"}</title>
+              <title>{"HTS \u2014 Harmonized Tariff Schedule (US)\n12 lvl · 26,655 leaves · 35,593 nodes\nOwner & Data: USITC\nClick to open data source"}</title>
               <rect x="520" y="85" width="110" height="48" rx="8" fill="#92400e" />
               <text x="575" y="114" textAnchor="middle" className="about-node-text">HTS (US)</text>
             </g>
           </a>
-          <text x="575" y="149" textAnchor="middle" className="about-node-detail">29,675 codes</text>
+          <text x="575" y="149" textAnchor="middle" className="about-node-detail">12 lvl · 26,655 leaves · 35,593 nodes</text>
           <text x="575" y="161" textAnchor="middle" className="about-node-source">USITC</text>
 
           {/* CA */}
           <a href={URLS.ca} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"CA \u2014 Canadian Customs Tariff\n19,252 codes · CBSA\nClick to open data source"}</title>
+              <title>{"CA \u2014 Canadian Customs Tariff\n6 lvl · 10,281 leaves · 19,274 nodes\nOwner & Data: CBSA\nClick to open data source"}</title>
               <rect x="720" y="85" width="110" height="48" rx="8" fill="#9f1239" />
               <text x="775" y="114" textAnchor="middle" className="about-node-text">CA</text>
             </g>
           </a>
-          <text x="775" y="149" textAnchor="middle" className="about-node-detail">19,252 codes</text>
+          <text x="775" y="149" textAnchor="middle" className="about-node-detail">6 lvl · 10,281 leaves · 19,274 nodes</text>
           <text x="775" y="161" textAnchor="middle" className="about-node-source">CBSA</text>
 
           {/* HS-family connector lines (dashed indigo) */}
@@ -126,57 +126,57 @@ function TaxonomyMapTab() {
           {/* NAICS */}
           <a href={URLS.naics} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"NAICS 2022 \u2014 North American Industry Classification\n2,122 codes · US Census Bureau\nClick to open data source"}</title>
+              <title>{"NAICS 2022 \u2014 North American Industry Classification\n5 lvl · 552 leaves · 1,216 nodes\nOwner: US Census / StatCan / INEGI\nData: US Census Bureau\nClick to open data source"}</title>
               <rect x="55" y="250" width="110" height="48" rx="8" fill="#0c4a6e" />
               <text x="110" y="279" textAnchor="middle" className="about-node-text">NAICS</text>
             </g>
           </a>
-          <text x="110" y="314" textAnchor="middle" className="about-node-detail">2,122 codes</text>
-          <text x="110" y="326" textAnchor="middle" className="about-node-source">US Census Bureau</text>
+          <text x="110" y="314" textAnchor="middle" className="about-node-detail">5 lvl · 552 leaves · 1,216 nodes</text>
+          <text x="110" y="326" textAnchor="middle" className="about-node-source">US Census / StatCan / INEGI</text>
 
           {/* CPC */}
           <a href={URLS.cpc} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"CPC 2.1 \u2014 Central Product Classification\n4,596 codes · UN Statistics Division\nClick to open data source"}</title>
+              <title>{"CPC 2.1 \u2014 Central Product Classification\n5 lvl · 2,887 leaves · 4,596 nodes\nOwner & Data: UN Statistics Division\nClick to open data source"}</title>
               <rect x="215" y="250" width="110" height="48" rx="8" fill="#0891b2" />
               <text x="270" y="279" textAnchor="middle" className="about-node-text">CPC</text>
             </g>
           </a>
-          <text x="270" y="314" textAnchor="middle" className="about-node-detail">4,596 codes</text>
-          <text x="270" y="326" textAnchor="middle" className="about-node-source">UN Stats</text>
+          <text x="270" y="314" textAnchor="middle" className="about-node-detail">5 lvl · 2,887 leaves · 4,596 nodes</text>
+          <text x="270" y="326" textAnchor="middle" className="about-node-source">UN Statistics Division</text>
 
           {/* CPA */}
           <a href={URLS.cpa} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"CPA 2.1 \u2014 Classification of Products by Activity (EU)\n5,522 codes · Eurostat / EIONET\nClick to open data source"}</title>
+              <title>{"CPA 2.1 \u2014 Classification of Products by Activity (EU)\n6 lvl · 3,218 leaves · 5,522 nodes\nOwner: Eurostat\nData: EIONET\nClick to open data source"}</title>
               <rect x="375" y="250" width="110" height="48" rx="8" fill="#c2410c" />
               <text x="430" y="279" textAnchor="middle" className="about-node-text">CPA</text>
             </g>
           </a>
-          <text x="430" y="314" textAnchor="middle" className="about-node-detail">5,522 codes</text>
-          <text x="430" y="326" textAnchor="middle" className="about-node-source">Eurostat / EIONET</text>
+          <text x="430" y="314" textAnchor="middle" className="about-node-detail">6 lvl · 3,218 leaves · 5,522 nodes</text>
+          <text x="430" y="326" textAnchor="middle" className="about-node-source">Eurostat · Data: EIONET</text>
 
           {/* BEA */}
           <a href={URLS.bea} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"BEA \u2014 Input-Output Commodity Codes (US)\n500 codes · Bureau of Economic Analysis\nClick to open data source"}</title>
+              <title>{"BEA \u2014 Input-Output Commodity Codes (US)\n3 lvl · 412 leaves · 508 nodes\nOwner & Data: Bureau of Economic Analysis\nClick to open data source"}</title>
               <rect x="535" y="250" width="110" height="48" rx="8" fill="#064e3b" />
               <text x="590" y="279" textAnchor="middle" className="about-node-text">BEA</text>
             </g>
           </a>
-          <text x="590" y="314" textAnchor="middle" className="about-node-detail">500 codes</text>
-          <text x="590" y="326" textAnchor="middle" className="about-node-source">BEA.gov</text>
+          <text x="590" y="314" textAnchor="middle" className="about-node-detail">3 lvl · 412 leaves · 508 nodes</text>
+          <text x="590" y="326" textAnchor="middle" className="about-node-source">Bureau of Economic Analysis</text>
 
           {/* UNSPSC */}
           <a href={URLS.unspsc} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"UNSPSC \u2014 Products & Services Code\n77,337 codes · Oklahoma Open Data\nClick to open data source"}</title>
+              <title>{"UNSPSC \u2014 Products & Services Code\n4 lvl · 71,502 leaves · 77,337 nodes\nOwner: UNDP / GS1 US\nData: Oklahoma Open Data\nClick to open data source"}</title>
               <rect x="685" y="250" width="120" height="48" rx="8" fill="#7c3aed" />
               <text x="745" y="279" textAnchor="middle" className="about-node-text">UNSPSC</text>
             </g>
           </a>
-          <text x="745" y="314" textAnchor="middle" className="about-node-detail">77,337 codes</text>
-          <text x="745" y="326" textAnchor="middle" className="about-node-source">Oklahoma Open Data</text>
+          <text x="745" y="314" textAnchor="middle" className="about-node-detail">4 lvl · 71,502 leaves · 77,337 nodes</text>
+          <text x="745" y="326" textAnchor="middle" className="about-node-source">UNDP / GS1 US · Data: OK Open Data</text>
 
           {/* === ROW 1 CONNECTION LINES: HS -> each === */}
 
@@ -221,24 +221,24 @@ function TaxonomyMapTab() {
           {/* ISIC */}
           <a href={URLS.isic} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"ISIC Rev. 4 \u2014 Intl Standard Industrial Classification\n766 codes · UN Statistics Division\nClick to open data source"}</title>
+              <title>{"ISIC Rev. 4 \u2014 Intl Standard Industrial Classification\n4 lvl · 419 leaves · 766 nodes\nOwner & Data: UN Statistics Division\nClick to open data source"}</title>
               <rect x="215" y="385" width="110" height="48" rx="8" fill="#1e1b4b" />
               <text x="270" y="414" textAnchor="middle" className="about-node-text">ISIC</text>
             </g>
           </a>
-          <text x="270" y="449" textAnchor="middle" className="about-node-detail">766 codes</text>
-          <text x="270" y="461" textAnchor="middle" className="about-node-source">UN Stats</text>
+          <text x="270" y="449" textAnchor="middle" className="about-node-detail">4 lvl · 419 leaves · 766 nodes</text>
+          <text x="270" y="461" textAnchor="middle" className="about-node-source">UN Statistics Division</text>
 
           {/* NACE */}
           <a href={URLS.nace} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"NACE Rev. 2 \u2014 EU Economic Activities\n996 codes · Eurostat / EIONET\nClick to open data source"}</title>
+              <title>{"NACE Rev. 2 \u2014 EU Economic Activities\n4 lvl · 615 leaves · 996 nodes\nOwner: Eurostat\nData: EIONET\nClick to open data source"}</title>
               <rect x="425" y="385" width="110" height="48" rx="8" fill="#500724" />
               <text x="480" y="414" textAnchor="middle" className="about-node-text">NACE</text>
             </g>
           </a>
-          <text x="480" y="449" textAnchor="middle" className="about-node-detail">996 codes</text>
-          <text x="480" y="461" textAnchor="middle" className="about-node-source">Eurostat / EIONET</text>
+          <text x="480" y="449" textAnchor="middle" className="about-node-detail">4 lvl · 615 leaves · 996 nodes</text>
+          <text x="480" y="461" textAnchor="middle" className="about-node-source">Eurostat · Data: EIONET</text>
 
           {/* CPC -> ISIC (Official concordance, green solid) */}
           <line x1="270" y1="298" x2="270" y2="385" stroke="#059669" strokeWidth="2">
