@@ -705,6 +705,125 @@ function LcaDatabasesTab() {
           </div>
         </div>
       </div>
+
+      <div className="about-details" style={{ marginTop: 20 }}>
+        <h4>Coverage Mapping Rules</h4>
+        <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.7, marginBottom: 12 }}>
+          Each tree node is evaluated <strong>independently</strong> &mdash; coverage is never propagated
+          from a parent node down to its children. A node receives a badge only if it has its own
+          concordance chain to the database. When a parent and child both show the same badge, each
+          found the match through its own code.
+        </p>
+        <table className="about-concordance-table" style={{ fontSize: 11.5 }}>
+          <thead>
+            <tr>
+              <th>Database</th>
+              <th>Leaf Nodes</th>
+              <th>Parent / Ancestor Nodes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>ecoinvent</strong></td>
+              <td>
+                Direct lookup: the node&rsquo;s own CPC, HS-6, or ISIC code must exist in the
+                ecoinvent product mapping. No prefix shortening &mdash; exact code or nothing.
+              </td>
+              <td>
+                Ancestor fallback: ecoinvent ships explicit ancestor lists (e.g., if ISIC <code>0111</code> has
+                products, <code>011</code>, <code>01</code>, and <code>0</code> are listed as ancestors). Parent
+                nodes are marked only if they appear in this pre-computed list &mdash; this is upward marking
+                from leaves, not downward propagation.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>EPA / USEEIO</strong></td>
+              <td>
+                <strong>HS-family:</strong> extract the 6-digit HS base code and look it up directly in the
+                emission factor table. No match at HS-4 or HS-2 level.<br />
+                <strong>NAICS:</strong> direct reverse-index lookup (NAICS code &rarr; factors). Tries
+                progressively shorter prefixes (6 &rarr; 4 digits) until a match is found.<br />
+                <strong>CPC:</strong> concordance chain &mdash; CPC code &rarr; HS-6 via CPC-HS concordance,
+                then HS-6 must exist in the factor table.
+              </td>
+              <td>
+                No ancestor mechanism. Parent nodes (e.g., HS-4 heading <code>0102</code>) have no 6-digit
+                code, so they never match. Only 6-digit leaf codes can receive a badge.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>EXIOBASE</strong></td>
+              <td>
+                <strong>HS-family:</strong> tries HS-6, then HS-4 in the concordance table. Count = number
+                of EXIOBASE product categories mapped to that code.<br />
+                <strong>CPC/CPA:</strong> tries progressively shorter CPA prefixes in the CPA-EXIO concordance.
+                Falls back to CPC &rarr; HS &rarr; EXIO concordance chain.<br />
+                <strong>ISIC/NACE:</strong> direct ISIC-EXIO or NACE-EXIO concordance lookup.
+              </td>
+              <td>
+                Ancestor fallback: EXIOBASE provides explicit HS and CPA ancestor lists. If a node&rsquo;s code
+                has no direct match but appears in the ancestor set, it is marked with count&nbsp;=&nbsp;1. This
+                means &ldquo;at least one descendant has coverage&rdquo; &mdash; it does not push coverage downward.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>US LCI (NREL)</strong></td>
+              <td>
+                <strong>HS-family:</strong> exact HS-6 lookup in the USLCI coverage map. Count = number of
+                processes with GHG data (kg unit).<br />
+                <strong>NAICS:</strong> direct reverse-index lookup (NAICS code &rarr; HS keys in USLCI).
+                Tries shorter prefixes (6 &rarr; 4).<br />
+                <strong>CPC:</strong> concordance chain CPC &rarr; HS-6, then HS-6 must exist in coverage map.
+              </td>
+              <td>
+                No ancestor mechanism. Only nodes whose code resolves to an exact HS-6 match (or NAICS
+                reverse match) receive a badge.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>BAFU:2025</strong></td>
+              <td>
+                <strong>HS-family:</strong> extract the 2-digit chapter from the node&rsquo;s code and look up
+                in the BAFU chapter map. Every node under the same chapter gets the same data independently.<br />
+                <strong>CPC:</strong> concordance chain CPC &rarr; HS-6, extract chapter, then chapter lookup.
+              </td>
+              <td>
+                No ancestor mechanism. The chapter match is intentionally coarse &mdash; both HS-2 <code>01</code> and
+                HS-6 <code>010121</code> independently extract chapter <code>01</code> and match the same BAFU entry.
+                This is not propagation; each node derives its own chapter.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h4 style={{ marginTop: 16 }}>Badge Directionality</h4>
+        <table className="about-concordance-table" style={{ fontSize: 11.5 }}>
+          <thead>
+            <tr>
+              <th>Badge</th>
+              <th>Meaning</th>
+              <th>Example</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>1:1</strong></td>
+              <td>Exclusive match &mdash; exactly one taxonomy node maps to one database entry, and vice versa.</td>
+              <td>HS <code>010121</code> &rarr; 1 ecoinvent product; that product maps only to <code>010121</code>.</td>
+            </tr>
+            <tr>
+              <td><strong>1:N</strong></td>
+              <td>Fan-out &mdash; this taxonomy node maps to N database entries (e.g., 1 HS code &rarr; 5 ecoinvent products).</td>
+              <td>HS <code>100630</code> &rarr; 12 ecoinvent products (different rice varieties).</td>
+            </tr>
+            <tr>
+              <td><strong>N:1</strong></td>
+              <td>Fan-in &mdash; N taxonomy nodes all share the same single database entry. The N value shown is the total sharing count within the visible taxonomy.</td>
+              <td>47 HS codes all map to the same BAFU chapter <code>01</code> entry.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
