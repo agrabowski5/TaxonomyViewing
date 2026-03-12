@@ -68,11 +68,11 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
       )}
       {(ecoinventCount || epaCount || exiobaseCount || uslciCount || bafuCount) && (
         <span className="ef-badges">
-          {ecoinventCount && <span className="ef-badge ef-ecoinvent" title={`ecoinvent v3.12 — 1:${ecoinventCount}`}>{ecoinventCount === 1 ? "e" : `e ${ecoinventCount}`}</span>}
-          {epaCount && <span className="ef-badge ef-epa" title={`EPA/USEEIO — 1:${epaCount}`}>{epaCount === 1 ? "U" : `U ${epaCount}`}</span>}
-          {exiobaseCount && <span className="ef-badge ef-exiobase" title={`EXIOBASE 3.8.2 — 1:${exiobaseCount}`}>{exiobaseCount === 1 ? "X" : `X ${exiobaseCount}`}</span>}
-          {uslciCount && <span className="ef-badge ef-uslci" title={`US LCI (NREL) — 1:${uslciCount}`}>{uslciCount === 1 ? "L" : `L ${uslciCount}`}</span>}
-          {bafuCount && <span className="ef-badge ef-bafu" title={`BAFU:2025 (Swiss FOEN) — 1:${bafuCount}`}>{bafuCount === 1 ? "B" : `B ${bafuCount}`}</span>}
+          {ecoinventCount && <span className="ef-badge ef-ecoinvent" title="ecoinvent v3.12">e</span>}
+          {epaCount && <span className="ef-badge ef-epa" title="EPA/USEEIO">U</span>}
+          {exiobaseCount && <span className="ef-badge ef-exiobase" title="EXIOBASE 3.8.2">X</span>}
+          {uslciCount && <span className="ef-badge ef-uslci" title="US LCI (NREL)">L</span>}
+          {bafuCount && <span className="ef-badge ef-bafu" title="BAFU:2025 (Swiss FOEN)">B</span>}
         </span>
       )}
       {info && (
