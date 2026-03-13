@@ -1795,7 +1795,7 @@ function AppContent() {
   const [showLibraryDialog, setShowLibraryDialog] = useState(false);
   const [mappingPanelCollapsed, setMappingPanelCollapsed] = useState(false);
   const [panelHeight, setPanelHeight] = useState(200);
-  const [strictMatch, setStrictMatch] = useState(false);
+  const [strictMatch, setStrictMatch] = useState(true);
   const aboutRef = useRef<AboutSectionHandle>(null);
   const panelDragging = useRef(false);
 

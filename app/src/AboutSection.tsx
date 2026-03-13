@@ -1,5 +1,5 @@
 import { useState, useMemo, useImperativeHandle, forwardRef, Fragment } from "react";
-import type { AppData, TreeNode, TaxonomyType, GenericConcordance } from "./types";
+import type { AppData, TreeNode, TaxonomyType, GenericConcordance, LookupEntry } from "./types";
 
 export type AboutSectionHandle = {
   openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances") => void;
@@ -2316,19 +2316,39 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
 
 type ConcordanceId = "cpcHs" | "naicsHs" | "isicCpc" | "cpaHs" | "beaHs" | "beaNaics" | "unspscHs" | "exioHs" | "exioCpa" | "exioIsic" | "exioNace";
 
-const CONCORDANCE_OPTIONS: { key: ConcordanceId; label: string; from: string; to: string; color: string }[] = [
-  { key: "cpcHs",    label: "CPC \u2194 HS",      from: "CPC",    to: "HS",     color: "#0891b2" },
-  { key: "naicsHs",  label: "NAICS \u2192 HS",     from: "NAICS",  to: "HS",     color: "#7c3aed" },
-  { key: "isicCpc",  label: "ISIC \u2192 CPC",     from: "ISIC",   to: "CPC",    color: "#0c4a6e" },
-  { key: "cpaHs",    label: "CPA \u2192 HS",       from: "CPA",    to: "HS",     color: "#b45309" },
-  { key: "beaHs",    label: "BEA \u2192 HS",       from: "BEA",    to: "HS",     color: "#be123c" },
-  { key: "beaNaics", label: "BEA \u2192 NAICS",    from: "BEA",    to: "NAICS",  color: "#9f1239" },
-  { key: "unspscHs", label: "UNSPSC \u2192 HS",    from: "UNSPSC", to: "HS",     color: "#6b7280" },
-  { key: "exioHs",   label: "HS \u2192 EXIOBASE",  from: "HS",     to: "EXIO",   color: "#059669" },
-  { key: "exioCpa",  label: "CPA \u2192 EXIOBASE", from: "CPA",    to: "EXIO",   color: "#047857" },
-  { key: "exioIsic", label: "ISIC \u2192 EXIOBASE",from: "ISIC",   to: "EXIO",   color: "#065f46" },
-  { key: "exioNace", label: "NACE \u2192 EXIOBASE",from: "NACE",   to: "EXIO",   color: "#064e3b" },
+const CONCORDANCE_OPTIONS: { key: ConcordanceId; label: string; from: string; to: string; color: string; source: string; sourceUrl: string }[] = [
+  { key: "cpcHs",    label: "CPC \u2194 HS",      from: "CPC",    to: "HS",     color: "#0891b2", source: "UN Statistics Division", sourceUrl: URLS.cpcHs },
+  { key: "naicsHs",  label: "NAICS \u2192 HS",     from: "NAICS",  to: "HS",     color: "#7c3aed", source: "US Census Bureau (imp-code.txt)", sourceUrl: URLS.naicsHs },
+  { key: "isicCpc",  label: "ISIC \u2192 CPC",     from: "ISIC",   to: "CPC",    color: "#0c4a6e", source: "UN Statistics Division", sourceUrl: URLS.isicCpc },
+  { key: "cpaHs",    label: "CPA \u2192 HS",       from: "CPA",    to: "HS",     color: "#b45309", source: "Eurostat RAMON", sourceUrl: URLS.cpaHs },
+  { key: "beaHs",    label: "BEA \u2192 HS",       from: "BEA",    to: "HS",     color: "#be123c", source: "Bureau of Economic Analysis", sourceUrl: URLS.beaHs },
+  { key: "beaNaics", label: "BEA \u2192 NAICS",    from: "BEA",    to: "NAICS",  color: "#9f1239", source: "Bureau of Economic Analysis", sourceUrl: URLS.beaNaics },
+  { key: "unspscHs", label: "UNSPSC \u2192 HS",    from: "UNSPSC", to: "HS",     color: "#6b7280", source: "Fuzzy text matching (Jaccard similarity)", sourceUrl: URLS.unspsc },
+  { key: "exioHs",   label: "HS \u2192 EXIOBASE",  from: "HS",     to: "EXIO",   color: "#059669", source: "EXIOBASE 3 (Zenodo)", sourceUrl: URLS.exiobase },
+  { key: "exioCpa",  label: "CPA \u2192 EXIOBASE", from: "CPA",    to: "EXIO",   color: "#047857", source: "EXIOBASE 3 (Zenodo)", sourceUrl: URLS.exiobase },
+  { key: "exioIsic", label: "ISIC \u2192 EXIOBASE",from: "ISIC",   to: "EXIO",   color: "#065f46", source: "EXIOBASE 3 (Zenodo)", sourceUrl: URLS.exiobase },
+  { key: "exioNace", label: "NACE \u2192 EXIOBASE",from: "NACE",   to: "EXIO",   color: "#064e3b", source: "EXIOBASE 3 (Zenodo)", sourceUrl: URLS.exiobase },
 ];
+
+/** Resolve a code to its description from the appropriate lookup table */
+function describeCode(code: string, taxonomy: string, data: AppData): string {
+  const lookupMap: Record<string, Record<string, LookupEntry> | undefined> = {
+    HS: data.hsLookup, CPC: data.cpcLookup, NAICS: data.naicsLookup,
+    ISIC: data.isicLookup, NACE: data.naceLookup, CPA: data.cpaLookup,
+    BEA: data.beaLookup, UNSPSC: data.unspscLookup,
+  };
+  const lookup = lookupMap[taxonomy];
+  if (!lookup) return "";
+  const entry = lookup[code];
+  return entry?.description ?? "";
+}
+
+/** Resolve EXIOBASE product code to product name */
+function exioProductName(code: string, data: AppData): string {
+  return data.exiobaseConcordance?.products[code] ?? "";
+}
+
+interface ConcRow { from: string; fromDesc: string; to: string; toDesc: string; partial: string; similarity: string }
 
 function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
   const [conc, setConc] = useState<ConcordanceId>("cpcHs");
@@ -2336,87 +2356,98 @@ function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
 
-  const rows = useMemo(() => {
+  const rows = useMemo<ConcRow[]>(() => {
     if (!data) return [];
 
+    const toExioDesc = (code: string) => exioProductName(code, data);
+
     if (conc === "cpcHs" && data.concordance) {
-      const out: { from: string; to: string; partial: string }[] = [];
+      const out: ConcRow[] = [];
       for (const [cpc, mappings] of Object.entries(data.concordance.cpcToHs)) {
+        const fd = describeCode(cpc, "CPC", data);
         for (const m of mappings) {
-          out.push({ from: cpc, to: m.code, partial: m.hsPartial || m.cpcPartial ? "partial" : "" });
+          out.push({ from: cpc, fromDesc: fd, to: m.code, toDesc: describeCode(m.code, "HS", data), partial: m.hsPartial || m.cpcPartial ? "partial" : "", similarity: "" });
         }
       }
-      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to, r.partial));
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.fromDesc, r.to, r.toDesc, r.partial));
       return out;
     }
 
     if (conc === "unspscHs" && data.unspscHsMapping) {
-      const out: { from: string; to: string; similarity: string }[] = [];
+      const out: ConcRow[] = [];
       for (const [unspsc, mappings] of Object.entries(data.unspscHsMapping.unspscToHs)) {
+        const fd = describeCode(unspsc, "UNSPSC", data);
         for (const m of mappings) {
-          out.push({ from: unspsc, to: m.code, similarity: (m.similarity * 100).toFixed(1) + "%" });
+          out.push({ from: unspsc, fromDesc: fd, to: m.code, toDesc: describeCode(m.code, "HS", data), partial: "", similarity: (m.similarity * 100).toFixed(1) + "%" });
         }
       }
-      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.fromDesc, r.to, r.toDesc));
       return out;
     }
 
     // EXIOBASE concordances
-    if (conc === "exioHs" && data.exiobaseConcordance) {
-      const out: { from: string; to: string }[] = [];
-      for (const [hs, prods] of Object.entries(data.exiobaseConcordance.hsToExio)) {
-        for (const p of prods) out.push({ from: hs, to: p });
+    const exioMap: Record<string, [Record<string, string[]>, string]> = {
+      exioHs:   [data.exiobaseConcordance?.hsToExio ?? {}, "HS"],
+      exioCpa:  [data.exiobaseConcordance?.cpaToExio ?? {}, "CPA"],
+      exioIsic: [data.exiobaseConcordance?.isicToExio ?? {}, "ISIC"],
+      exioNace: [data.exiobaseConcordance?.naceToExio ?? {}, "NACE"],
+    };
+    if (conc in exioMap && data.exiobaseConcordance) {
+      const [mapping, fromTax] = exioMap[conc];
+      const out: ConcRow[] = [];
+      for (const [code, prods] of Object.entries(mapping)) {
+        const fd = describeCode(code, fromTax, data);
+        for (const p of prods) {
+          out.push({ from: code, fromDesc: fd, to: p, toDesc: toExioDesc(p), partial: "", similarity: "" });
+        }
       }
-      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
-      return out;
-    }
-    if (conc === "exioCpa" && data.exiobaseConcordance) {
-      const out: { from: string; to: string }[] = [];
-      for (const [cpa, prods] of Object.entries(data.exiobaseConcordance.cpaToExio)) {
-        for (const p of prods) out.push({ from: cpa, to: p });
-      }
-      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
-      return out;
-    }
-    if (conc === "exioIsic" && data.exiobaseConcordance) {
-      const out: { from: string; to: string }[] = [];
-      for (const [isic, prods] of Object.entries(data.exiobaseConcordance.isicToExio)) {
-        for (const p of prods) out.push({ from: isic, to: p });
-      }
-      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
-      return out;
-    }
-    if (conc === "exioNace" && data.exiobaseConcordance) {
-      const out: { from: string; to: string }[] = [];
-      for (const [nace, prods] of Object.entries(data.exiobaseConcordance.naceToExio)) {
-        for (const p of prods) out.push({ from: nace, to: p });
-      }
-      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.fromDesc, r.to, r.toDesc));
       return out;
     }
 
     // GenericConcordance types
-    const gcMap: Record<string, GenericConcordance | null> = {
-      naicsHs: data.naicsHsConcordance,
-      isicCpc: data.isicCpcConcordance,
-      cpaHs: data.cpaHsConcordance,
-      beaHs: data.beaHsConcordance,
-      beaNaics: data.beaNaicsConcordance,
+    const gcMeta: Record<string, [GenericConcordance | null, string, string]> = {
+      naicsHs:  [data.naicsHsConcordance, "NAICS", "HS"],
+      isicCpc:  [data.isicCpcConcordance, "ISIC", "CPC"],
+      cpaHs:    [data.cpaHsConcordance, "CPA", "HS"],
+      beaHs:    [data.beaHsConcordance, "BEA", "HS"],
+      beaNaics: [data.beaNaicsConcordance, "BEA", "NAICS"],
     };
-    const gc = gcMap[conc];
-    if (gc) {
-      const out: { from: string; to: string; partial: string }[] = [];
+    const gcEntry = gcMeta[conc];
+    if (gcEntry) {
+      const [gc, fromTax, toTax] = gcEntry;
+      if (!gc) return [];
+      const out: ConcRow[] = [];
       for (const [code, mappings] of Object.entries(gc.forward)) {
+        const fd = describeCode(code, fromTax, data);
         for (const m of mappings) {
-          out.push({ from: code, to: m.code, partial: m.partial ? "partial" : "" });
+          out.push({ from: code, fromDesc: fd, to: m.code, toDesc: describeCode(m.code, toTax, data), partial: m.partial ? "partial" : "", similarity: "" });
         }
       }
-      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to, r.partial));
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.fromDesc, r.to, r.toDesc, r.partial));
       return out;
     }
 
     return [];
   }, [data, conc, searchTerms]);
+
+  // Summary stats
+  const stats = useMemo(() => {
+    const uniqueFrom = new Set(rows.map(r => r.from));
+    const uniqueTo = new Set(rows.map(r => r.to));
+    const partialCount = rows.filter(r => r.partial === "partial").length;
+    // Cardinality: count how many "from" codes map to >1 "to" codes and vice versa
+    const fromToCount = new Map<string, number>();
+    const toFromCount = new Map<string, number>();
+    for (const r of rows) {
+      fromToCount.set(r.from, (fromToCount.get(r.from) ?? 0) + 1);
+      toFromCount.set(r.to, (toFromCount.get(r.to) ?? 0) + 1);
+    }
+    const oneToOne = [...fromToCount.entries()].filter(([k, v]) => v === 1 && (toFromCount.get(rows.find(r => r.from === k)?.to ?? "") ?? 0) === 1).length;
+    const oneToMany = [...fromToCount.entries()].filter(([, v]) => v > 1).length;
+    const manyToOne = [...toFromCount.entries()].filter(([, v]) => v > 1).length;
+    return { uniqueFrom: uniqueFrom.size, uniqueTo: uniqueTo.size, partialCount, oneToOne, oneToMany, manyToOne };
+  }, [rows]);
 
   const concMeta = CONCORDANCE_OPTIONS.find(c => c.key === conc)!;
   const hasPartial = conc === "cpcHs" || conc === "naicsHs" || conc === "isicCpc" || conc === "cpaHs" || conc === "beaHs" || conc === "beaNaics";
@@ -2437,10 +2468,13 @@ function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
             </button>
           ))}
         </div>
+        <div className="conc-source-line">
+          Source: <ExtLink href={concMeta.sourceUrl}>{concMeta.source}</ExtLink>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
           <input
             type="text"
-            placeholder="Search codes..."
+            placeholder="Search codes or descriptions..."
             value={search}
             onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
             className="lca-search-input"
@@ -2449,21 +2483,35 @@ function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
         </div>
       </div>
 
+      <div className="lca-stats-bar">
+        <strong>{rows.length.toLocaleString()}</strong> mappings &nbsp;·&nbsp;
+        <strong>{stats.uniqueFrom.toLocaleString()}</strong> unique {concMeta.from} codes &nbsp;·&nbsp;
+        <strong>{stats.uniqueTo.toLocaleString()}</strong> unique {concMeta.to} codes
+        {hasPartial && stats.partialCount > 0 && <> &nbsp;·&nbsp; <strong>{stats.partialCount.toLocaleString()}</strong> partial</>}
+        {" "}&nbsp;·&nbsp; Cardinality: <span title="One source code maps to exactly one target code (and vice versa)">1:1 = {stats.oneToOne.toLocaleString()}</span>,{" "}
+        <span title="One source code maps to multiple target codes">1:N = {stats.oneToMany.toLocaleString()}</span>,{" "}
+        <span title="Multiple source codes map to one target code">N:1 = {stats.manyToOne.toLocaleString()}</span>
+      </div>
+
       <div className="lca-browser-table-wrapper">
         <table className="lca-browser-table">
           <thead>
             <tr>
               <th>{concMeta.from} Code</th>
+              <th>{concMeta.from} Description</th>
               <th>{concMeta.to} Code</th>
+              <th>{concMeta.to} Description</th>
               {hasPartial && <th>Partial</th>}
               {hasSimilarity && <th>Similarity</th>}
             </tr>
           </thead>
           <tbody>
-            {(rows as any[]).slice(0, visibleCount).map((r, i) => (
+            {rows.slice(0, visibleCount).map((r, i) => (
               <tr key={i}>
                 <td className="lca-code">{r.from}</td>
+                <td className="conc-desc">{r.fromDesc}</td>
                 <td className="lca-code">{r.to}</td>
+                <td className="conc-desc">{r.toDesc}</td>
                 {hasPartial && <td className="lca-num">{r.partial && <span className="conc-partial-badge">partial</span>}</td>}
                 {hasSimilarity && <td className="lca-num">{r.similarity}</td>}
               </tr>

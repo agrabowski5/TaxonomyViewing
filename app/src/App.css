@@ -2702,6 +2702,21 @@
   color: #92400e;
 }
 
+.conc-source-line {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.conc-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Responsive About */
 @media (max-width: 768px) {
   .about-overlay {
