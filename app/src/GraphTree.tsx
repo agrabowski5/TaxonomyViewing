@@ -91,6 +91,8 @@ export const GraphTree = forwardRef<GraphTreeHandle, Props>(function GraphTree(
 ) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [autoFitDone, setAutoFitDone] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastSyncSeq = useRef(-1);
 
@@ -134,6 +136,58 @@ export const GraphTree = forwardRef<GraphTreeHandle, Props>(function GraphTree(
     () => computeGraphLayout(data, expandedIds),
     [data, expandedIds],
   );
+
+  // Auto-fit on initial load: scale to fit container width
+  useEffect(() => {
+    if (autoFitDone) return;
+    const el = containerRef.current;
+    if (!el || layout.totalWidth <= 0) return;
+    const containerWidth = el.clientWidth - 16; // account for padding
+    if (layout.totalWidth > containerWidth) {
+      const fitZoom = Math.max(0.1, containerWidth / layout.totalWidth);
+      setZoom(Math.round(fitZoom * 100) / 100);
+    }
+    setAutoFitDone(true);
+  }, [layout, autoFitDone]);
+
+  // Reset auto-fit when data changes (taxonomy switch)
+  useEffect(() => {
+    setAutoFitDone(false);
+  }, [data]);
+
+  const handleFitToWidth = useCallback(() => {
+    const el = containerRef.current;
+    if (!el || layout.totalWidth <= 0) return;
+    const containerWidth = el.clientWidth - 16;
+    const fitZoom = Math.max(0.1, containerWidth / layout.totalWidth);
+    setZoom(Math.round(fitZoom * 100) / 100);
+  }, [layout.totalWidth]);
+
+  const handleZoomIn = useCallback(() => {
+    setZoom((z) => Math.min(2, Math.round((z + 0.1) * 100) / 100));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom((z) => Math.max(0.1, Math.round((z - 0.1) * 100) / 100));
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    setZoom(1);
+  }, []);
+
+  // Ctrl+wheel zoom
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      setZoom((z) => Math.min(2, Math.max(0.1, Math.round((z + delta) * 100) / 100)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   const handleToggle = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -226,14 +280,33 @@ export const GraphTree = forwardRef<GraphTreeHandle, Props>(function GraphTree(
         </div>
       )}
       <div className="graph-container" ref={containerRef}>
+        <div className="graph-zoom-controls">
+          <button className="graph-zoom-btn" onClick={handleFitToWidth} title="Fit to width">Fit</button>
+          <button className="graph-zoom-btn" onClick={handleZoomOut} title="Zoom out">−</button>
+          <span className="graph-zoom-level">{Math.round(zoom * 100)}%</span>
+          <button className="graph-zoom-btn" onClick={handleZoomIn} title="Zoom in">+</button>
+          <button className="graph-zoom-btn" onClick={handleZoomReset} title="Reset zoom">1:1</button>
+        </div>
         <div
           className="graph-canvas"
           style={{
-            width: Math.max(layout.totalWidth, 400),
-            height: Math.max(layout.totalHeight, 200),
+            width: Math.max(layout.totalWidth, 400) * zoom,
+            height: Math.max(layout.totalHeight, 200) * zoom,
             position: "relative",
           }}
         >
+          <div
+            className="graph-canvas-inner"
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: "top left",
+              width: Math.max(layout.totalWidth, 400),
+              height: Math.max(layout.totalHeight, 200),
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          >
           {/* SVG edge layer */}
           <svg
             className="graph-edges"
@@ -283,6 +356,7 @@ export const GraphTree = forwardRef<GraphTreeHandle, Props>(function GraphTree(
               />
             </div>
           ))}
+          </div>
         </div>
       </div>
     </div>

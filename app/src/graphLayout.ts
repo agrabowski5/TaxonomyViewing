@@ -27,10 +27,10 @@ export interface LayoutResult {
   totalHeight: number;
 }
 
-const NODE_WIDTH = 220;
-const NODE_HEIGHT = 44;
-const H_GAP = 12;
-const V_GAP = 50;
+const NODE_WIDTH = 180;
+const NODE_HEIGHT = 40;
+const H_GAP = 8;
+const V_GAP = 36;
 
 export { NODE_WIDTH, NODE_HEIGHT };
 
