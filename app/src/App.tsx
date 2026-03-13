@@ -2,6 +2,8 @@ import React, { useState, useRef, useCallback, useMemo, useEffect } from "react"
 import { TreeApi } from "react-arborist";
 import { useData } from "./useData";
 import { TaxonomyTree } from "./TaxonomyTree";
+import { GraphTree } from "./GraphTree";
+import type { GraphTreeHandle } from "./GraphTree";
 import { BuilderProvider, useBuilder } from "./builder/context";
 import { BuilderBanner } from "./builder/BuilderBanner";
 import { BuilderTaxonomyPanel } from "./builder/BuilderTaxonomyPanel";
@@ -2422,6 +2424,8 @@ function AppContent() {
   const [search, setSearch] = useState("");
   const [leftTaxonomy, setLeftTaxonomy] = useState<TaxonomyType>("hs");
   const [rightTaxonomy, setRightTaxonomy] = useState<TaxonomyType>("cpc");
+  const [leftViewMode, setLeftViewMode] = useState<"list" | "graph">("list");
+  const [rightViewMode, setRightViewMode] = useState<"list" | "graph">("list");
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<TaxonomyType | null>(null);
   const [showBaseTaxonomyDialog, setShowBaseTaxonomyDialog] = useState(false);
@@ -2481,6 +2485,9 @@ function AppContent() {
     cpa: useRef<TreeApi<TreeNode>>(null),
     bea: useRef<TreeApi<TreeNode>>(null),
   };
+
+  const leftGraphRef = useRef<GraphTreeHandle>(null);
+  const rightGraphRef = useRef<GraphTreeHandle>(null);
 
   const getTreeData = useCallback((taxonomy: TaxonomyType): TreeNode[] => {
     if (!data) return [];
@@ -3627,30 +3634,59 @@ function AppContent() {
             >
               {taxonomyOptions}
             </select>
+            <div className="view-mode-toggle">
+              <button className={`view-mode-btn ${leftViewMode === "list" ? "active" : ""}`} onClick={() => setLeftViewMode("list")}>List</button>
+              <button className={`view-mode-btn ${leftViewMode === "graph" ? "active" : ""}`} onClick={() => setLeftViewMode("graph")}>Graph</button>
+            </div>
           </div>
           <>
-            <TaxonomyTree
-              key={`${leftTaxonomy}-${debouncedSearch}`}
-              ref={treeRefs[leftTaxonomy]}
-              data={leftTreeData}
-              openByDefault={isSearching}
-              mappingInfo={mappingInfo}
-              onNodeSelect={(node) => handleNodeSelect("left", node)}
-              label={TAXONOMY_INFO[leftTaxonomy].label}
-              taxonomyClass={TAXONOMY_INFO[leftTaxonomy].taxonomyClass}
-              fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
-              legend={TAXONOMY_INFO[leftTaxonomy].legend}
-              colorMap={leftColorMap}
-              ecoinventCoverage={leftEcoinventCoverage}
-              epaCoverage={leftEpaCoverage}
-              exiobaseCoverage={leftExiobaseCoverage}
-              uslciCoverage={leftUslciCoverage}
-              bafuCoverage={leftBafuCoverage}
-              gabiCoverage={leftGabiCoverage}
-              side="left"
-              gapHighlight={gapHighlight?.taxonomy === leftTaxonomy ? gapHighlight : undefined}
-              onClearGapHighlight={() => setGapHighlight(null)}
-            />
+            {leftViewMode === "list" ? (
+              <TaxonomyTree
+                key={`${leftTaxonomy}-${debouncedSearch}`}
+                ref={treeRefs[leftTaxonomy]}
+                data={leftTreeData}
+                openByDefault={isSearching}
+                mappingInfo={mappingInfo}
+                onNodeSelect={(node) => handleNodeSelect("left", node)}
+                label={TAXONOMY_INFO[leftTaxonomy].label}
+                taxonomyClass={TAXONOMY_INFO[leftTaxonomy].taxonomyClass}
+                fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
+                legend={TAXONOMY_INFO[leftTaxonomy].legend}
+                colorMap={leftColorMap}
+                ecoinventCoverage={leftEcoinventCoverage}
+                epaCoverage={leftEpaCoverage}
+                exiobaseCoverage={leftExiobaseCoverage}
+                uslciCoverage={leftUslciCoverage}
+                bafuCoverage={leftBafuCoverage}
+                gabiCoverage={leftGabiCoverage}
+                side="left"
+                gapHighlight={gapHighlight?.taxonomy === leftTaxonomy ? gapHighlight : undefined}
+                onClearGapHighlight={() => setGapHighlight(null)}
+              />
+            ) : (
+              <GraphTree
+                key={`graph-${leftTaxonomy}-${debouncedSearch}`}
+                ref={leftGraphRef}
+                data={leftTreeData}
+                openByDefault={isSearching}
+                mappingInfo={mappingInfo}
+                onNodeSelect={(node) => handleNodeSelect("left", node)}
+                label={TAXONOMY_INFO[leftTaxonomy].label}
+                taxonomyClass={TAXONOMY_INFO[leftTaxonomy].taxonomyClass}
+                fullName={TAXONOMY_INFO[leftTaxonomy].fullName}
+                legend={TAXONOMY_INFO[leftTaxonomy].legend}
+                colorMap={leftColorMap}
+                ecoinventCoverage={leftEcoinventCoverage}
+                epaCoverage={leftEpaCoverage}
+                exiobaseCoverage={leftExiobaseCoverage}
+                uslciCoverage={leftUslciCoverage}
+                bafuCoverage={leftBafuCoverage}
+                gabiCoverage={leftGabiCoverage}
+                side="left"
+                gapHighlight={gapHighlight?.taxonomy === leftTaxonomy ? gapHighlight : undefined}
+                onClearGapHighlight={() => setGapHighlight(null)}
+              />
+            )}
           </>
         </div>
 
@@ -3705,27 +3741,54 @@ function AppContent() {
                 >
                   {taxonomyOptions}
                 </select>
+                <div className="view-mode-toggle">
+                  <button className={`view-mode-btn ${rightViewMode === "list" ? "active" : ""}`} onClick={() => setRightViewMode("list")}>List</button>
+                  <button className={`view-mode-btn ${rightViewMode === "graph" ? "active" : ""}`} onClick={() => setRightViewMode("graph")}>Graph</button>
+                </div>
               </div>
-              <TaxonomyTree
-                key={`${rightTaxonomy}-${debouncedSearch}`}
-                ref={treeRefs[rightTaxonomy]}
-                data={rightTreeData}
-                openByDefault={isSearching}
-                mappingInfo={mappingInfo}
-                onNodeSelect={(node) => handleNodeSelect("right", node)}
-                label={TAXONOMY_INFO[rightTaxonomy].label}
-                taxonomyClass={TAXONOMY_INFO[rightTaxonomy].taxonomyClass}
-                fullName={TAXONOMY_INFO[rightTaxonomy].fullName}
-                legend={TAXONOMY_INFO[rightTaxonomy].legend}
-                colorMap={rightColorMap}
-                ecoinventCoverage={rightEcoinventCoverage}
-                epaCoverage={rightEpaCoverage}
-                exiobaseCoverage={rightExiobaseCoverage}
-                uslciCoverage={rightUslciCoverage}
-                bafuCoverage={rightBafuCoverage}
-                gabiCoverage={rightGabiCoverage}
-                side="right"
-              />
+              {rightViewMode === "list" ? (
+                <TaxonomyTree
+                  key={`${rightTaxonomy}-${debouncedSearch}`}
+                  ref={treeRefs[rightTaxonomy]}
+                  data={rightTreeData}
+                  openByDefault={isSearching}
+                  mappingInfo={mappingInfo}
+                  onNodeSelect={(node) => handleNodeSelect("right", node)}
+                  label={TAXONOMY_INFO[rightTaxonomy].label}
+                  taxonomyClass={TAXONOMY_INFO[rightTaxonomy].taxonomyClass}
+                  fullName={TAXONOMY_INFO[rightTaxonomy].fullName}
+                  legend={TAXONOMY_INFO[rightTaxonomy].legend}
+                  colorMap={rightColorMap}
+                  ecoinventCoverage={rightEcoinventCoverage}
+                  epaCoverage={rightEpaCoverage}
+                  exiobaseCoverage={rightExiobaseCoverage}
+                  uslciCoverage={rightUslciCoverage}
+                  bafuCoverage={rightBafuCoverage}
+                  gabiCoverage={rightGabiCoverage}
+                  side="right"
+                />
+              ) : (
+                <GraphTree
+                  key={`graph-${rightTaxonomy}-${debouncedSearch}`}
+                  ref={rightGraphRef}
+                  data={rightTreeData}
+                  openByDefault={isSearching}
+                  mappingInfo={mappingInfo}
+                  onNodeSelect={(node) => handleNodeSelect("right", node)}
+                  label={TAXONOMY_INFO[rightTaxonomy].label}
+                  taxonomyClass={TAXONOMY_INFO[rightTaxonomy].taxonomyClass}
+                  fullName={TAXONOMY_INFO[rightTaxonomy].fullName}
+                  legend={TAXONOMY_INFO[rightTaxonomy].legend}
+                  colorMap={rightColorMap}
+                  ecoinventCoverage={rightEcoinventCoverage}
+                  epaCoverage={rightEpaCoverage}
+                  exiobaseCoverage={rightExiobaseCoverage}
+                  uslciCoverage={rightUslciCoverage}
+                  bafuCoverage={rightBafuCoverage}
+                  gabiCoverage={rightGabiCoverage}
+                  side="right"
+                />
+              )}
             </>
           )}
         </div>
