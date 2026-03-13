@@ -2487,6 +2487,25 @@ function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
   );
 }
 
+/* =============================== Build Info =============================== */
+
+declare const __BUILD_HASH__: string;
+declare const __BUILD_DATE__: string;
+
+const BUILD_ID = `${typeof __BUILD_DATE__ !== "undefined" ? __BUILD_DATE__ : "dev"}-${typeof __BUILD_HASH__ !== "undefined" ? __BUILD_HASH__ : "local"}`;
+
+function reportBugUrl() {
+  const subject = encodeURIComponent(`[Bug] Taxonomy Explorer (build ${BUILD_ID})`);
+  const body = encodeURIComponent(
+    `Build: ${BUILD_ID}\n` +
+    `URL: ${window.location.href}\n` +
+    `Browser: ${navigator.userAgent}\n\n` +
+    `--- Describe the bug below ---\n\n\n\n` +
+    `--- Please attach screenshots if applicable ---\n`
+  );
+  return `mailto:agrabowski5@gmail.com?subject=${subject}&body=${body}`;
+}
+
 /* =============================== Main Component =============================== */
 
 export const AboutSection = forwardRef<AboutSectionHandle, { data: AppData | null }>(function AboutSection({ data }, ref) {
@@ -2510,6 +2529,19 @@ export const AboutSection = forwardRef<AboutSectionHandle, { data: AppData | nul
       <div className="about-panel" onClick={(e) => e.stopPropagation()}>
         <div className="about-header">
           <h2>Data Sources &amp; Connections</h2>
+          <div className="about-header-actions">
+            <a
+              className="report-bug-btn"
+              href={reportBugUrl()}
+              title={`Report a bug (build ${BUILD_ID})`}
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                <path fillRule="evenodd" d="M6.56 1.14a.75.75 0 01.177 1.045A3.987 3.987 0 006 4h8a3.987 3.987 0 00-.737-2.315.75.75 0 111.222-.87c.58.816.965 1.777 1.07 2.81.49.18.905.502 1.195.925a.75.75 0 01-1.248.832A.75.75 0 0015 5H5a.75.75 0 00-.502.192.75.75 0 01-1.248-.832c.29-.423.705-.745 1.195-.925a5.487 5.487 0 011.07-2.81.75.75 0 011.045-.177zM4.75 7a.75.75 0 01.75.75v.508c0 .891-.356 1.746-.988 2.375l-.063.063v2.054c0 2.329 1.886 4.25 4.301 4.25h2.5c2.415 0 4.301-1.921 4.301-4.25v-2.054l-.063-.063A3.353 3.353 0 0114.5 8.258V7.75a.75.75 0 011.5 0v.508c0 1.29.516 2.527 1.433 3.439l.067.067v.986c0 3.129-2.527 5.75-5.75 5.75h-2.5c-3.223 0-5.75-2.621-5.75-5.75v-.986l.067-.067A4.853 4.853 0 005 8.258V7.75A.75.75 0 014.75 7z" clipRule="evenodd" />
+              </svg>
+              Report Bug
+            </a>
+            <span className="build-label">build {BUILD_ID}</span>
+          </div>
           <button className="about-close" onClick={() => setOpen(false)}>&times;</button>
         </div>
 
