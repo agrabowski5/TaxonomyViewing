@@ -1641,26 +1641,35 @@
   padding: 2px 4px;
 }
 
-/* ===== Resolution Chain ===== */
-.resolution-chain {
-  flex: 1 1 100%;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 11px;
+/* ===== Resolution Chain (inside LCA cards) ===== */
+.resolution-chain-toggle {
+  margin-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  padding-top: 6px;
 }
-.resolution-chain-header {
-  font-weight: 700;
+.resolution-toggle-btn {
+  background: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 10px;
   color: #475569;
-  margin-bottom: 8px;
-  display: flex;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
 }
-.resolution-chain-icon {
-  font-size: 13px;
+.resolution-toggle-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+.resolution-chain {
+  margin-top: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 11px;
 }
 .resolution-chain-steps {
   display: flex;
@@ -1706,12 +1715,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.resolution-chain-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
 .resolution-link-btn {
   background: #eff6ff;
   border: 1px solid #bfdbfe;
@@ -1721,6 +1724,7 @@
   color: #2563eb;
   cursor: pointer;
   white-space: nowrap;
+  margin-top: 3px;
 }
 .resolution-link-btn:hover {
   background: #dbeafe;

@@ -841,48 +841,48 @@ function traceResolutionChain(
 
 /* =============================== Resolution Chain Display =============================== */
 
-function ResolutionChainDisplay({ chain, onOpenTab }: {
+function ResolutionChainToggle({ chain, onOpenTab }: {
   chain: ResolutionChain;
   onOpenTab?: (tab: "concordances" | "browser") => void;
 }) {
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <div className="resolution-chain">
-      <div className="resolution-chain-header">
-        <span className="resolution-chain-icon">🔗</span>
-        Resolution path
-      </div>
-      <div className="resolution-chain-steps">
-        {chain.steps.map((step, i) => (
-          <div key={i} className="resolution-step">
-            {i > 0 && <div className="resolution-arrow">→</div>}
-            <div className="resolution-step-box">
-              <div className="resolution-step-label">{step.label}</div>
-              <div className="resolution-step-code">{step.code}</div>
-              {step.description && <div className="resolution-step-desc">{step.description}</div>}
-              {step.concordance && onOpenTab && (
-                <button className="resolution-link-btn" onClick={() => onOpenTab("concordances")}>
-                  View in Concordance Browser
-                </button>
-              )}
-            </div>
+    <div className="resolution-chain-toggle">
+      <button className="resolution-toggle-btn" onClick={() => setOpen(!open)}>
+        {open ? "Hide" : "Show"} resolution path
+      </button>
+      {open && (
+        <div className="resolution-chain">
+          <div className="resolution-chain-steps">
+            {chain.steps.map((step, i) => (
+              <div key={i} className="resolution-step">
+                {i > 0 && <div className="resolution-arrow">→</div>}
+                <div className="resolution-step-box">
+                  <div className="resolution-step-label">{step.label}</div>
+                  <div className="resolution-step-code">{step.code}</div>
+                  {step.description && <div className="resolution-step-desc">{step.description}</div>}
+                  {step.concordance && onOpenTab && (
+                    <button className="resolution-link-btn" onClick={() => onOpenTab("concordances")}>
+                      View in Concordance Browser
+                    </button>
+                  )}
+                  {!step.concordance && onOpenTab && (
+                    <button className="resolution-link-btn" onClick={() => onOpenTab("browser")}>
+                      View in LCA Browser
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {onOpenTab && (
-        <div className="resolution-chain-actions">
-          <button className="resolution-link-btn" onClick={() => onOpenTab("browser")}>
-            Open in LCA Data Browser
-          </button>
-          <button className="resolution-link-btn" onClick={() => onOpenTab("concordances")}>
-            Open Concordance Browser
-          </button>
         </div>
       )}
     </div>
   );
 }
 
-function EmissionFactorDisplay({ entry }: { entry: EmissionFactorEntry }) {
+function EmissionFactorDisplay({ entry, chain, onOpenTab }: { entry: EmissionFactorEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser") => void }) {
   const total = entry.factor;
   const prodPct = total > 0 ? (entry.factorWithoutMargins / total) * 100 : 0;
   const marginPct = total > 0 ? (entry.margins / total) * 100 : 0;
@@ -916,6 +916,7 @@ function EmissionFactorDisplay({ entry }: { entry: EmissionFactorEntry }) {
         NAICS {entry.naicsCode}: {entry.naicsDescription}
       </div>
       <div className="emission-source">{entry.source}</div>
+      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -1075,7 +1076,7 @@ function getExiobaseProducts(
   return null;
 }
 
-function ExiobaseProductDisplay({ match }: { match: ExiobaseProductMatch }) {
+function ExiobaseProductDisplay({ match, chain, onOpenTab }: { match: ExiobaseProductMatch; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser") => void }) {
   return (
     <div className="emission-factor-card exiobase-products-card">
       <h4>EXIOBASE Product Mapping</h4>
@@ -1093,6 +1094,7 @@ function ExiobaseProductDisplay({ match }: { match: ExiobaseProductMatch }) {
           <div className="exiobase-more">+{match.products.length - 8} more</div>
         )}
       </div>
+      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -1161,12 +1163,12 @@ function getBafuChapterData(
   return null;
 }
 
-function BafuFactorDisplay({ entry }: { entry: BafuCoverageEntry }) {
-  return <LciFactorDisplay entry={entry} title="Direct Emissions (BAFU)" source="BAFU:2025 (direct process emissions only, GWP-100 AR6)" cardClass="bafu-card" />;
+function BafuFactorDisplay({ entry, chain, onOpenTab }: { entry: BafuCoverageEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser") => void }) {
+  return <LciFactorDisplay entry={entry} title="Direct Emissions (BAFU)" source="BAFU:2025 (direct process emissions only, GWP-100 AR6)" cardClass="bafu-card" chain={chain} onOpenTab={onOpenTab} />;
 }
 
-function UslciFactorDisplay({ entry }: { entry: UslciCoverageEntry }) {
-  return <LciFactorDisplay entry={entry} title="Direct Emissions (US LCI)" source="NREL USLCI (direct process emissions only, GWP-100 AR6)" cardClass="uslci-card" />;
+function UslciFactorDisplay({ entry, chain, onOpenTab }: { entry: UslciCoverageEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser") => void }) {
+  return <LciFactorDisplay entry={entry} title="Direct Emissions (US LCI)" source="NREL USLCI (direct process emissions only, GWP-100 AR6)" cardClass="uslci-card" chain={chain} onOpenTab={onOpenTab} />;
 }
 
 // Look up USLCI data for a selected node (keyed by HS-6 code)
@@ -1378,11 +1380,13 @@ function formatGhg(v: number): string {
   return v.toFixed(digits);
 }
 
-function LciFactorDisplay({ entry, title, source, cardClass }: {
+function LciFactorDisplay({ entry, title, source, cardClass, chain, onOpenTab }: {
   entry: { withGhgData: number; unitStats: Record<string, LciUnitStats>; topProcesses: { name: string; ghg: number; unit: string }[] };
   title: string;
   source: string;
   cardClass: string;
+  chain?: ResolutionChain | null;
+  onOpenTab?: (tab: "concordances" | "browser") => void;
 }) {
   if (entry.withGhgData === 0) return null;
 
@@ -1417,6 +1421,7 @@ function LciFactorDisplay({ entry, title, source, cardClass }: {
         </div>
       )}
       <div className="emission-source">{source}</div>
+      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -1931,13 +1936,15 @@ function computeBafuCoverage(
   return assignDirectionality(raw);
 }
 
-function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode }: {
+function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode, chain, onOpenTab }: {
   cpc: EcoinventCodeMapping | null;
   hs: EcoinventCodeMapping | null;
   isic: EcoinventCodeMapping | null;
   cpcCode: string | null;
   hsCode: string | null;
   isicCode: string | null;
+  chain?: ResolutionChain | null;
+  onOpenTab?: (tab: "concordances" | "browser") => void;
 }) {
   if (!cpc && !hs && !isic) return null;
 
@@ -2001,6 +2008,7 @@ function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode }: {
           </div>
         </div>
       )}
+      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -3466,30 +3474,26 @@ function AppContent() {
               );
             })()}
 
-            {emissionFactor && (<>
-              <EmissionFactorDisplay entry={emissionFactor} />
-              {resolutionChains.epa && <ResolutionChainDisplay chain={resolutionChains.epa} onOpenTab={openAboutTab} />}
-            </>)}
+            {emissionFactor && (
+              <EmissionFactorDisplay entry={emissionFactor} chain={resolutionChains.epa} onOpenTab={openAboutTab} />
+            )}
 
-            {exiobaseFactor && (<>
+            {exiobaseFactor && (
               <ExiobaseFactorDisplay entry={exiobaseFactor} />
-            </>)}
-            {exiobaseProducts && (<>
-              <ExiobaseProductDisplay match={exiobaseProducts} />
-              {resolutionChains.exiobase && <ResolutionChainDisplay chain={resolutionChains.exiobase} onOpenTab={openAboutTab} />}
-            </>)}
+            )}
+            {exiobaseProducts && (
+              <ExiobaseProductDisplay match={exiobaseProducts} chain={resolutionChains.exiobase} onOpenTab={openAboutTab} />
+            )}
 
-            {bafuFactor && bafuFactor.withGhgData > 0 && (<>
-              <BafuFactorDisplay entry={bafuFactor} />
-              {resolutionChains.bafu && <ResolutionChainDisplay chain={resolutionChains.bafu} onOpenTab={openAboutTab} />}
-            </>)}
+            {bafuFactor && bafuFactor.withGhgData > 0 && (
+              <BafuFactorDisplay entry={bafuFactor} chain={resolutionChains.bafu} onOpenTab={openAboutTab} />
+            )}
 
-            {uslciFactor && uslciFactor.withGhgData > 0 && (<>
-              <UslciFactorDisplay entry={uslciFactor} />
-              {resolutionChains.uslci && <ResolutionChainDisplay chain={resolutionChains.uslci} onOpenTab={openAboutTab} />}
-            </>)}
+            {uslciFactor && uslciFactor.withGhgData > 0 && (
+              <UslciFactorDisplay entry={uslciFactor} chain={resolutionChains.uslci} onOpenTab={openAboutTab} />
+            )}
 
-            {(ecoinventInfo.cpc || ecoinventInfo.hs || ecoinventInfo.isic) && (<>
+            {(ecoinventInfo.cpc || ecoinventInfo.hs || ecoinventInfo.isic) && (
               <EcoinventDisplay
                 cpc={ecoinventInfo.cpc}
                 hs={ecoinventInfo.hs}
@@ -3497,9 +3501,10 @@ function AppContent() {
                 cpcCode={ecoinventInfo.cpcCode}
                 hsCode={ecoinventInfo.hsCode}
                 isicCode={ecoinventInfo.isicCode}
+                chain={resolutionChains.ecoinvent}
+                onOpenTab={openAboutTab}
               />
-              {resolutionChains.ecoinvent && <ResolutionChainDisplay chain={resolutionChains.ecoinvent} onOpenTab={openAboutTab} />}
-            </>)}
+            )}
 
             {descendantRanges && (
               <DescendantRangeDisplay ranges={descendantRanges} />
