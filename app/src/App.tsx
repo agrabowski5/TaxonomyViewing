@@ -246,6 +246,56 @@ function resolveFromHsCode(
   return null;
 }
 
+// Resolve a node to its HS-2 chapter for BAFU/GaBi chapter-level matching.
+// Handles all 13 taxonomy types including concordance taxonomies and UNSPSC.
+function resolveNodeToHs2Chapter(
+  code: string,
+  taxonomy: TaxonomyType,
+  nodeId: string,
+  concordance: ConcordanceData,
+  naicsHsConcordance: GenericConcordance | null,
+  isicCpcConcordance: GenericConcordance | null,
+  cpaHsConcordance: GenericConcordance | null,
+  beaHsConcordance: GenericConcordance | null,
+  unspscHsMapping?: FuzzyMappingData,
+): string | null {
+  const clean = stripCode(code);
+
+  // HS-family: direct chapter extraction
+  if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(nodeId) === "hts") || (taxonomy === "t1" && !nodeId.startsWith("t1-svc-"))) {
+    if (/^\d+$/.test(clean) && clean.length >= 2) return clean.substring(0, 2);
+    return null;
+  }
+
+  // CPC (and CPC-origin T1/T2 nodes): concordance to HS, then chapter
+  if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(nodeId) === "cpc") || (taxonomy === "t1" && nodeId.startsWith("t1-svc-"))) {
+    for (let len = clean.length; len >= 4; len--) {
+      const prefix = clean.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        return hsMappings[0].code.substring(0, 2);
+      }
+    }
+    return null;
+  }
+
+  // CONCORDANCE_TAXONOMIES: resolve to HS codes, take first chapter
+  if (CONCORDANCE_TAXONOMIES.includes(taxonomy)) {
+    const hsCodes = resolveToHsCodes(clean, taxonomy, naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, concordance);
+    if (hsCodes.length > 0) return hsCodes[0].substring(0, 2);
+    return null;
+  }
+
+  // UNSPSC: fuzzy mapping to HS, then chapter
+  if (taxonomy === "unspsc" && unspscHsMapping) {
+    const hsEntries = unspscHsMapping.unspscToHs[clean];
+    if (hsEntries && hsEntries.length > 0) return hsEntries[0].code.substring(0, 2);
+    return null;
+  }
+
+  return null;
+}
+
 // T1 helper: detect whether a T1 node originated from HTS or CPC services
 function getT1Origin(nodeId: string, lookup: Record<string, LookupEntry>, code: string): "hts" | "cpc" | null {
   // Check node ID prefix first
@@ -1324,62 +1374,16 @@ function getBafuChapterData(
   taxonomy: TaxonomyType,
   bafuCoverage: BafuCoverage | null,
   concordance: ConcordanceData,
+  naicsHsConcordance?: GenericConcordance | null,
+  isicCpcConcordance?: GenericConcordance | null,
+  cpaHsConcordance?: GenericConcordance | null,
+  beaHsConcordance?: GenericConcordance | null,
+  unspscHsMapping?: FuzzyMappingData,
 ): BafuCoverageEntry | null {
   if (!bafuCoverage) return null;
-  const cov = bafuCoverage.coverage;
-
-  if (HS_FAMILY.includes(taxonomy)) {
-    const hsBase = getHsBase(node.code, taxonomy);
-    if (!hsBase || hsBase.length < 2) return null;
-    const chapter = hsBase.substring(0, 2);
-    return cov[chapter] ?? null;
-  }
-
-  if (taxonomy === "cpc") {
-    const cleanCpc = stripCode(node.code);
-    for (let len = cleanCpc.length; len >= 4; len--) {
-      const prefix = cleanCpc.substring(0, len);
-      const hsMappings = concordance.cpcToHs[prefix];
-      if (hsMappings && hsMappings.length > 0) {
-        const chapter = hsMappings[0].code.substring(0, 2);
-        if (cov[chapter]) return cov[chapter];
-      }
-    }
-  }
-
-  if (taxonomy === "t1") {
-    const origin = getT1Origin(node.id, {} as Record<string, LookupEntry>, node.code);
-    if (origin === "hts") {
-      const hsBase = getHsBase(node.code, "hts");
-      if (hsBase && hsBase.length >= 2) {
-        const chapter = hsBase.substring(0, 2);
-        return cov[chapter] ?? null;
-      }
-    }
-  }
-
-  if (taxonomy === "t2") {
-    const origin = getT2Origin(node.id);
-    if (origin === "hts") {
-      const hsBase = getHsBase(node.code, "hts");
-      if (hsBase && hsBase.length >= 2) {
-        const chapter = hsBase.substring(0, 2);
-        return cov[chapter] ?? null;
-      }
-    } else if (origin === "cpc") {
-      const cleanCpc = stripCode(node.code);
-      for (let len = cleanCpc.length; len >= 4; len--) {
-        const prefix = cleanCpc.substring(0, len);
-        const hsMappings = concordance.cpcToHs[prefix];
-        if (hsMappings && hsMappings.length > 0) {
-          const chapter = hsMappings[0].code.substring(0, 2);
-          if (cov[chapter]) return cov[chapter];
-        }
-      }
-    }
-  }
-
-  return null;
+  const chapter = resolveNodeToHs2Chapter(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
+  if (!chapter) return null;
+  return bafuCoverage.coverage[chapter] ?? null;
 }
 
 function BafuFactorDisplay({ entry, getChain, onOpenTab }: { entry: BafuCoverageEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
@@ -1392,62 +1396,16 @@ function getGabiChapterData(
   taxonomy: TaxonomyType,
   gabiCoverage: GabiCoverage | null,
   concordance: ConcordanceData,
+  naicsHsConcordance?: GenericConcordance | null,
+  isicCpcConcordance?: GenericConcordance | null,
+  cpaHsConcordance?: GenericConcordance | null,
+  beaHsConcordance?: GenericConcordance | null,
+  unspscHsMapping?: FuzzyMappingData,
 ): GabiCoverageEntry | null {
   if (!gabiCoverage) return null;
-  const cov = gabiCoverage.coverage;
-
-  if (HS_FAMILY.includes(taxonomy)) {
-    const hsBase = getHsBase(node.code, taxonomy);
-    if (!hsBase || hsBase.length < 2) return null;
-    const chapter = hsBase.substring(0, 2);
-    return cov[chapter] ?? null;
-  }
-
-  if (taxonomy === "cpc") {
-    const cleanCpc = stripCode(node.code);
-    for (let len = cleanCpc.length; len >= 4; len--) {
-      const prefix = cleanCpc.substring(0, len);
-      const hsMappings = concordance.cpcToHs[prefix];
-      if (hsMappings && hsMappings.length > 0) {
-        const chapter = hsMappings[0].code.substring(0, 2);
-        if (cov[chapter]) return cov[chapter];
-      }
-    }
-  }
-
-  if (taxonomy === "t1") {
-    const origin = getT1Origin(node.id, {} as Record<string, LookupEntry>, node.code);
-    if (origin === "hts") {
-      const hsBase = getHsBase(node.code, "hts");
-      if (hsBase && hsBase.length >= 2) {
-        const chapter = hsBase.substring(0, 2);
-        return cov[chapter] ?? null;
-      }
-    }
-  }
-
-  if (taxonomy === "t2") {
-    const origin = getT2Origin(node.id);
-    if (origin === "hts") {
-      const hsBase = getHsBase(node.code, "hts");
-      if (hsBase && hsBase.length >= 2) {
-        const chapter = hsBase.substring(0, 2);
-        return cov[chapter] ?? null;
-      }
-    } else if (origin === "cpc") {
-      const cleanCpc = stripCode(node.code);
-      for (let len = cleanCpc.length; len >= 4; len--) {
-        const prefix = cleanCpc.substring(0, len);
-        const hsMappings = concordance.cpcToHs[prefix];
-        if (hsMappings && hsMappings.length > 0) {
-          const chapter = hsMappings[0].code.substring(0, 2);
-          if (cov[chapter]) return cov[chapter];
-        }
-      }
-    }
-  }
-
-  return null;
+  const chapter = resolveNodeToHs2Chapter(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
+  if (!chapter) return null;
+  return gabiCoverage.coverage[chapter] ?? null;
 }
 
 function GabiFactorDisplay({ entry, getChain, onOpenTab }: { entry: GabiCoverageEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
@@ -1570,14 +1528,14 @@ function computeDescendantRanges(
     if (exf) exioVals.push(exf.factor);
 
     // BAFU
-    const bf = getBafuChapterData(leaf, taxonomy, data.bafuCoverage, data.concordance);
+    const bf = getBafuChapterData(leaf, taxonomy, data.bafuCoverage, data.concordance, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping);
     if (bf && bf.withGhgData > 0) {
       const kgStats = bf.unitStats["kg"];
       if (kgStats) bafuVals.push(kgStats.median);
     }
 
     // GaBi
-    const gf = getGabiChapterData(leaf, taxonomy, data.gabiCoverage, data.concordance);
+    const gf = getGabiChapterData(leaf, taxonomy, data.gabiCoverage, data.concordance, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping);
     if (gf && gf.processCount > 0) {
       const kgStats = gf.unitStats["kg"];
       if (kgStats) gabiVals.push(kgStats.median);
@@ -2206,6 +2164,11 @@ function computeBafuCoverage(
   bafuCoverage: BafuCoverage | null,
   concordance: ConcordanceData,
   strict: boolean,
+  naicsHsConcordance?: GenericConcordance | null,
+  isicCpcConcordance?: GenericConcordance | null,
+  cpaHsConcordance?: GenericConcordance | null,
+  beaHsConcordance?: GenericConcordance | null,
+  unspscHsMapping?: FuzzyMappingData,
 ): Map<string, CoverageInfo> {
   // BAFU maps at HS-2 chapter level — this IS the native resolution, not a fallback
   if (!bafuCoverage) return new Map();
@@ -2219,30 +2182,11 @@ function computeBafuCoverage(
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
-      const clean = stripCode(node.code);
-      let count = 0;
-      let matchKey = "";
-
-      if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
-        for (let len = clean.length; len >= 4; len--) {
-          const prefix = clean.substring(0, len);
-          const hsMappings = concordance.cpcToHs[prefix];
-          if (hsMappings && hsMappings.length > 0) {
-            const chapter = hsMappings[0].code.substring(0, 2);
-            const pc = coverageMap.get(chapter);
-            if (pc) { count = pc; matchKey = chapter; }
-            break;
-          }
-        }
-      } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
-        if (/^\d+$/.test(clean) && clean.length >= 2) {
-          const ch = clean.substring(0, 2);
-          const pc = coverageMap.get(ch);
-          if (pc) { count = pc; matchKey = ch; }
-        }
+      const chapter = resolveNodeToHs2Chapter(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
+      if (chapter) {
+        const pc = coverageMap.get(chapter);
+        if (pc) raw.set(node.id, { count: pc, key: chapter });
       }
-
-      if (count > 0) raw.set(node.id, { count, key: matchKey });
       if (node.children) walk(node.children);
     }
   }
@@ -2257,6 +2201,11 @@ function computeGabiCoverage(
   gabiCoverage: GabiCoverage | null,
   concordance: ConcordanceData,
   strict: boolean,
+  naicsHsConcordance?: GenericConcordance | null,
+  isicCpcConcordance?: GenericConcordance | null,
+  cpaHsConcordance?: GenericConcordance | null,
+  beaHsConcordance?: GenericConcordance | null,
+  unspscHsMapping?: FuzzyMappingData,
 ): Map<string, CoverageInfo> {
   // GaBi maps at HS-2 chapter level — this IS the native resolution, not a fallback
   if (!gabiCoverage) return new Map();
@@ -2269,30 +2218,11 @@ function computeGabiCoverage(
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
-      const clean = stripCode(node.code);
-      let count = 0;
-      let matchKey = "";
-
-      if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
-        for (let len = clean.length; len >= 4; len--) {
-          const prefix = clean.substring(0, len);
-          const hsMappings = concordance.cpcToHs[prefix];
-          if (hsMappings && hsMappings.length > 0) {
-            const chapter = hsMappings[0].code.substring(0, 2);
-            const pc = coverageMap.get(chapter);
-            if (pc) { count = pc; matchKey = chapter; }
-            break;
-          }
-        }
-      } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
-        if (/^\d+$/.test(clean) && clean.length >= 2) {
-          const ch = clean.substring(0, 2);
-          const pc = coverageMap.get(ch);
-          if (pc) { count = pc; matchKey = ch; }
-        }
+      const chapter = resolveNodeToHs2Chapter(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
+      if (chapter) {
+        const pc = coverageMap.get(chapter);
+        if (pc) raw.set(node.id, { count: pc, key: chapter });
       }
-
-      if (count > 0) raw.set(node.id, { count, key: matchKey });
       if (node.children) walk(node.children);
     }
   }
@@ -2870,12 +2800,12 @@ function AppContent() {
 
   const bafuFactor = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return null;
-    return getBafuChapterData(selectedNode, selectedFrom, data.bafuCoverage, data.concordance);
+    return getBafuChapterData(selectedNode, selectedFrom, data.bafuCoverage, data.concordance, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping);
   }, [selectedNode, selectedFrom, data]);
 
   const gabiFactor = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return null;
-    return getGabiChapterData(selectedNode, selectedFrom, data.gabiCoverage, data.concordance);
+    return getGabiChapterData(selectedNode, selectedFrom, data.gabiCoverage, data.concordance, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping);
   }, [selectedNode, selectedFrom, data]);
 
   const uslciFactor = useMemo(() => {
@@ -3482,19 +3412,19 @@ function AppContent() {
     [data, rightTaxonomy, getTreeData, strictMatch]
   );
   const leftBafuCoverage = useMemo(
-    () => data ? computeBafuCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.bafuCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    () => data ? computeBafuCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.bafuCoverage, data.concordance, strictMatch, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping) : new Map<string, CoverageInfo>(),
     [data, leftTaxonomy, getTreeData, strictMatch]
   );
   const rightBafuCoverage = useMemo(
-    () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance, strictMatch, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping) : new Map<string, CoverageInfo>(),
     [data, rightTaxonomy, getTreeData, strictMatch]
   );
   const leftGabiCoverage = useMemo(
-    () => data ? computeGabiCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.gabiCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    () => data ? computeGabiCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.gabiCoverage, data.concordance, strictMatch, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping) : new Map<string, CoverageInfo>(),
     [data, leftTaxonomy, getTreeData, strictMatch]
   );
   const rightGabiCoverage = useMemo(
-    () => data ? computeGabiCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.gabiCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    () => data ? computeGabiCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.gabiCoverage, data.concordance, strictMatch, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping) : new Map<string, CoverageInfo>(),
     [data, rightTaxonomy, getTreeData, strictMatch]
   );
 

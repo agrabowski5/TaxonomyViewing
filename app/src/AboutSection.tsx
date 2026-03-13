@@ -629,7 +629,7 @@ function LcaDatabasesTab() {
           {/* Coarse-grained bar */}
           <rect x="480" y="325" width="360" height="22" rx="4" fill="#fef9c3" stroke="#d97706" strokeWidth="1" />
           <text x="660" y="340" textAnchor="middle" fontSize="10" fontWeight="600" fill="#854d0e">Chapter-level (HS-2)</text>
-          <text x="480" y="360" fontSize="9" fill="#6b7280">BAFU, GaBi/Sphera (category {"\u2192"} HS-2 chapter mapping)</text>
+          <text x="480" y="360" fontSize="9" fill="#6b7280">BAFU, GaBi/Sphera (direct HS-2 chapter; also via CPC, NAICS, ISIC, CPA, BEA concordances)</text>
 
         </svg>
       </div>
@@ -732,7 +732,7 @@ function LcaDatabasesTab() {
           </div>
           <div className="about-detail-card" style={{ borderLeftColor: "#7c3aed" }}>
             <strong>GaBi/Sphera 2026.1</strong>
-            <p>Sphera MLC (Managed LCA Content) Databases. ~10,500 processes mapped to HS-2 chapters via folder category-to-chapter correspondence.</p>
+            <p>Sphera MLC (Managed LCA Content) Databases. ~10,500 processes mapped to HS-2 chapters via folder category-to-chapter correspondence. Reaches all taxonomies through concordance chains: CPC via CPC→HS, NAICS via NAICS→HS, ISIC/NACE via ISIC→CPC→HS, CPA via CPA→HS, BEA via BEA→HS, UNSPSC via fuzzy→HS.</p>
           </div>
         </div>
       </div>
