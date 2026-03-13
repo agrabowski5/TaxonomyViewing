@@ -2594,6 +2594,53 @@
   font-style: italic;
 }
 
+.lca-code-list {
+  font-size: 11px;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
+  color: #374151;
+  word-break: break-all;
+  max-width: 200px;
+}
+
+.lca-none {
+  color: #d1d5db;
+}
+
+.lca-load-more-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.lca-load-more-info {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.lca-load-more-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.lca-load-more-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.lca-load-all {
+  color: #6b7280;
+  border-style: dashed;
+}
+
 .conc-partial-badge {
   display: inline-block;
   padding: 1px 5px;

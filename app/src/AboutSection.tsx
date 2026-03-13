@@ -1946,9 +1946,12 @@ function matchesSearch(terms: string[], ...fields: string[]): boolean {
   return terms.every(t => joined.includes(t));
 }
 
+const PAGE_SIZE = 200;
+
 function LcaDataBrowserTab({ data }: { data: AppData | null }) {
   const [db, setDb] = useState<LcaDb>("ecoinvent");
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
 
   const rows = useMemo(() => {
@@ -2074,7 +2077,7 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               key={opt.key}
               className={`lca-db-tab ${db === opt.key ? "active" : ""}`}
               style={db === opt.key ? { backgroundColor: opt.color, color: "#fff", borderColor: opt.color } : {}}
-              onClick={() => { setDb(opt.key); setSearch(""); }}
+              onClick={() => { setDb(opt.key); setSearch(""); setVisibleCount(PAGE_SIZE); }}
             >
               {opt.label}
             </button>
@@ -2085,7 +2088,7 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
             type="text"
             placeholder={`Search ${dbInfo.label}...`}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
             className="lca-search-input"
           />
           <span className="lca-result-count">{rows.length.toLocaleString()} entries</span>
@@ -2104,7 +2107,7 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               </tr>
             </thead>
             <tbody>
-              {(rows as { code: string; system: string; products: string[]; type: string }[]).slice(0, 500).map((r, i) => (
+              {(rows as { code: string; system: string; products: string[]; type: string }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.code}</td>
                   <td><span className="lca-system-badge" style={{ backgroundColor: r.system === "CPC" ? "#0891b2" : r.system === "HS" ? "#4f46e5" : "#0c4a6e" }}>{r.system}</span></td>
@@ -2128,7 +2131,7 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               </tr>
             </thead>
             <tbody>
-              {(rows as { hs: string; naics: string; desc: string; factor: number; unit: string }[]).slice(0, 500).map((r, i) => (
+              {(rows as { hs: string; naics: string; desc: string; factor: number; unit: string }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.hs}</td>
                   <td className="lca-code">{r.naics}</td>
@@ -2146,20 +2149,20 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
             <thead>
               <tr>
                 <th>EXIOBASE Product</th>
-                <th>HS codes</th>
-                <th>CPA codes</th>
-                <th>ISIC codes</th>
-                <th>NACE codes</th>
+                <th>HS Codes</th>
+                <th>CPA Codes</th>
+                <th>ISIC Codes</th>
+                <th>NACE Codes</th>
               </tr>
             </thead>
             <tbody>
-              {(rows as { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[] }[]).slice(0, 500).map((r, i) => (
+              {(rows as { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[] }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
-                  <td>{r.product}</td>
-                  <td className="lca-num" title={r.hsCodes.join(", ")}>{r.hsCodes.length}</td>
-                  <td className="lca-num" title={r.cpaCodes.join(", ")}>{r.cpaCodes.length}</td>
-                  <td className="lca-num" title={r.isicCodes.join(", ")}>{r.isicCodes.length}</td>
-                  <td className="lca-num" title={r.naceCodes.join(", ")}>{r.naceCodes.length}</td>
+                  <td className="lca-products">{r.product}</td>
+                  <td className="lca-code-list">{r.hsCodes.length > 0 ? r.hsCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
+                  <td className="lca-code-list">{r.cpaCodes.length > 0 ? r.cpaCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
+                  <td className="lca-code-list">{r.isicCodes.length > 0 ? r.isicCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
+                  <td className="lca-code-list">{r.naceCodes.length > 0 ? r.naceCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -2178,7 +2181,7 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               </tr>
             </thead>
             <tbody>
-              {(rows as { hs: string; naics: string; processes: number; withGhg: number; allProcesses: string[] }[]).slice(0, 500).map((r, i) => (
+              {(rows as { hs: string; naics: string; processes: number; withGhg: number; allProcesses: string[] }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.hs}</td>
                   <td className="lca-code">{r.naics}</td>
@@ -2203,7 +2206,7 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               </tr>
             </thead>
             <tbody>
-              {(rows as { chapter: string; processes: number; withGhg: number; units: string; allProcesses: string[] }[]).slice(0, 500).map((r, i) => (
+              {(rows as { chapter: string; processes: number; withGhg: number; units: string; allProcesses: string[] }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.chapter}</td>
                   <td className="lca-num">{r.processes}</td>
@@ -2216,8 +2219,16 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
           </table>
         )}
 
-        {rows.length > 500 && (
-          <p className="lca-truncation-note">Showing first 500 of {rows.length.toLocaleString()} entries. Use search to narrow results.</p>
+        {rows.length > visibleCount && (
+          <div className="lca-load-more-wrap">
+            <span className="lca-load-more-info">Showing {visibleCount.toLocaleString()} of {rows.length.toLocaleString()} entries</span>
+            <button className="lca-load-more-btn" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
+              Load {Math.min(PAGE_SIZE, rows.length - visibleCount).toLocaleString()} more
+            </button>
+            <button className="lca-load-more-btn lca-load-all" onClick={() => setVisibleCount(rows.length)}>
+              Show all
+            </button>
+          </div>
         )}
       </div>
     </>
@@ -2245,6 +2256,7 @@ const CONCORDANCE_OPTIONS: { key: ConcordanceId; label: string; from: string; to
 function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
   const [conc, setConc] = useState<ConcordanceId>("cpcHs");
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
 
   const rows = useMemo(() => {
@@ -2342,7 +2354,7 @@ function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
               key={c.key}
               className={`lca-db-tab ${conc === c.key ? "lca-db-active" : ""}`}
               style={conc === c.key ? { backgroundColor: c.color, borderColor: c.color } : {}}
-              onClick={() => { setConc(c.key); setSearch(""); }}
+              onClick={() => { setConc(c.key); setSearch(""); setVisibleCount(PAGE_SIZE); }}
             >
               {c.label}
             </button>
@@ -2353,7 +2365,7 @@ function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
             type="text"
             placeholder="Search codes..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
             className="lca-search-input"
           />
           <span className="lca-result-count">{rows.length.toLocaleString()} mappings</span>
@@ -2371,7 +2383,7 @@ function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
             </tr>
           </thead>
           <tbody>
-            {(rows as any[]).slice(0, 500).map((r, i) => (
+            {(rows as any[]).slice(0, visibleCount).map((r, i) => (
               <tr key={i}>
                 <td className="lca-code">{r.from}</td>
                 <td className="lca-code">{r.to}</td>
@@ -2382,8 +2394,16 @@ function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
           </tbody>
         </table>
 
-        {rows.length > 500 && (
-          <p className="lca-truncation-note">Showing first 500 of {rows.length.toLocaleString()} mappings. Use search to narrow results.</p>
+        {rows.length > visibleCount && (
+          <div className="lca-load-more-wrap">
+            <span className="lca-load-more-info">Showing {visibleCount.toLocaleString()} of {rows.length.toLocaleString()} mappings</span>
+            <button className="lca-load-more-btn" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
+              Load {Math.min(PAGE_SIZE, rows.length - visibleCount).toLocaleString()} more
+            </button>
+            <button className="lca-load-more-btn lca-load-all" onClick={() => setVisibleCount(rows.length)}>
+              Show all
+            </button>
+          </div>
         )}
       </div>
     </>
