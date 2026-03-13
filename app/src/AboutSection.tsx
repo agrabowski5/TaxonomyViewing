@@ -1,5 +1,9 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useImperativeHandle, forwardRef, Fragment } from "react";
 import type { AppData, TreeNode, TaxonomyType } from "./types";
+
+export type AboutSectionHandle = {
+  openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser") => void;
+};
 
 /* Data-source URLs for every taxonomy and concordance */
 const URLS = {
@@ -1953,9 +1957,13 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
 
 /* =============================== Main Component =============================== */
 
-export function AboutSection({ data }: { data: AppData | null }) {
+export const AboutSection = forwardRef<AboutSectionHandle, { data: AppData | null }>(function AboutSection({ data }, ref) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser">("taxonomies");
+
+  useImperativeHandle(ref, () => ({
+    openToTab(t) { setTab(t); setOpen(true); },
+  }));
 
   if (!open) {
     return (
@@ -2016,5 +2024,5 @@ export function AboutSection({ data }: { data: AppData | null }) {
       </div>
     </div>
   );
-}
+});
 

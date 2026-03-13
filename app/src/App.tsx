@@ -13,6 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
+import type { AboutSectionHandle } from "./AboutSection";
 import type { TreeNode, LookupEntry, TaxonomyType, AppData, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance, CoverageInfo } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
@@ -1795,6 +1796,7 @@ function AppContent() {
   const [mappingPanelCollapsed, setMappingPanelCollapsed] = useState(false);
   const [panelHeight, setPanelHeight] = useState(200);
   const [strictMatch, setStrictMatch] = useState(false);
+  const aboutRef = useRef<AboutSectionHandle>(null);
   const panelDragging = useRef(false);
 
   // Resizable bottom panel drag handler
@@ -2830,7 +2832,11 @@ function AppContent() {
             <span className="match-mode-thumb" />
           </button>
           <span className={`match-mode-label ${strictMatch ? "active" : ""}`}>Exact</span>
-          <span className="match-mode-help" title={"Relaxed: broader coverage using ancestor fallback, prefix shortening, and chapter-level matching.\n\nExact: only precise code-level matches — disables ancestor fallback, prefix shortening, HS-4 fallback, and chapter-level (BAFU) matching.\n\nSee the Coverage Mapping Rules in the LCA Databases help tab for details."}>?</span>
+          <span
+            className="match-mode-help"
+            title="Click to see Coverage Mapping Rules"
+            onClick={() => aboutRef.current?.openToTab("lca")}
+          >?</span>
         </div>
         <div className="search-bar">
           <svg
@@ -2858,7 +2864,7 @@ function AppContent() {
             </button>
           )}
         </div>
-        <AboutSection data={data} />
+        <AboutSection ref={aboutRef} data={data} />
       </header>
 
       <BuilderBanner />
