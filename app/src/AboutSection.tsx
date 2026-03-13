@@ -1,8 +1,8 @@
 import { useState, useMemo, useImperativeHandle, forwardRef, Fragment } from "react";
-import type { AppData, TreeNode, TaxonomyType } from "./types";
+import type { AppData, TreeNode, TaxonomyType, GenericConcordance } from "./types";
 
 export type AboutSectionHandle = {
-  openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser") => void;
+  openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances") => void;
 };
 
 /* Data-source URLs for every taxonomy and concordance */
@@ -2224,11 +2224,177 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
   );
 }
 
+/* =============================== Concordance Browser Tab =============================== */
+
+type ConcordanceId = "cpcHs" | "naicsHs" | "isicCpc" | "cpaHs" | "beaHs" | "beaNaics" | "unspscHs" | "exioHs" | "exioCpa" | "exioIsic" | "exioNace";
+
+const CONCORDANCE_OPTIONS: { key: ConcordanceId; label: string; from: string; to: string; color: string }[] = [
+  { key: "cpcHs",    label: "CPC \u2194 HS",      from: "CPC",    to: "HS",     color: "#0891b2" },
+  { key: "naicsHs",  label: "NAICS \u2192 HS",     from: "NAICS",  to: "HS",     color: "#7c3aed" },
+  { key: "isicCpc",  label: "ISIC \u2192 CPC",     from: "ISIC",   to: "CPC",    color: "#0c4a6e" },
+  { key: "cpaHs",    label: "CPA \u2192 HS",       from: "CPA",    to: "HS",     color: "#b45309" },
+  { key: "beaHs",    label: "BEA \u2192 HS",       from: "BEA",    to: "HS",     color: "#be123c" },
+  { key: "beaNaics", label: "BEA \u2192 NAICS",    from: "BEA",    to: "NAICS",  color: "#9f1239" },
+  { key: "unspscHs", label: "UNSPSC \u2192 HS",    from: "UNSPSC", to: "HS",     color: "#6b7280" },
+  { key: "exioHs",   label: "HS \u2192 EXIOBASE",  from: "HS",     to: "EXIO",   color: "#059669" },
+  { key: "exioCpa",  label: "CPA \u2192 EXIOBASE", from: "CPA",    to: "EXIO",   color: "#047857" },
+  { key: "exioIsic", label: "ISIC \u2192 EXIOBASE",from: "ISIC",   to: "EXIO",   color: "#065f46" },
+  { key: "exioNace", label: "NACE \u2192 EXIOBASE",from: "NACE",   to: "EXIO",   color: "#064e3b" },
+];
+
+function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
+  const [conc, setConc] = useState<ConcordanceId>("cpcHs");
+  const [search, setSearch] = useState("");
+  const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
+
+  const rows = useMemo(() => {
+    if (!data) return [];
+
+    if (conc === "cpcHs" && data.concordance) {
+      const out: { from: string; to: string; partial: string }[] = [];
+      for (const [cpc, mappings] of Object.entries(data.concordance.cpcToHs)) {
+        for (const m of mappings) {
+          out.push({ from: cpc, to: m.code, partial: m.hsPartial || m.cpcPartial ? "partial" : "" });
+        }
+      }
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to, r.partial));
+      return out;
+    }
+
+    if (conc === "unspscHs" && data.unspscHsMapping) {
+      const out: { from: string; to: string; similarity: string }[] = [];
+      for (const [unspsc, mappings] of Object.entries(data.unspscHsMapping.unspscToHs)) {
+        for (const m of mappings) {
+          out.push({ from: unspsc, to: m.code, similarity: (m.similarity * 100).toFixed(1) + "%" });
+        }
+      }
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
+      return out;
+    }
+
+    // EXIOBASE concordances
+    if (conc === "exioHs" && data.exiobaseConcordance) {
+      const out: { from: string; to: string }[] = [];
+      for (const [hs, prods] of Object.entries(data.exiobaseConcordance.hsToExio)) {
+        for (const p of prods) out.push({ from: hs, to: p });
+      }
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
+      return out;
+    }
+    if (conc === "exioCpa" && data.exiobaseConcordance) {
+      const out: { from: string; to: string }[] = [];
+      for (const [cpa, prods] of Object.entries(data.exiobaseConcordance.cpaToExio)) {
+        for (const p of prods) out.push({ from: cpa, to: p });
+      }
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
+      return out;
+    }
+    if (conc === "exioIsic" && data.exiobaseConcordance) {
+      const out: { from: string; to: string }[] = [];
+      for (const [isic, prods] of Object.entries(data.exiobaseConcordance.isicToExio)) {
+        for (const p of prods) out.push({ from: isic, to: p });
+      }
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
+      return out;
+    }
+    if (conc === "exioNace" && data.exiobaseConcordance) {
+      const out: { from: string; to: string }[] = [];
+      for (const [nace, prods] of Object.entries(data.exiobaseConcordance.naceToExio)) {
+        for (const p of prods) out.push({ from: nace, to: p });
+      }
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to));
+      return out;
+    }
+
+    // GenericConcordance types
+    const gcMap: Record<string, GenericConcordance | null> = {
+      naicsHs: data.naicsHsConcordance,
+      isicCpc: data.isicCpcConcordance,
+      cpaHs: data.cpaHsConcordance,
+      beaHs: data.beaHsConcordance,
+      beaNaics: data.beaNaicsConcordance,
+    };
+    const gc = gcMap[conc];
+    if (gc) {
+      const out: { from: string; to: string; partial: string }[] = [];
+      for (const [code, mappings] of Object.entries(gc.forward)) {
+        for (const m of mappings) {
+          out.push({ from: code, to: m.code, partial: m.partial ? "partial" : "" });
+        }
+      }
+      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.to, r.partial));
+      return out;
+    }
+
+    return [];
+  }, [data, conc, searchTerms]);
+
+  const concMeta = CONCORDANCE_OPTIONS.find(c => c.key === conc)!;
+  const hasPartial = conc === "cpcHs" || conc === "naicsHs" || conc === "isicCpc" || conc === "cpaHs" || conc === "beaHs" || conc === "beaNaics";
+  const hasSimilarity = conc === "unspscHs";
+
+  return (
+    <>
+      <div className="lca-browser-controls">
+        <div className="lca-db-tabs">
+          {CONCORDANCE_OPTIONS.map(c => (
+            <button
+              key={c.key}
+              className={`lca-db-tab ${conc === c.key ? "lca-db-active" : ""}`}
+              style={conc === c.key ? { backgroundColor: c.color, borderColor: c.color } : {}}
+              onClick={() => { setConc(c.key); setSearch(""); }}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <input
+            type="text"
+            placeholder="Search codes..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="lca-search-input"
+          />
+          <span className="lca-result-count">{rows.length.toLocaleString()} mappings</span>
+        </div>
+      </div>
+
+      <div className="lca-browser-table-wrapper">
+        <table className="lca-browser-table">
+          <thead>
+            <tr>
+              <th>{concMeta.from} Code</th>
+              <th>{concMeta.to} Code</th>
+              {hasPartial && <th>Partial</th>}
+              {hasSimilarity && <th>Similarity</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {(rows as any[]).slice(0, 500).map((r, i) => (
+              <tr key={i}>
+                <td className="lca-code">{r.from}</td>
+                <td className="lca-code">{r.to}</td>
+                {hasPartial && <td className="lca-num">{r.partial && <span className="conc-partial-badge">partial</span>}</td>}
+                {hasSimilarity && <td className="lca-num">{r.similarity}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {rows.length > 500 && (
+          <p className="lca-truncation-note">Showing first 500 of {rows.length.toLocaleString()} mappings. Use search to narrow results.</p>
+        )}
+      </div>
+    </>
+  );
+}
+
 /* =============================== Main Component =============================== */
 
 export const AboutSection = forwardRef<AboutSectionHandle, { data: AppData | null }>(function AboutSection({ data }, ref) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser">("taxonomies");
+  const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances">("taxonomies");
 
   useImperativeHandle(ref, () => ({
     openToTab(t) { setTab(t); setOpen(true); },
@@ -2282,6 +2448,12 @@ export const AboutSection = forwardRef<AboutSectionHandle, { data: AppData | nul
             >
               LCA Data Browser
             </button>
+            <button
+              className={`about-tab ${tab === "concordances" ? "active" : ""}`}
+              onClick={() => setTab("concordances")}
+            >
+              Concordance Browser
+            </button>
           </div>
 
           {tab === "taxonomies" && <TaxonomyMapTab />}
@@ -2289,6 +2461,7 @@ export const AboutSection = forwardRef<AboutSectionHandle, { data: AppData | nul
           {tab === "methods" && <ResolutionMethodsTab />}
           {tab === "matrix" && <CoverageMatrixTab data={data} />}
           {tab === "browser" && <LcaDataBrowserTab data={data} />}
+          {tab === "concordances" && <ConcordanceBrowserTab data={data} />}
         </div>
       </div>
     </div>

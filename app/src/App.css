@@ -2594,6 +2594,16 @@
   font-style: italic;
 }
 
+.conc-partial-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+}
+
 /* Responsive About */
 @media (max-width: 768px) {
   .about-overlay {
