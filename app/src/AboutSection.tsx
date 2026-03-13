@@ -436,10 +436,10 @@ function LcaDatabasesTab() {
 
       <h3>LCA Database Connections</h3>
       <div className="about-diagram-container">
-        <svg viewBox="0 0 900 420" className="about-diagram">
+        <svg viewBox="0 0 1020 420" className="about-diagram">
 
           {/* === Background Region: Taxonomy Bridge Nodes === */}
-          <rect x="30" y="10" width="840" height="120" rx="12" fill="#f0fdf4" stroke="#bbf7d0" strokeWidth="1.5" />
+          <rect x="30" y="10" width="960" height="120" rx="12" fill="#f0fdf4" stroke="#bbf7d0" strokeWidth="1.5" />
           <text x="450" y="30" textAnchor="middle" className="about-region-label" fill="#166534">
             Taxonomy Entry Points
           </text>
@@ -616,7 +616,7 @@ function LcaDatabasesTab() {
           <text x="720" y="108" textAnchor="middle" className="about-edge-label" fill="#d97706">HS-2 chapters</text>
 
           {/* === RESOLUTION ANNOTATIONS === */}
-          <rect x="30" y="290" width="960" height="120" rx="10" fill="#fafafa" stroke="#e5e7eb" strokeWidth="1" />
+          <rect x="30" y="290" width="970" height="120" rx="10" fill="#fafafa" stroke="#e5e7eb" strokeWidth="1" />
           <text x="510" y="312" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Mapping Resolution Comparison</text>
 
           {/* Fine-grained bar */}
