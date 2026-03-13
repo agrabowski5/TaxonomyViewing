@@ -1576,7 +1576,7 @@ function computeDescendantRanges(
 
     // GaBi
     const gf = getGabiChapterData(leaf, taxonomy, data.gabiCoverage, data.concordance);
-    if (gf && gf.withGhgData > 0) {
+    if (gf && gf.processCount > 0) {
       const kgStats = gf.unitStats["kg"];
       if (kgStats) gabiVals.push(kgStats.median);
     }
@@ -2255,8 +2255,8 @@ function computeGabiCoverage(
   const raw = new Map<string, { count: number; key: string }>();
   const coverageMap = new Map(
     Object.entries(gabiCoverage.coverage)
-      .filter(([, entry]) => entry.withGhgData > 0)
-      .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.withGhgData] as const)
+      .filter(([, entry]) => entry.processCount > 0)
+      .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.processCount] as const)
   );
 
   function walk(nodes: TreeNode[]) {
@@ -3861,7 +3861,7 @@ function AppContent() {
               <BafuFactorDisplay entry={bafuFactor} getChain={getBafuChain} onOpenTab={openAboutTab} />
             )}
 
-            {gabiFactor && gabiFactor.withGhgData > 0 && (
+            {gabiFactor && gabiFactor.processCount > 0 && (
               <GabiFactorDisplay entry={gabiFactor} getChain={getGabiChain} onOpenTab={openAboutTab} />
             )}
 
@@ -3886,7 +3886,7 @@ function AppContent() {
               <DescendantRangeDisplay ranges={descendantRanges} />
             )}
 
-            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !exiobaseProducts && !(bafuFactor && bafuFactor.withGhgData > 0) && !(gabiFactor && gabiFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && !ecoinventInfo.isic && (
+            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !exiobaseProducts && !(bafuFactor && bafuFactor.withGhgData > 0) && !(gabiFactor && gabiFactor.processCount > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && !ecoinventInfo.isic && (
               <div className="comparison-item no-mapping">
                 <p className="name">No mappings found at this level</p>
               </div>
