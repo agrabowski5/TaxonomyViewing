@@ -4,6 +4,11 @@ import type { GapHighlightData } from "./TaxonomyTree";
 import { computeGraphLayout, NODE_WIDTH, NODE_HEIGHT } from "./graphLayout";
 import { GraphNodeCard, countDescendants } from "./GraphNodeCard";
 
+export interface GraphSyncTarget {
+  id: string;
+  seq: number;
+}
+
 interface Props {
   data: TreeNode[];
   openByDefault?: boolean;
@@ -23,24 +28,12 @@ interface Props {
   side?: "left" | "right";
   gapHighlight?: GapHighlightData;
   onClearGapHighlight?: () => void;
+  syncTarget?: GraphSyncTarget;
 }
 
 export interface GraphTreeHandle {
   expandToNode: (id: string) => void;
   selectNode: (id: string) => void;
-}
-
-/** Build a map of nodeId -> TreeNode for fast lookup */
-function buildNodeMap(data: TreeNode[]): Map<string, TreeNode> {
-  const map = new Map<string, TreeNode>();
-  function walk(nodes: TreeNode[]) {
-    for (const n of nodes) {
-      map.set(n.id, n);
-      if (n.children) walk(n.children);
-    }
-  }
-  walk(data);
-  return map;
 }
 
 /** Find path from root to a target node */
@@ -92,18 +85,48 @@ export const GraphTree = forwardRef<GraphTreeHandle, Props>(function GraphTree(
     side,
     gapHighlight,
     onClearGapHighlight,
+    syncTarget,
   },
   ref,
 ) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastSyncSeq = useRef(-1);
 
   // Reset expanded state when data changes (taxonomy switch)
   useEffect(() => {
     setExpandedIds(new Set());
     setSelectedId(null);
   }, [data]);
+
+  // Prop-based cross-pane sync: expand to and select target node
+  useEffect(() => {
+    if (!syncTarget || syncTarget.seq === lastSyncSeq.current) return;
+    lastSyncSeq.current = syncTarget.seq;
+
+    const path = findPath(data, syncTarget.id);
+    if (path.length === 0) return;
+
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      for (let i = 0; i < path.length - 1; i++) {
+        next.add(path[i]);
+      }
+      return next;
+    });
+    setSelectedId(syncTarget.id);
+
+    // Scroll to node after layout settles
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = containerRef.current?.querySelector(
+          `[data-node-id="${syncTarget.id}"]`,
+        );
+        el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+      });
+    });
+  }, [syncTarget, data]);
 
   const descendantCounts = useMemo(() => buildDescendantCounts(data), [data]);
 

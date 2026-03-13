@@ -3,7 +3,7 @@ import { TreeApi } from "react-arborist";
 import { useData } from "./useData";
 import { TaxonomyTree } from "./TaxonomyTree";
 import { GraphTree } from "./GraphTree";
-import type { GraphTreeHandle } from "./GraphTree";
+import type { GraphTreeHandle, GraphSyncTarget } from "./GraphTree";
 import { BuilderProvider, useBuilder } from "./builder/context";
 import { BuilderBanner } from "./builder/BuilderBanner";
 import { BuilderTaxonomyPanel } from "./builder/BuilderTaxonomyPanel";
@@ -2488,6 +2488,9 @@ function AppContent() {
 
   const leftGraphRef = useRef<GraphTreeHandle>(null);
   const rightGraphRef = useRef<GraphTreeHandle>(null);
+  const [leftGraphSync, setLeftGraphSync] = useState<GraphSyncTarget | undefined>();
+  const [rightGraphSync, setRightGraphSync] = useState<GraphSyncTarget | undefined>();
+  const syncSeqRef = useRef(0);
 
   const getTreeData = useCallback((taxonomy: TaxonomyType): TreeNode[] => {
     if (!data) return [];
@@ -3087,10 +3090,12 @@ function AppContent() {
         const otherViewMode = otherPane === "left" ? leftViewMode : rightViewMode;
 
         if (otherViewMode === "graph") {
-          // Graph mode: use graph ref for sync
-          const graphRef = otherPane === "left" ? leftGraphRef : rightGraphRef;
-          if (graphRef.current) {
-            graphRef.current.expandToNode(mappedNodeId);
+          // Graph mode: use prop-based sync (more reliable than ref)
+          const seq = ++syncSeqRef.current;
+          if (otherPane === "left") {
+            setLeftGraphSync({ id: mappedNodeId, seq });
+          } else {
+            setRightGraphSync({ id: mappedNodeId, seq });
           }
         } else {
           // List mode: use react-arborist ref
@@ -3145,8 +3150,12 @@ function AppContent() {
       // Allow time for taxonomy switch + modal close before navigating
       setTimeout(() => {
         if (viewMode === "graph") {
-          const graphRef = targetPane === "left" ? leftGraphRef : rightGraphRef;
-          if (graphRef.current) graphRef.current.expandToNode(nodeId);
+          const seq = ++syncSeqRef.current;
+          if (targetPane === "left") {
+            setLeftGraphSync({ id: nodeId, seq });
+          } else {
+            setRightGraphSync({ id: nodeId, seq });
+          }
         } else {
           const ancestorPath = findPathToNode(treeData, nodeId);
           let delay = 50;
@@ -3703,6 +3712,7 @@ function AppContent() {
                 side="left"
                 gapHighlight={gapHighlight?.taxonomy === leftTaxonomy ? gapHighlight : undefined}
                 onClearGapHighlight={() => setGapHighlight(null)}
+                syncTarget={leftGraphSync}
               />
             )}
           </>
@@ -3805,6 +3815,7 @@ function AppContent() {
                   bafuCoverage={rightBafuCoverage}
                   gabiCoverage={rightGabiCoverage}
                   side="right"
+                  syncTarget={rightGraphSync}
                 />
               )}
             </>
