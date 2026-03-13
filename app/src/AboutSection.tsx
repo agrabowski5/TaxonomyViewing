@@ -1992,27 +1992,31 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
       const ef = data.exiobaseFactors;
 
       if (ec) {
+        // hsToExio etc. map taxonomy codes → product CODES (e.g., "p01.l")
+        // ec.products maps product code → product name
+        // Build reverse: product CODE → taxonomy codes
         const prodHsCodes = new Map<string, string[]>();
         const prodCpaCodes = new Map<string, string[]>();
         const prodIsicCodes = new Map<string, string[]>();
         const prodNaceCodes = new Map<string, string[]>();
-        for (const [code, prods] of Object.entries(ec.hsToExio)) {
-          for (const p of prods) { const l = prodHsCodes.get(p) ?? []; l.push(code); prodHsCodes.set(p, l); }
+        for (const [code, prodCodes] of Object.entries(ec.hsToExio)) {
+          for (const pc of prodCodes) { const l = prodHsCodes.get(pc) ?? []; l.push(code); prodHsCodes.set(pc, l); }
         }
-        for (const [code, prods] of Object.entries(ec.cpaToExio)) {
-          for (const p of prods) { const l = prodCpaCodes.get(p) ?? []; l.push(code); prodCpaCodes.set(p, l); }
+        for (const [code, prodCodes] of Object.entries(ec.cpaToExio)) {
+          for (const pc of prodCodes) { const l = prodCpaCodes.get(pc) ?? []; l.push(code); prodCpaCodes.set(pc, l); }
         }
-        for (const [code, prods] of Object.entries(ec.isicToExio)) {
-          for (const p of prods) { const l = prodIsicCodes.get(p) ?? []; l.push(code); prodIsicCodes.set(p, l); }
+        for (const [code, prodCodes] of Object.entries(ec.isicToExio)) {
+          for (const pc of prodCodes) { const l = prodIsicCodes.get(pc) ?? []; l.push(code); prodIsicCodes.set(pc, l); }
         }
-        for (const [code, prods] of Object.entries(ec.naceToExio)) {
-          for (const p of prods) { const l = prodNaceCodes.get(p) ?? []; l.push(code); prodNaceCodes.set(p, l); }
+        for (const [code, prodCodes] of Object.entries(ec.naceToExio)) {
+          for (const pc of prodCodes) { const l = prodNaceCodes.get(pc) ?? []; l.push(code); prodNaceCodes.set(pc, l); }
         }
-        const unique = [...new Set(Object.values(ec.products))].sort();
+        // Iterate by product code, resolve to name
+        const uniqueCodes = [...new Set(Object.keys(ec.products))].sort();
         const out: { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[]; factor: number | null; unit: string }[] = [];
-        for (const name of unique) {
-          // Try to find emission factor from HS chapter-level data
-          const hsCodes = prodHsCodes.get(name) ?? [];
+        for (const pc of uniqueCodes) {
+          const name = ec.products[pc] ?? pc;
+          const hsCodes = prodHsCodes.get(pc) ?? [];
           let factor: number | null = null;
           let unit = "";
           if (ef) {
@@ -2022,11 +2026,11 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
             }
           }
           out.push({
-            product: name,
+            product: `${name} (${pc})`,
             hsCodes,
-            cpaCodes: prodCpaCodes.get(name) ?? [],
-            isicCodes: prodIsicCodes.get(name) ?? [],
-            naceCodes: prodNaceCodes.get(name) ?? [],
+            cpaCodes: prodCpaCodes.get(pc) ?? [],
+            isicCodes: prodIsicCodes.get(pc) ?? [],
+            naceCodes: prodNaceCodes.get(pc) ?? [],
             factor,
             unit,
           });
@@ -2244,9 +2248,9 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               <tr>
                 <th>HS-6</th>
                 <th>NAICS</th>
-                <th>Processes</th>
-                <th>w/ GHG</th>
-                <th>Process Details</th>
+                <th title="Total LCI processes mapped to this HS-6 code">Processes</th>
+                <th title="Processes that have GHG emission data (direct process emissions, GWP-100 AR6)">w/ GHG</th>
+                <th title="Process names with GHG values in parentheses where available (kg CO2e per functional unit)">Process Details</th>
               </tr>
             </thead>
             <tbody>
@@ -2270,10 +2274,10 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
             <thead>
               <tr>
                 <th>HS Ch.</th>
-                <th>Processes</th>
-                <th>w/ GHG</th>
-                <th>Unit Ranges</th>
-                <th>Process Details</th>
+                <th title="Total LCI processes mapped to this HS-2 chapter">Processes</th>
+                <th title="Processes that have GHG emission data (direct process emissions, GWP-100 AR6)">w/ GHG</th>
+                <th title="Reference units with count and value ranges (min-max)">Unit Ranges</th>
+                <th title="Process names with GHG values in parentheses where available (kg CO2e per functional unit)">Process Details</th>
               </tr>
             </thead>
             <tbody>
