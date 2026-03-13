@@ -1959,15 +1959,15 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
 
     if (db === "ecoinvent" && data.ecoinventMapping) {
       const em = data.ecoinventMapping;
-      const out: { code: string; system: string; products: string[]; type: string }[] = [];
+      const out: { code: string; system: string; products: string[]; count: number; type: string; isAncestor: boolean }[] = [];
       for (const [code, info] of Object.entries(em.cpc)) {
-        out.push({ code, system: "CPC", products: info.products, type: info.mappingType });
+        out.push({ code, system: "CPC", products: info.products, count: info.count, type: info.mappingType, isAncestor: em.cpcAncestors.includes(code) });
       }
       for (const [code, info] of Object.entries(em.hs)) {
-        out.push({ code, system: "HS", products: info.products, type: info.mappingType });
+        out.push({ code, system: "HS", products: info.products, count: info.count, type: info.mappingType, isAncestor: em.hsAncestors.includes(code) });
       }
       for (const [code, info] of Object.entries(em.isic)) {
-        out.push({ code, system: "ISIC", products: info.products, type: info.mappingType });
+        out.push({ code, system: "ISIC", products: info.products, count: info.count, type: info.mappingType, isAncestor: em.isicAncestors.includes(code) });
       }
       if (searchTerms.length) {
         return out.filter(r => matchesSearch(searchTerms, r.code, r.system, ...r.products));
@@ -1976,9 +1976,9 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
     }
 
     if (db === "epa" && data.emissionFactors) {
-      const out: { hs: string; naics: string; desc: string; factor: number; unit: string }[] = [];
+      const out: { hs: string; naics: string; desc: string; factor: number; production: number; margins: number; unit: string }[] = [];
       for (const [hs, entry] of Object.entries(data.emissionFactors)) {
-        out.push({ hs, naics: entry.naicsCode, desc: entry.naicsDescription, factor: entry.factor, unit: entry.unit });
+        out.push({ hs, naics: entry.naicsCode, desc: entry.naicsDescription, factor: entry.factor, production: entry.factorWithoutMargins, margins: entry.margins, unit: entry.unit });
       }
       if (searchTerms.length) {
         return out.filter(r => matchesSearch(searchTerms, r.hs, r.naics, r.desc));
@@ -1986,75 +1986,117 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
       return out;
     }
 
-    if (db === "exiobase" && data.exiobaseConcordance) {
+    if (db === "exiobase") {
+      // Merge concordance product data with chapter-level emission factors
       const ec = data.exiobaseConcordance;
-      // Build product → mapped codes for searchability
-      const prodHsCodes = new Map<string, string[]>();
-      const prodCpaCodes = new Map<string, string[]>();
-      const prodIsicCodes = new Map<string, string[]>();
-      const prodNaceCodes = new Map<string, string[]>();
-      for (const [code, prods] of Object.entries(ec.hsToExio)) {
-        for (const p of prods) { const l = prodHsCodes.get(p) ?? []; l.push(code); prodHsCodes.set(p, l); }
+      const ef = data.exiobaseFactors;
+
+      if (ec) {
+        const prodHsCodes = new Map<string, string[]>();
+        const prodCpaCodes = new Map<string, string[]>();
+        const prodIsicCodes = new Map<string, string[]>();
+        const prodNaceCodes = new Map<string, string[]>();
+        for (const [code, prods] of Object.entries(ec.hsToExio)) {
+          for (const p of prods) { const l = prodHsCodes.get(p) ?? []; l.push(code); prodHsCodes.set(p, l); }
+        }
+        for (const [code, prods] of Object.entries(ec.cpaToExio)) {
+          for (const p of prods) { const l = prodCpaCodes.get(p) ?? []; l.push(code); prodCpaCodes.set(p, l); }
+        }
+        for (const [code, prods] of Object.entries(ec.isicToExio)) {
+          for (const p of prods) { const l = prodIsicCodes.get(p) ?? []; l.push(code); prodIsicCodes.set(p, l); }
+        }
+        for (const [code, prods] of Object.entries(ec.naceToExio)) {
+          for (const p of prods) { const l = prodNaceCodes.get(p) ?? []; l.push(code); prodNaceCodes.set(p, l); }
+        }
+        const unique = [...new Set(Object.values(ec.products))].sort();
+        const out: { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[]; factor: number | null; unit: string }[] = [];
+        for (const name of unique) {
+          // Try to find emission factor from HS chapter-level data
+          const hsCodes = prodHsCodes.get(name) ?? [];
+          let factor: number | null = null;
+          let unit = "";
+          if (ef) {
+            for (const hs of hsCodes) {
+              const ch = hs.substring(0, 2);
+              if (ef[ch]) { factor = ef[ch].factor; unit = ef[ch].unit; break; }
+            }
+          }
+          out.push({
+            product: name,
+            hsCodes,
+            cpaCodes: prodCpaCodes.get(name) ?? [],
+            isicCodes: prodIsicCodes.get(name) ?? [],
+            naceCodes: prodNaceCodes.get(name) ?? [],
+            factor,
+            unit,
+          });
+        }
+        if (searchTerms.length) {
+          return out.filter(r => matchesSearch(searchTerms,
+            r.product,
+            ...r.hsCodes, ...r.cpaCodes, ...r.isicCodes, ...r.naceCodes,
+          ));
+        }
+        return out;
       }
-      for (const [code, prods] of Object.entries(ec.cpaToExio)) {
-        for (const p of prods) { const l = prodCpaCodes.get(p) ?? []; l.push(code); prodCpaCodes.set(p, l); }
+
+      // Fallback: show chapter-level factors only
+      if (ef) {
+        const out: { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[]; factor: number | null; unit: string }[] = [];
+        for (const [ch, entry] of Object.entries(ef)) {
+          out.push({
+            product: entry.sectors.join("; "),
+            hsCodes: [ch],
+            cpaCodes: [],
+            isicCodes: [],
+            naceCodes: [],
+            factor: entry.factor,
+            unit: entry.unit,
+          });
+        }
+        if (searchTerms.length) {
+          return out.filter(r => matchesSearch(searchTerms, r.product, ...r.hsCodes));
+        }
+        return out;
       }
-      for (const [code, prods] of Object.entries(ec.isicToExio)) {
-        for (const p of prods) { const l = prodIsicCodes.get(p) ?? []; l.push(code); prodIsicCodes.set(p, l); }
-      }
-      for (const [code, prods] of Object.entries(ec.naceToExio)) {
-        for (const p of prods) { const l = prodNaceCodes.get(p) ?? []; l.push(code); prodNaceCodes.set(p, l); }
-      }
-      const unique = [...new Set(Object.values(ec.products))].sort();
-      const out: { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[] }[] = [];
-      for (const name of unique) {
-        out.push({
-          product: name,
-          hsCodes: prodHsCodes.get(name) ?? [],
-          cpaCodes: prodCpaCodes.get(name) ?? [],
-          isicCodes: prodIsicCodes.get(name) ?? [],
-          naceCodes: prodNaceCodes.get(name) ?? [],
-        });
-      }
-      if (searchTerms.length) {
-        return out.filter(r => matchesSearch(searchTerms,
-          r.product,
-          ...r.hsCodes, ...r.cpaCodes, ...r.isicCodes, ...r.naceCodes,
-        ));
-      }
-      return out;
+      return [];
     }
 
     if (db === "uslci" && data.uslciCoverage) {
-      const out: { hs: string; naics: string; processes: number; withGhg: number; allProcesses: string[] }[] = [];
+      const out: { hs: string; naics: string; processes: number; withGhg: number; processDetails: { name: string; ghg: number; unit: string }[] }[] = [];
       for (const [hs, entry] of Object.entries(data.uslciCoverage.coverage)) {
         out.push({
           hs,
           naics: entry.naicsCodes.join(", "),
           processes: entry.processCount,
           withGhg: entry.withGhgData,
-          allProcesses: entry.topProcesses.map(p => p.name),
+          processDetails: entry.topProcesses,
         });
       }
       if (searchTerms.length) {
-        return out.filter(r => matchesSearch(searchTerms, r.hs, r.naics, ...r.allProcesses));
+        return out.filter(r => matchesSearch(searchTerms, r.hs, r.naics, ...r.processDetails.map(p => p.name)));
       }
       return out;
     }
 
     if (db === "bafu" && data.bafuCoverage) {
-      const out: { chapter: string; processes: number; withGhg: number; units: string; allProcesses: string[] }[] = [];
+      const out: { chapter: string; processes: number; withGhg: number; unitSummary: string; processDetails: { name: string; ghg: number; unit: string }[] }[] = [];
       for (const [ch, entry] of Object.entries(data.bafuCoverage.coverage)) {
+        // Build unit summary with ranges
+        const unitParts: string[] = [];
+        for (const [unit, stats] of Object.entries(entry.unitStats)) {
+          unitParts.push(`${unit}: ${stats.count} (${stats.min.toFixed(4)}\u2013${stats.max.toFixed(4)})`);
+        }
         out.push({
           chapter: ch,
           processes: entry.processCount,
           withGhg: entry.withGhgData,
-          units: Object.keys(entry.unitStats).join(", "),
-          allProcesses: entry.topProcesses.map(p => p.name),
+          unitSummary: unitParts.join("; "),
+          processDetails: entry.topProcesses,
         });
       }
       if (searchTerms.length) {
-        return out.filter(r => matchesSearch(searchTerms, r.chapter, r.units, ...r.allProcesses));
+        return out.filter(r => matchesSearch(searchTerms, r.chapter, r.unitSummary, ...r.processDetails.map(p => p.name)));
       }
       return out;
     }
@@ -2095,6 +2137,23 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
         </div>
       </div>
 
+      {/* Stats summary bar */}
+      <div className="lca-stats-bar">
+        {db === "ecoinvent" && data?.ecoinventMapping && (
+          <>{data.ecoinventMapping.stats.totalProducts.toLocaleString()} products &middot; {data.ecoinventMapping.stats.uniqueCpcCodes} CPC &middot; {data.ecoinventMapping.stats.uniqueHsCodes} HS &middot; {data.ecoinventMapping.stats.uniqueIsicCodes} ISIC codes</>
+        )}
+        {db === "epa" && <>EPA Supply Chain GHG Emission Factors v1.3 &middot; kg CO2e / 2022 USD</>}
+        {db === "exiobase" && data?.exiobaseConcordance && (
+          <>{data.exiobaseConcordance.stats.uniqueExioProducts} products &middot; {data.exiobaseConcordance.stats.hsCodesMatched} HS &middot; {data.exiobaseConcordance.stats.cpaCodesMatched} CPA &middot; {data.exiobaseConcordance.stats.isicCodesMatched} ISIC &middot; {data.exiobaseConcordance.stats.naceCodesMatched} NACE codes</>
+        )}
+        {db === "uslci" && data?.uslciCoverage && (
+          <>{data.uslciCoverage.stats.totalProcesses.toLocaleString()} processes &middot; {data.uslciCoverage.stats.totalWithGhg} w/ GHG &middot; {data.uslciCoverage.stats.uniqueNaicsCodes} NAICS &middot; {data.uslciCoverage.stats.coveredHs6Codes.toLocaleString()} HS-6 codes</>
+        )}
+        {db === "bafu" && data?.bafuCoverage && (
+          <>{data.bafuCoverage.stats.totalProcesses.toLocaleString()} total processes &middot; {data.bafuCoverage.stats.mappedProcesses.toLocaleString()} mapped &middot; {data.bafuCoverage.stats.mappedWithGhg.toLocaleString()} w/ GHG &middot; {data.bafuCoverage.stats.coveredHsChapters} HS chapters</>
+        )}
+      </div>
+
       <div className="lca-browser-table-wrapper">
         {db === "ecoinvent" && (
           <table className="lca-browser-table">
@@ -2102,16 +2161,20 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               <tr>
                 <th>Code</th>
                 <th>System</th>
+                <th>Count</th>
                 <th>Mapping</th>
+                <th>Ancestor</th>
                 <th>Products</th>
               </tr>
             </thead>
             <tbody>
-              {(rows as { code: string; system: string; products: string[]; type: string }[]).slice(0, visibleCount).map((r, i) => (
+              {(rows as { code: string; system: string; products: string[]; count: number; type: string; isAncestor: boolean }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.code}</td>
                   <td><span className="lca-system-badge" style={{ backgroundColor: r.system === "CPC" ? "#0891b2" : r.system === "HS" ? "#4f46e5" : "#0c4a6e" }}>{r.system}</span></td>
+                  <td className="lca-num">{r.count}</td>
                   <td><span className={`lca-mapping-badge ${r.type === "1:1" ? "lca-m-one" : "lca-m-many"}`}>{r.type}</span></td>
+                  <td className="lca-num">{r.isAncestor && <span className="conc-partial-badge">ancestor</span>}</td>
                   <td className="lca-products">{r.products.join("; ")}</td>
                 </tr>
               ))}
@@ -2126,17 +2189,21 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
                 <th>HS-6</th>
                 <th>NAICS</th>
                 <th>NAICS Description</th>
-                <th>Factor</th>
+                <th>Total Factor</th>
+                <th>Production</th>
+                <th>Margins</th>
                 <th>Unit</th>
               </tr>
             </thead>
             <tbody>
-              {(rows as { hs: string; naics: string; desc: string; factor: number; unit: string }[]).slice(0, visibleCount).map((r, i) => (
+              {(rows as { hs: string; naics: string; desc: string; factor: number; production: number; margins: number; unit: string }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.hs}</td>
                   <td className="lca-code">{r.naics}</td>
                   <td>{r.desc}</td>
                   <td className="lca-num">{r.factor.toFixed(3)}</td>
+                  <td className="lca-num">{r.production.toFixed(3)}</td>
+                  <td className="lca-num">{r.margins.toFixed(3)}</td>
                   <td className="lca-unit">{r.unit}</td>
                 </tr>
               ))}
@@ -2149,6 +2216,7 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
             <thead>
               <tr>
                 <th>EXIOBASE Product</th>
+                <th>Factor</th>
                 <th>HS Codes</th>
                 <th>CPA Codes</th>
                 <th>ISIC Codes</th>
@@ -2156,9 +2224,10 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
               </tr>
             </thead>
             <tbody>
-              {(rows as { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[] }[]).slice(0, visibleCount).map((r, i) => (
+              {(rows as { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[]; factor: number | null; unit: string }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-products">{r.product}</td>
+                  <td className="lca-num" title={r.unit}>{r.factor !== null ? r.factor.toFixed(3) : <span className="lca-none">&mdash;</span>}</td>
                   <td className="lca-code-list">{r.hsCodes.length > 0 ? r.hsCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
                   <td className="lca-code-list">{r.cpaCodes.length > 0 ? r.cpaCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
                   <td className="lca-code-list">{r.isicCodes.length > 0 ? r.isicCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
@@ -2177,17 +2246,19 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
                 <th>NAICS</th>
                 <th>Processes</th>
                 <th>w/ GHG</th>
-                <th>Process Names</th>
+                <th>Process Details</th>
               </tr>
             </thead>
             <tbody>
-              {(rows as { hs: string; naics: string; processes: number; withGhg: number; allProcesses: string[] }[]).slice(0, visibleCount).map((r, i) => (
+              {(rows as { hs: string; naics: string; processes: number; withGhg: number; processDetails: { name: string; ghg: number; unit: string }[] }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.hs}</td>
                   <td className="lca-code">{r.naics}</td>
                   <td className="lca-num">{r.processes}</td>
                   <td className="lca-num">{r.withGhg}</td>
-                  <td className="lca-products" title={r.allProcesses.join("\n")}>{r.allProcesses.join("; ")}</td>
+                  <td className="lca-products">{r.processDetails.map(p =>
+                    p.ghg > 0 ? `${p.name} (${p.ghg.toFixed(4)} ${p.unit})` : p.name
+                  ).join("; ")}</td>
                 </tr>
               ))}
             </tbody>
@@ -2198,21 +2269,23 @@ function LcaDataBrowserTab({ data }: { data: AppData | null }) {
           <table className="lca-browser-table">
             <thead>
               <tr>
-                <th>HS Chapter</th>
+                <th>HS Ch.</th>
                 <th>Processes</th>
                 <th>w/ GHG</th>
-                <th>Units</th>
-                <th>Process Names</th>
+                <th>Unit Ranges</th>
+                <th>Process Details</th>
               </tr>
             </thead>
             <tbody>
-              {(rows as { chapter: string; processes: number; withGhg: number; units: string; allProcesses: string[] }[]).slice(0, visibleCount).map((r, i) => (
+              {(rows as { chapter: string; processes: number; withGhg: number; unitSummary: string; processDetails: { name: string; ghg: number; unit: string }[] }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
                   <td className="lca-code">{r.chapter}</td>
                   <td className="lca-num">{r.processes}</td>
                   <td className="lca-num">{r.withGhg}</td>
-                  <td className="lca-unit">{r.units}</td>
-                  <td className="lca-products" title={r.allProcesses.join("\n")}>{r.allProcesses.join("; ")}</td>
+                  <td className="lca-unit" title={r.unitSummary}>{r.unitSummary}</td>
+                  <td className="lca-products">{r.processDetails.map(p =>
+                    p.ghg > 0 ? `${p.name} (${p.ghg.toFixed(4)} ${p.unit})` : p.name
+                  ).join("; ")}</td>
                 </tr>
               ))}
             </tbody>

@@ -2493,8 +2493,19 @@
   white-space: nowrap;
 }
 
+.lca-stats-bar {
+  font-size: 11px;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
 .lca-browser-table-wrapper {
-  max-height: 420px;
+  max-height: 500px;
   overflow: auto;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
