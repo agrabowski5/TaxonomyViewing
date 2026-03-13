@@ -1687,14 +1687,14 @@ function formatGhg(v: number): string {
 }
 
 function LciFactorDisplay({ entry, title, source, cardClass, getChain, onOpenTab }: {
-  entry: { withGhgData: number; unitStats: Record<string, LciUnitStats>; topProcesses: { name: string; ghg: number; unit: string }[] };
+  entry: { processCount?: number; withGhgData: number; unitStats: Record<string, LciUnitStats>; topProcesses: { name: string; ghg: number; unit: string }[] };
   title: string;
   source: string;
   cardClass: string;
   getChain?: () => ResolutionChain | null;
   onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void;
 }) {
-  if (entry.withGhgData === 0) return null;
+  if (entry.withGhgData === 0 && !(entry.processCount && entry.processCount > 0)) return null;
 
   // Find the "kg" unit stats as the most meaningful for goods
   const kgStats = entry.unitStats["kg"];
@@ -1716,12 +1716,20 @@ function LciFactorDisplay({ entry, title, source, cardClass, getChain, onOpenTab
           </div>
         </div>
       )}
+      {!primaryStats && entry.processCount && entry.processCount > 0 && (
+        <div className="lci-summary">
+          <div className="emission-main">
+            <span className="emission-value">{entry.processCount.toLocaleString()}</span>
+            <span className="emission-unit">mapped processes</span>
+          </div>
+        </div>
+      )}
       {entry.topProcesses.length > 0 && (
         <div className="lci-processes">
           {entry.topProcesses.slice(0, 5).map((p, i) => (
             <div key={i} className="lci-process">
               <span className="lci-process-name">{p.name}</span>
-              <span className="lci-process-value">{formatGhg(p.ghg)} kg CO₂e/{p.unit}</span>
+              {p.ghg > 0 && <span className="lci-process-value">{formatGhg(p.ghg)} kg CO₂e/{p.unit}</span>}
             </div>
           ))}
         </div>

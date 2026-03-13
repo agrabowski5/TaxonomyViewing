@@ -387,3 +387,165 @@ test.describe('Data Loading', () => {
     expect(await errorMsg.count()).toBe(0);
   });
 });
+
+test.describe('GaBi/Sphera Integration', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+    // GaBi uses chapter-level matching which only works in Relaxed mode
+    // Click the match-mode toggle to switch from Exact (default) to Relaxed
+    const toggle = page.locator('.match-mode-track');
+    const isStrict = await toggle.evaluate(el => el.classList.contains('strict'));
+    if (isStrict) {
+      await toggle.click();
+      await page.waitForTimeout(500);
+    }
+  });
+
+  test('GaBi badges appear on HS tree nodes after expanding', async ({ page }) => {
+    const leftPane = page.locator('.left-pane');
+
+    // Expand Section I to reveal chapter nodes
+    await leftPane.locator('.tree-node .toggle').first().click();
+    await page.waitForTimeout(300);
+
+    // GaBi badges (class ef-gabi) should appear on at least some chapter nodes
+    const gabiBadges = leftPane.locator('.ef-badge.ef-gabi');
+    await expect(gabiBadges.first()).toBeVisible({ timeout: 5000 });
+    const badgeCount = await gabiBadges.count();
+    expect(badgeCount).toBeGreaterThan(0);
+  });
+
+  test('GaBi badge shows "G" prefix', async ({ page }) => {
+    const leftPane = page.locator('.left-pane');
+
+    // Expand first section
+    await leftPane.locator('.tree-node .toggle').first().click();
+    await page.waitForTimeout(300);
+
+    // Check first GaBi badge text starts with "G"
+    const firstGabiBadge = leftPane.locator('.ef-badge.ef-gabi').first();
+    await expect(firstGabiBadge).toBeVisible({ timeout: 5000 });
+    const badgeText = await firstGabiBadge.textContent();
+    expect(badgeText).toMatch(/^G /);
+  });
+
+  test('GaBi badges do NOT appear in Exact mode', async ({ page }) => {
+    // Switch back to Exact mode
+    const toggle = page.locator('.match-mode-track');
+    await toggle.click();
+    await page.waitForTimeout(500);
+
+    const leftPane = page.locator('.left-pane');
+
+    // Expand Section I
+    await leftPane.locator('.tree-node .toggle').first().click();
+    await page.waitForTimeout(300);
+
+    // GaBi badges should NOT appear in strict/exact mode
+    const gabiBadges = leftPane.locator('.ef-badge.ef-gabi');
+    expect(await gabiBadges.count()).toBe(0);
+  });
+
+  test('GaBi comparison card appears when selecting a covered node', async ({ page }) => {
+    const leftPane = page.locator('.left-pane');
+
+    // Expand Section I and click Chapter 01 (live animals - covered)
+    await leftPane.locator('.tree-node .toggle').first().click();
+    await page.waitForTimeout(300);
+
+    // Find a node with a GaBi badge and click it
+    const nodeWithGabi = leftPane.locator('.tree-node:has(.ef-badge.ef-gabi)').first();
+    await nodeWithGabi.click();
+    await page.waitForTimeout(500);
+
+    // The comparison panel should show a GaBi card
+    const gabiCard = page.locator('.gabi-card');
+    await expect(gabiCard).toBeVisible({ timeout: 5000 });
+    await expect(gabiCard).toContainText('GaBi');
+  });
+
+  test('GaBi card shows process count when no emission data', async ({ page }) => {
+    const leftPane = page.locator('.left-pane');
+
+    // Expand and click a covered node
+    await leftPane.locator('.tree-node .toggle').first().click();
+    await page.waitForTimeout(300);
+    const nodeWithGabi = leftPane.locator('.tree-node:has(.ef-badge.ef-gabi)').first();
+    await nodeWithGabi.click();
+    await page.waitForTimeout(500);
+
+    // GaBi card should show "mapped processes" text (since GaBi has no GHG values)
+    const gabiCard = page.locator('.gabi-card');
+    await expect(gabiCard).toContainText('mapped processes');
+  });
+
+  test('GaBi badges appear on CPC tree via concordance', async ({ page }) => {
+    // Switch left pane to CPC
+    const leftSelector = page.locator('.left-pane .taxonomy-selector');
+    await leftSelector.selectOption('cpc');
+    await page.waitForTimeout(500);
+
+    const leftPane = page.locator('.left-pane');
+
+    // Expand Section 0 > Division 02 > Group 021 > Class 0213 to reach 5-digit subclasses
+    // GaBi concordance needs 5-digit CPC codes to resolve to HS chapters
+    await leftPane.locator('.tree-node .toggle').first().click();
+    await page.waitForTimeout(300);
+    await leftPane.locator('.tree-node:has-text("02")').first().locator('.toggle').click();
+    await page.waitForTimeout(300);
+    await leftPane.locator('.tree-node:has-text("021")').first().locator('.toggle').click();
+    await page.waitForTimeout(300);
+    await leftPane.locator('.tree-node:has-text("0213")').first().locator('.toggle').click();
+    await page.waitForTimeout(300);
+
+    // Check for GaBi badges on 5-digit subclass nodes
+    const gabiBadges = leftPane.locator('.ef-badge.ef-gabi');
+    const count = await gabiBadges.count();
+    expect(count).toBeGreaterThan(0);
+  });
+});
+
+test.describe('LCA Diagram', () => {
+  test.beforeEach(async ({ page }) => {
+    await waitForAppReady(page);
+  });
+
+  test('LCA diagram is fully visible without clipping', async ({ page }) => {
+    // Open the About panel
+    const aboutToggle = page.locator('.about-toggle');
+    await aboutToggle.click();
+    await page.waitForTimeout(500);
+
+    // Navigate to the LCA Databases tab that contains the LCA diagram
+    const lcaTab = page.locator('.about-tab:has-text("LCA Databases")');
+    await lcaTab.click();
+    await page.waitForTimeout(300);
+
+    // The SVG diagram should exist
+    const diagram = page.locator('.about-diagram');
+    await expect(diagram).toBeVisible();
+
+    // Check that the diagram container is scrollable or wide enough for all content
+    const container = page.locator('.about-diagram-container');
+    const diagramScrollWidth = await container.evaluate(el => el.scrollWidth);
+
+    // The scroll width should accommodate the full diagram (viewBox is 1020 wide)
+    expect(diagramScrollWidth).toBeGreaterThanOrEqual(1000);
+
+    // The container should have overflow-x: auto for scrollability
+    const overflowX = await container.evaluate(el => getComputedStyle(el).overflowX);
+    expect(overflowX).toBe('auto');
+  });
+
+  test('GaBi node exists in LCA diagram SVG', async ({ page }) => {
+    // Open About panel
+    await page.locator('.about-toggle').click();
+    await page.waitForTimeout(500);
+    await page.locator('.about-tab:has-text("LCA Databases")').click();
+    await page.waitForTimeout(300);
+
+    // The diagram should contain a GaBi text element
+    const gabiText = page.locator('.about-diagram text:has-text("GaBi")');
+    await expect(gabiText.first()).toBeVisible();
+  });
+});

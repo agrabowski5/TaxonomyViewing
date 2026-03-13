@@ -2055,7 +2055,7 @@
 
 .about-diagram {
   width: 100%;
-  max-width: 1040px;
+  min-width: 1020px;
   height: auto;
   display: block;
   margin: 0 auto;
