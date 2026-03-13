@@ -1375,7 +1375,7 @@ function ResolutionMethodsTab() {
 }
 
 function CoverageMatrixTab({ data }: { data: AppData | null }) {
-  const [mode, setMode] = useState<MatrixMode>("coverage");
+  const [mode, setMode] = useState<MatrixMode>("leafCoverage");
 
   const matrix = useMemo(() => {
     if (!data) return null;
@@ -1404,21 +1404,16 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
           </p>
           {/* Mini tree diagram */}
           <svg className="cm-tree-diagram" viewBox="0 0 340 150" aria-label="Reachability diagram">
-            {/* Root */}
             <circle cx="170" cy="20" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
             <text x="170" y="24" textAnchor="middle" fontSize="9" fill="#6b7280">root</text>
-            {/* Branches */}
             <line x1="170" y1="30" x2="80" y2="60" stroke="#d1d5db" strokeWidth="1.5" />
             <line x1="170" y1="30" x2="260" y2="60" stroke="#d1d5db" strokeWidth="1.5" />
-            {/* Internal nodes */}
             <circle cx="80" cy="68" r="9" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
             <circle cx="260" cy="68" r="9" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
-            {/* Leaf branches */}
             <line x1="80" y1="77" x2="40" y2="110" stroke="#d1d5db" strokeWidth="1.5" />
             <line x1="80" y1="77" x2="120" y2="110" stroke="#d1d5db" strokeWidth="1.5" />
             <line x1="260" y1="77" x2="220" y2="110" stroke="#d1d5db" strokeWidth="1.5" />
             <line x1="260" y1="77" x2="300" y2="110" stroke="#d1d5db" strokeWidth="1.5" />
-            {/* Leaves: 3 covered (green), 1 uncovered (red) */}
             <circle cx="40" cy="118" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
             <text x="40" y="122" textAnchor="middle" fontSize="8" fontWeight="700" fill="#16a34a">&#x2713;</text>
             <circle cx="120" cy="118" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
@@ -1427,133 +1422,103 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
             <text x="220" y="122" textAnchor="middle" fontSize="8" fontWeight="700" fill="#16a34a">&#x2713;</text>
             <circle cx="300" cy="118" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
             <text x="300" y="122" textAnchor="middle" fontSize="8" fontWeight="700" fill="#ef4444">&#x2717;</text>
-            {/* Labels */}
             <text x="170" y="147" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Reachability = 3 / 4 = 75%</text>
           </svg>
 
-          {/* Edge Case 1: Parent coverage does NOT propagate */}
-          <h4 className="cm-edge-heading">Edge Case: Parent Has LCA Entry</h4>
-          <p className="cm-metric-desc">
-            A parent node having an LCA database match does <strong>not</strong> propagate coverage to its children.
-            Each leaf is evaluated <strong>independently</strong> using its own code through the concordance chain.
-          </p>
-          <svg className="cm-tree-diagram" viewBox="0 0 420 200" aria-label="Parent coverage does not propagate">
-            {/* Parent node with LCA match */}
-            <circle cx="210" cy="28" r="14" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />
-            <text x="210" y="32" textAnchor="middle" fontSize="8" fontWeight="700" fill="#92400e">01</text>
-            <text x="262" y="22" fontSize="8" fill="#92400e" fontWeight="600">parent &ldquo;01&rdquo;</text>
-            <text x="262" y="33" fontSize="8" fill="#92400e">has ecoinvent match</text>
-            {/* Branch lines */}
-            <line x1="200" y1="42" x2="110" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
-            <line x1="210" y1="42" x2="210" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
-            <line x1="220" y1="42" x2="310" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
-            {/* Leaf nodes */}
-            <circle cx="110" cy="90" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
-            <text x="110" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0101</text>
-            <circle cx="210" cy="90" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
-            <text x="210" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0102</text>
-            <circle cx="310" cy="90" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
-            <text x="310" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0103</text>
-            {/* Annotations for each leaf */}
-            <text x="110" y="116" textAnchor="middle" fontSize="7" fill="#16a34a">own HS-6 match</text>
-            <text x="210" y="116" textAnchor="middle" fontSize="7" fill="#ef4444">no HS-6 match</text>
-            <text x="310" y="116" textAnchor="middle" fontSize="7" fill="#16a34a">own HS-6 match</text>
-            {/* Crossed-out arrow from parent to uncovered leaf */}
-            <line x1="210" y1="42" x2="210" y2="64" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
-            {/* Big X over the propagation idea */}
-            <line x1="195" y1="52" x2="225" y2="68" stroke="#ef4444" strokeWidth="2" />
-            <line x1="225" y1="52" x2="195" y2="68" stroke="#ef4444" strokeWidth="2" />
-            {/* Result box */}
-            <rect x="30" y="135" width="360" height="52" rx="6" fill="#fff7ed" stroke="#f59e0b" strokeWidth="1" />
-            <text x="210" y="153" textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">Parent &ldquo;01&rdquo; has data, but leaf &ldquo;0102&rdquo; is NOT covered</text>
-            <text x="210" y="168" textAnchor="middle" fontSize="9" fill="#78716c">Each leaf resolves through its own code &mdash; no downward inheritance</text>
-            <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#78716c">Reachability = 2 / 3 = 67% (parent&rsquo;s match is irrelevant)</text>
-          </svg>
+          <details className="cm-edge-details">
+            <summary className="cm-edge-summary">Edge Cases &amp; Examples</summary>
 
-          {/* Edge Case 2: Relaxed ancestor fallback */}
-          <h4 className="cm-edge-heading">Edge Case: Ancestor Fallback (Relaxed Mode)</h4>
-          <p className="cm-metric-desc">
-            In <strong>Relaxed</strong> mode, if a leaf&rsquo;s exact code isn&rsquo;t found in a database, the system tries
-            shorter prefixes of that code (walking <em>up</em> the code hierarchy). This is <strong>not</strong> parent-to-child propagation
-            &mdash; it&rsquo;s the leaf looking upward for the nearest available data.
-          </p>
-          <svg className="cm-tree-diagram" viewBox="0 0 420 210" aria-label="Ancestor fallback in relaxed mode">
-            {/* Database column */}
-            <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT DATABASE</text>
-            <rect x="290" y="25" width="80" height="24" rx="5" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
-            <text x="330" y="41" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">CPC &ldquo;011&rdquo;</text>
-            <text x="330" y="62" fontSize="7" fill="#6b7280" textAnchor="middle">(3-digit group)</text>
-            {/* Taxonomy tree side */}
-            <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY TREE</text>
-            {/* CPC 0 → 01 → 011 → 0111, 0112 */}
-            <circle cx="100" cy="35" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
-            <text x="100" y="39" textAnchor="middle" fontSize="8" fill="#6b7280">01</text>
-            <line x1="100" y1="45" x2="100" y2="65" stroke="#d1d5db" strokeWidth="1.5" />
-            <circle cx="100" cy="75" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
-            <text x="100" y="79" textAnchor="middle" fontSize="8" fill="#6b7280">011</text>
-            <line x1="93" y1="85" x2="60" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
-            <line x1="107" y1="85" x2="140" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
-            {/* Leaves */}
-            <circle cx="60" cy="125" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
-            <text x="60" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0111</text>
-            <circle cx="140" cy="125" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
-            <text x="140" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0112</text>
-            {/* Arrows: leaf tries exact, fails, then prefix match succeeds */}
-            <path d="M 72 122 Q 200 80 288 37" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
-            <path d="M 152 122 Q 200 110 288 40" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
-            <defs>
-              <marker id="arrowGreen" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#22c55e" /></marker>
-            </defs>
-            {/* Annotation */}
-            <text x="210" y="95" textAnchor="middle" fontSize="7" fill="#16a34a" fontWeight="600">exact &ldquo;0111&rdquo; not found</text>
-            <text x="210" y="106" textAnchor="middle" fontSize="7" fill="#16a34a">prefix &ldquo;011&rdquo; matches!</text>
-            {/* Result box */}
-            <rect x="30" y="148" width="360" height="52" rx="6" fill="#ecfdf5" stroke="#22c55e" strokeWidth="1" />
-            <text x="210" y="166" textAnchor="middle" fontSize="10" fontWeight="600" fill="#065f46">Relaxed: leaf &ldquo;0111&rdquo; covered via ancestor code &ldquo;011&rdquo;</text>
-            <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#6b7280">The leaf looks upward for the nearest matching prefix in the database</text>
-            <text x="210" y="194" textAnchor="middle" fontSize="9" fill="#6b7280">This is NOT parent propagation &mdash; it&rsquo;s the leaf resolving itself</text>
-          </svg>
+            <h4 className="cm-edge-heading">Parent Has LCA Entry</h4>
+            <p className="cm-metric-desc">
+              A parent node having an LCA database match does <strong>not</strong> propagate coverage to its children.
+              Each leaf is evaluated <strong>independently</strong> using its own code through the concordance chain.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 200" aria-label="Parent coverage does not propagate">
+              <circle cx="210" cy="28" r="14" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />
+              <text x="210" y="32" textAnchor="middle" fontSize="8" fontWeight="700" fill="#92400e">01</text>
+              <text x="262" y="22" fontSize="8" fill="#92400e" fontWeight="600">parent &ldquo;01&rdquo;</text>
+              <text x="262" y="33" fontSize="8" fill="#92400e">has ecoinvent match</text>
+              <line x1="200" y1="42" x2="110" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
+              <line x1="210" y1="42" x2="210" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
+              <line x1="220" y1="42" x2="310" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
+              <circle cx="110" cy="90" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="110" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0101</text>
+              <circle cx="210" cy="90" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+              <text x="210" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0102</text>
+              <circle cx="310" cy="90" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="310" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0103</text>
+              <text x="110" y="116" textAnchor="middle" fontSize="7" fill="#16a34a">own HS-6 match</text>
+              <text x="210" y="116" textAnchor="middle" fontSize="7" fill="#ef4444">no HS-6 match</text>
+              <text x="310" y="116" textAnchor="middle" fontSize="7" fill="#16a34a">own HS-6 match</text>
+              <line x1="210" y1="42" x2="210" y2="64" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="195" y1="52" x2="225" y2="68" stroke="#ef4444" strokeWidth="2" />
+              <line x1="225" y1="52" x2="195" y2="68" stroke="#ef4444" strokeWidth="2" />
+              <rect x="30" y="135" width="360" height="52" rx="6" fill="#fff7ed" stroke="#f59e0b" strokeWidth="1" />
+              <text x="210" y="153" textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">Parent &ldquo;01&rdquo; has data, but leaf &ldquo;0102&rdquo; is NOT covered</text>
+              <text x="210" y="168" textAnchor="middle" fontSize="9" fill="#78716c">Each leaf resolves through its own code &mdash; no downward inheritance</text>
+              <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#78716c">Reachability = 2 / 3 = 67% (parent&rsquo;s match is irrelevant)</text>
+            </svg>
 
-          {/* Edge Case 3: Exact mode */}
-          <h4 className="cm-edge-heading">Edge Case: Exact Mode (No Fallback)</h4>
-          <p className="cm-metric-desc">
-            In <strong>Exact</strong> mode, ancestor fallback is disabled. If the database doesn&rsquo;t have the leaf&rsquo;s precise code,
-            that leaf is <strong>not covered</strong> &mdash; even if a broader parent code exists in the database.
-          </p>
-          <svg className="cm-tree-diagram" viewBox="0 0 420 190" aria-label="Exact mode no fallback">
-            {/* Database column */}
-            <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT DATABASE</text>
-            <rect x="290" y="25" width="80" height="24" rx="5" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
-            <text x="330" y="41" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">CPC &ldquo;011&rdquo;</text>
-            <text x="330" y="62" fontSize="7" fill="#6b7280" textAnchor="middle">(3-digit group only)</text>
-            {/* Taxonomy tree */}
-            <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY TREE</text>
-            <circle cx="100" cy="35" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
-            <text x="100" y="39" textAnchor="middle" fontSize="8" fill="#6b7280">01</text>
-            <line x1="100" y1="45" x2="100" y2="65" stroke="#d1d5db" strokeWidth="1.5" />
-            <circle cx="100" cy="75" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
-            <text x="100" y="79" textAnchor="middle" fontSize="8" fill="#6b7280">011</text>
-            <line x1="93" y1="85" x2="60" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
-            <line x1="107" y1="85" x2="140" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
-            {/* Leaves - uncovered in exact mode */}
-            <circle cx="60" cy="125" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
-            <text x="60" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0111</text>
-            <circle cx="140" cy="125" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
-            <text x="140" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0112</text>
-            {/* Blocked arrows */}
-            <line x1="72" y1="120" x2="180" y2="80" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
-            <line x1="152" y1="120" x2="180" y2="85" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
-            {/* X marks */}
-            <line x1="170" y1="72" x2="190" y2="92" stroke="#ef4444" strokeWidth="2.5" />
-            <line x1="190" y1="72" x2="170" y2="92" stroke="#ef4444" strokeWidth="2.5" />
-            {/* Annotation */}
-            <text x="210" y="98" textAnchor="middle" fontSize="7" fill="#ef4444" fontWeight="600">exact &ldquo;0111&rdquo; not in DB</text>
-            <text x="210" y="109" textAnchor="middle" fontSize="7" fill="#ef4444">prefix fallback disabled</text>
-            {/* Result box */}
-            <rect x="30" y="142" width="360" height="40" rx="6" fill="#fef2f2" stroke="#ef4444" strokeWidth="1" />
-            <text x="210" y="158" textAnchor="middle" fontSize="10" fontWeight="600" fill="#991b1b">Exact: leaves &ldquo;0111&rdquo; &amp; &ldquo;0112&rdquo; are NOT covered</text>
-            <text x="210" y="173" textAnchor="middle" fontSize="9" fill="#78716c">DB has &ldquo;011&rdquo; but Exact mode requires the leaf&rsquo;s precise code</text>
-          </svg>
+            <h4 className="cm-edge-heading">Ancestor Code Inheritance</h4>
+            <p className="cm-metric-desc">
+              Some databases (e.g., ecoinvent) only have entries at a <strong>broader code level</strong> (e.g., CPC &ldquo;011&rdquo;) rather than the
+              leaf&rsquo;s exact code (e.g., &ldquo;0111&rdquo;). The matrix uses <strong>prefix matching</strong>: the leaf tries progressively shorter
+              prefixes of its own code until it finds a database entry. This is the leaf resolving <em>itself</em>, not a parent pushing data down.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 210" aria-label="Ancestor code inheritance">
+              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT DATABASE</text>
+              <rect x="290" y="25" width="80" height="24" rx="5" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+              <text x="330" y="41" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">CPC &ldquo;011&rdquo;</text>
+              <text x="330" y="62" fontSize="7" fill="#6b7280" textAnchor="middle">(3-digit group)</text>
+              <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY TREE</text>
+              <circle cx="100" cy="35" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+              <text x="100" y="39" textAnchor="middle" fontSize="8" fill="#6b7280">01</text>
+              <line x1="100" y1="45" x2="100" y2="65" stroke="#d1d5db" strokeWidth="1.5" />
+              <circle cx="100" cy="75" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+              <text x="100" y="79" textAnchor="middle" fontSize="8" fill="#6b7280">011</text>
+              <line x1="93" y1="85" x2="60" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
+              <line x1="107" y1="85" x2="140" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
+              <circle cx="60" cy="125" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0111</text>
+              <circle cx="140" cy="125" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="140" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0112</text>
+              <path d="M 72 122 Q 200 80 288 37" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
+              <path d="M 152 122 Q 200 110 288 40" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
+              <defs>
+                <marker id="arrowGreen" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#22c55e" /></marker>
+              </defs>
+              <text x="210" y="95" textAnchor="middle" fontSize="7" fill="#16a34a" fontWeight="600">exact &ldquo;0111&rdquo; not found</text>
+              <text x="210" y="106" textAnchor="middle" fontSize="7" fill="#16a34a">prefix &ldquo;011&rdquo; matches!</text>
+              <rect x="30" y="148" width="360" height="52" rx="6" fill="#ecfdf5" stroke="#22c55e" strokeWidth="1" />
+              <text x="210" y="166" textAnchor="middle" fontSize="10" fontWeight="600" fill="#065f46">Leaf &ldquo;0111&rdquo; covered via its prefix code &ldquo;011&rdquo;</text>
+              <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#6b7280">The leaf walks up its own code hierarchy to find data</text>
+              <text x="210" y="194" textAnchor="middle" fontSize="9" fill="#6b7280">Both leaves are &ldquo;covered&rdquo; but share 1 record (low specificity)</text>
+            </svg>
+
+            <h4 className="cm-edge-heading">No Concordance Path</h4>
+            <p className="cm-metric-desc">
+              Some taxonomy-database combinations have no concordance chain at all. For example,
+              <strong>ecoinvent</strong> has no NAICS mapping and <strong>UNSPSC</strong> has no ecoinvent path.
+              These leaves can never be reached regardless of prefix matching.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 160" aria-label="No concordance path">
+              <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">NAICS LEAVES</text>
+              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT</text>
+              <circle cx="100" cy="42" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+              <text x="60" y="46" textAnchor="end" fontSize="7" fill="#374151">111110</text>
+              <circle cx="100" cy="72" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+              <text x="60" y="76" textAnchor="end" fontSize="7" fill="#374151">111120</text>
+              <circle cx="100" cy="102" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+              <text x="60" y="106" textAnchor="end" fontSize="7" fill="#374151">111130</text>
+              <rect x="280" y="50" width="100" height="30" rx="5" fill="#f3f4f6" stroke="#d1d5db" strokeWidth="1.5" />
+              <text x="330" y="69" textAnchor="middle" fontSize="8" fill="#9ca3af">no NAICS index</text>
+              <line x1="110" y1="72" x2="200" y2="65" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="190" y1="58" x2="210" y2="72" stroke="#ef4444" strokeWidth="2" />
+              <line x1="210" y1="58" x2="190" y2="72" stroke="#ef4444" strokeWidth="2" />
+              <rect x="30" y="122" width="360" height="28" rx="6" fill="#fef2f2" stroke="#ef4444" strokeWidth="1" />
+              <text x="210" y="140" textAnchor="middle" fontSize="10" fontWeight="600" fill="#991b1b">Reachability = 0% &mdash; no concordance path exists</text>
+            </svg>
+          </details>
         </>)}
 
         {mode === "specificity" && (<>
@@ -1573,11 +1538,8 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
           </p>
           {/* Specificity diagram: 4 covered leaves mapping to 2 unique DB records */}
           <svg className="cm-tree-diagram" viewBox="0 0 340 170" aria-label="Specificity diagram">
-            {/* Taxonomy side label */}
             <text x="80" y="12" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY LEAVES</text>
-            {/* Database side label */}
             <text x="260" y="12" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">DATABASE RECORDS</text>
-            {/* Leaf nodes */}
             <circle cx="80" cy="40" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
             <text x="55" y="44" textAnchor="end" fontSize="8" fill="#374151">leaf A</text>
             <circle cx="80" cy="70" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
@@ -1586,20 +1548,107 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
             <text x="55" y="104" textAnchor="end" fontSize="8" fill="#374151">leaf C</text>
             <circle cx="80" cy="130" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
             <text x="55" y="134" textAnchor="end" fontSize="8" fill="#374151">leaf D</text>
-            {/* DB records */}
             <rect x="240" y="45" width="50" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
             <text x="265" y="60" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">rec #1</text>
             <rect x="240" y="95" width="50" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
             <text x="265" y="110" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">rec #2</text>
-            {/* Arrows: A,B,C → rec #1; D → rec #2 */}
             <line x1="90" y1="40" x2="238" y2="54" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
             <line x1="90" y1="70" x2="238" y2="56" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
             <line x1="90" y1="100" x2="238" y2="58" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
             <line x1="90" y1="130" x2="238" y2="106" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
             <defs><marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#9ca3af" /></marker></defs>
-            {/* Result */}
             <text x="170" y="163" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Specificity = 2 unique / 4 covered = 50%</text>
           </svg>
+
+          <details className="cm-edge-details">
+            <summary className="cm-edge-summary">Edge Cases &amp; Examples</summary>
+
+            <h4 className="cm-edge-heading">Coarse Database (HS-2 Chapter Level)</h4>
+            <p className="cm-metric-desc">
+              When a database like <strong>BAFU</strong> maps at the HS-2 chapter level, hundreds of leaf codes resolve to the same
+              record. Reachability may be high, but specificity is very low &mdash; indicating the data is not granular.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 185" aria-label="Coarse database specificity">
+              <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">HS CHAPTER &ldquo;01&rdquo; LEAVES</text>
+              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">BAFU DATABASE</text>
+              <circle cx="100" cy="38" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="42" textAnchor="end" fontSize="7" fill="#374151">010121</text>
+              <circle cx="100" cy="62" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="66" textAnchor="end" fontSize="7" fill="#374151">010129</text>
+              <circle cx="100" cy="86" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="90" textAnchor="end" fontSize="7" fill="#374151">010221</text>
+              <circle cx="100" cy="110" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="114" textAnchor="end" fontSize="7" fill="#374151">010290</text>
+              <text x="100" y="135" textAnchor="middle" fontSize="8" fill="#6b7280">... 50+ more</text>
+              <rect x="290" y="62" width="80" height="26" rx="5" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.5" />
+              <text x="330" y="79" textAnchor="middle" fontSize="8" fontWeight="600" fill="#92400e">ch. &ldquo;01&rdquo;</text>
+              <line x1="110" y1="38" x2="288" y2="72" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+              <line x1="110" y1="62" x2="288" y2="74" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+              <line x1="110" y1="86" x2="288" y2="76" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+              <line x1="110" y1="110" x2="288" y2="78" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+              <rect x="30" y="148" width="360" height="28" rx="6" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1" />
+              <text x="210" y="166" textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">50+ leaves &rarr; 1 record = very low specificity (~2%)</text>
+            </svg>
+
+            <h4 className="cm-edge-heading">Granular Database (Product-Level)</h4>
+            <p className="cm-metric-desc">
+              When a database like <strong>ecoinvent</strong> maps at the product level, each covered leaf often resolves to its own
+              unique CPC or HS code. This yields high specificity &mdash; the data is precise per product.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 170" aria-label="Granular database specificity">
+              <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY LEAVES</text>
+              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT RECORDS</text>
+              <circle cx="100" cy="42" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="46" textAnchor="end" fontSize="7" fill="#374151">01111</text>
+              <circle cx="100" cy="72" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="76" textAnchor="end" fontSize="7" fill="#374151">01112</text>
+              <circle cx="100" cy="102" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="106" textAnchor="end" fontSize="7" fill="#374151">01120</text>
+              <rect x="290" y="30" width="80" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+              <text x="330" y="45" textAnchor="middle" fontSize="7" fontWeight="600" fill="#1e40af">CPC 01111</text>
+              <rect x="290" y="60" width="80" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+              <text x="330" y="75" textAnchor="middle" fontSize="7" fontWeight="600" fill="#1e40af">CPC 01112</text>
+              <rect x="290" y="90" width="80" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+              <text x="330" y="105" textAnchor="middle" fontSize="7" fontWeight="600" fill="#1e40af">CPC 01120</text>
+              <line x1="110" y1="42" x2="288" y2="41" stroke="#22c55e" strokeWidth="1.5" markerEnd="url(#arrowGreen2)" />
+              <line x1="110" y1="72" x2="288" y2="71" stroke="#22c55e" strokeWidth="1.5" markerEnd="url(#arrowGreen2)" />
+              <line x1="110" y1="102" x2="288" y2="101" stroke="#22c55e" strokeWidth="1.5" markerEnd="url(#arrowGreen2)" />
+              <defs>
+                <marker id="arrowGreen2" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#22c55e" /></marker>
+              </defs>
+              <rect x="30" y="130" width="360" height="28" rx="6" fill="#ecfdf5" stroke="#22c55e" strokeWidth="1" />
+              <text x="210" y="148" textAnchor="middle" fontSize="10" fontWeight="600" fill="#065f46">3 leaves &rarr; 3 unique records = 100% specificity</text>
+            </svg>
+
+            <h4 className="cm-edge-heading">Prefix Matching Reduces Specificity</h4>
+            <p className="cm-metric-desc">
+              When multiple leaves resolve to the <strong>same ancestor code</strong> via prefix matching,
+              they all share one data record. Reachability is high, but specificity drops &mdash; revealing
+              the database lacks granular data at the leaf level.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 180" aria-label="Prefix matching reduces specificity">
+              <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY LEAVES</text>
+              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT DATABASE</text>
+              <circle cx="100" cy="40" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="44" textAnchor="end" fontSize="7" fill="#374151">0111</text>
+              <circle cx="100" cy="68" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="72" textAnchor="end" fontSize="7" fill="#374151">0112</text>
+              <circle cx="100" cy="96" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="100" textAnchor="end" fontSize="7" fill="#374151">0113</text>
+              <rect x="290" y="56" width="80" height="24" rx="5" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.5" />
+              <text x="330" y="72" textAnchor="middle" fontSize="8" fontWeight="600" fill="#92400e">CPC &ldquo;011&rdquo;</text>
+              <text x="330" y="95" fontSize="7" fill="#6b7280" textAnchor="middle">prefix match</text>
+              <line x1="110" y1="40" x2="288" y2="64" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,3" markerEnd="url(#arrowAmber)" />
+              <line x1="110" y1="68" x2="288" y2="68" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,3" markerEnd="url(#arrowAmber)" />
+              <line x1="110" y1="96" x2="288" y2="72" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,3" markerEnd="url(#arrowAmber)" />
+              <defs>
+                <marker id="arrowAmber" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#f59e0b" /></marker>
+              </defs>
+              <rect x="30" y="115" width="360" height="48" rx="6" fill="#fff7ed" stroke="#f59e0b" strokeWidth="1" />
+              <text x="210" y="133" textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">3 covered, 1 unique record = 33% specificity</text>
+              <text x="210" y="150" textAnchor="middle" fontSize="9" fill="#78716c">All 3 leaves matched via prefix &ldquo;011&rdquo; &mdash; same data for all</text>
+            </svg>
+          </details>
         </>)}
 
         {mode === "leafCoverage" && (<>
@@ -1615,13 +1664,11 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
             How many distinct database records exist relative to <em>all</em> leaf nodes. Combines breadth and granularity &mdash; a database scores high only if it covers many leaves <strong>and</strong> provides unique data for each.
           </p>
           <p className="cm-metric-note">
-            Leaf Coverage = Coverage &times; Specificity. It penalizes both gaps (uncovered leaves) and coarseness (many leaves sharing one record).
+            Leaf Coverage = Reachability &times; Specificity. It penalizes both gaps (uncovered leaves) and coarseness (many leaves sharing one record).
           </p>
-          {/* Leaf Coverage diagram: 5 total leaves, 4 covered, 2 unique records */}
           <svg className="cm-tree-diagram" viewBox="0 0 340 170" aria-label="Leaf Coverage diagram">
             <text x="80" y="12" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ALL LEAVES</text>
             <text x="260" y="12" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">DATABASE RECORDS</text>
-            {/* Leaf nodes: 4 covered, 1 uncovered */}
             <circle cx="80" cy="35" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
             <text x="55" y="39" textAnchor="end" fontSize="8" fill="#374151">leaf A</text>
             <circle cx="80" cy="62" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
@@ -1632,22 +1679,120 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
             <text x="55" y="120" textAnchor="end" fontSize="8" fill="#374151">leaf D</text>
             <circle cx="80" cy="143" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
             <text x="55" y="147" textAnchor="end" fontSize="8" fill="#9ca3af">leaf E</text>
-            {/* DB records */}
             <rect x="240" y="38" width="50" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
             <text x="265" y="53" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">rec #1</text>
             <rect x="240" y="88" width="50" height="22" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
             <text x="265" y="103" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">rec #2</text>
-            {/* Arrows */}
             <line x1="90" y1="35" x2="238" y2="47" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
             <line x1="90" y1="62" x2="238" y2="49" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
             <line x1="90" y1="89" x2="238" y2="51" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
             <line x1="90" y1="116" x2="238" y2="99" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
-            {/* No arrow from leaf E */}
             <line x1="90" y1="143" x2="130" y2="143" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
             <text x="138" y="147" fontSize="8" fill="#ef4444">no match</text>
-            {/* Result */}
             <text x="170" y="167" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Leaf Coverage = 2 unique / 5 total = 40%</text>
           </svg>
+
+          <details className="cm-edge-details">
+            <summary className="cm-edge-summary">Edge Cases &amp; Examples</summary>
+
+            <h4 className="cm-edge-heading">High Reachability, Low Leaf Coverage</h4>
+            <p className="cm-metric-desc">
+              A database can &ldquo;reach&rdquo; many leaves but provide the <strong>same data point</strong> for all of them.
+              Reachability looks great, but Leaf Coverage reveals the true data granularity is poor.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 195" aria-label="High reach low leaf coverage">
+              <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ALL 5 LEAVES</text>
+              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">DATABASE</text>
+              <circle cx="100" cy="35" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="39" textAnchor="end" fontSize="7" fill="#374151">leaf A</text>
+              <circle cx="100" cy="58" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="62" textAnchor="end" fontSize="7" fill="#374151">leaf B</text>
+              <circle cx="100" cy="81" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="85" textAnchor="end" fontSize="7" fill="#374151">leaf C</text>
+              <circle cx="100" cy="104" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="60" y="108" textAnchor="end" fontSize="7" fill="#374151">leaf D</text>
+              <circle cx="100" cy="127" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+              <text x="60" y="131" textAnchor="end" fontSize="7" fill="#9ca3af">leaf E</text>
+              <rect x="290" y="62" width="80" height="26" rx="5" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.5" />
+              <text x="330" y="79" textAnchor="middle" fontSize="8" fontWeight="600" fill="#92400e">1 record</text>
+              <line x1="110" y1="35" x2="288" y2="72" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+              <line x1="110" y1="58" x2="288" y2="74" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+              <line x1="110" y1="81" x2="288" y2="75" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+              <line x1="110" y1="104" x2="288" y2="77" stroke="#9ca3af" strokeWidth="1" markerEnd="url(#arrowhead)" />
+              <line x1="110" y1="127" x2="150" y2="127" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
+              <text x="158" y="131" fontSize="7" fill="#ef4444">no match</text>
+              <rect x="30" y="148" width="360" height="40" rx="6" fill="#fff7ed" stroke="#f59e0b" strokeWidth="1" />
+              <text x="210" y="162" textAnchor="middle" fontSize="9" fontWeight="600" fill="#92400e">Reachability = 4/5 = 80% &mdash; but Leaf Coverage = 1/5 = 20%</text>
+              <text x="210" y="177" textAnchor="middle" fontSize="8" fill="#78716c">4 leaves share 1 record &mdash; all get the same data point</text>
+            </svg>
+
+            <h4 className="cm-edge-heading">Comparing Two Databases</h4>
+            <p className="cm-metric-desc">
+              Leaf Coverage is the best single metric for comparing databases. A database with lower reachability but
+              higher specificity can have <strong>better</strong> Leaf Coverage than one that reaches more leaves with coarse data.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 200" aria-label="Comparing databases via leaf coverage">
+              <text x="210" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">SAME 4 TAXONOMY LEAVES</text>
+              {/* DB A: coarse, 4/4 reached, 1 unique */}
+              <text x="105" y="35" textAnchor="middle" fontSize="9" fontWeight="600" fill="#92400e">Database A (coarse)</text>
+              <circle cx="50" cy="58" r="8" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <circle cx="80" cy="58" r="8" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <circle cx="110" cy="58" r="8" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <circle cx="140" cy="58" r="8" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <rect x="70" y="80" width="60" height="20" rx="4" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1" />
+              <text x="100" y="93" textAnchor="middle" fontSize="7" fontWeight="600" fill="#92400e">1 record</text>
+              <line x1="50" y1="66" x2="82" y2="80" stroke="#9ca3af" strokeWidth="0.8" />
+              <line x1="80" y1="66" x2="92" y2="80" stroke="#9ca3af" strokeWidth="0.8" />
+              <line x1="110" y1="66" x2="102" y2="80" stroke="#9ca3af" strokeWidth="0.8" />
+              <line x1="140" y1="66" x2="118" y2="80" stroke="#9ca3af" strokeWidth="0.8" />
+              <text x="105" y="118" textAnchor="middle" fontSize="9" fill="#92400e">Reach 100% &middot; Spec 25% &middot; <tspan fontWeight="700">LC 25%</tspan></text>
+              {/* DB B: granular, 3/4 reached, 3 unique */}
+              <text x="315" y="35" textAnchor="middle" fontSize="9" fontWeight="600" fill="#065f46">Database B (granular)</text>
+              <circle cx="260" cy="58" r="8" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <circle cx="290" cy="58" r="8" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <circle cx="320" cy="58" r="8" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <circle cx="350" cy="58" r="8" fill="#fef2f2" stroke="#ef4444" strokeWidth="1.5" />
+              <rect x="245" y="80" width="40" height="18" rx="3" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1" />
+              <text x="265" y="92" textAnchor="middle" fontSize="6" fontWeight="600" fill="#1e40af">rec 1</text>
+              <rect x="290" y="80" width="40" height="18" rx="3" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1" />
+              <text x="310" y="92" textAnchor="middle" fontSize="6" fontWeight="600" fill="#1e40af">rec 2</text>
+              <rect x="335" y="80" width="40" height="18" rx="3" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1" />
+              <text x="355" y="92" textAnchor="middle" fontSize="6" fontWeight="600" fill="#1e40af">rec 3</text>
+              <line x1="260" y1="66" x2="265" y2="80" stroke="#22c55e" strokeWidth="0.8" />
+              <line x1="290" y1="66" x2="310" y2="80" stroke="#22c55e" strokeWidth="0.8" />
+              <line x1="320" y1="66" x2="355" y2="80" stroke="#22c55e" strokeWidth="0.8" />
+              <text x="315" y="118" textAnchor="middle" fontSize="9" fill="#065f46">Reach 75% &middot; Spec 100% &middot; <tspan fontWeight="700">LC 75%</tspan></text>
+              {/* Winner box */}
+              <rect x="30" y="135" width="360" height="52" rx="6" fill="#ecfdf5" stroke="#22c55e" strokeWidth="1" />
+              <text x="210" y="153" textAnchor="middle" fontSize="10" fontWeight="600" fill="#065f46">Database B wins on Leaf Coverage (75% vs 25%)</text>
+              <text x="210" y="168" textAnchor="middle" fontSize="9" fill="#78716c">Lower reach but much higher granularity &mdash; more useful data</text>
+              <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#78716c">Leaf Coverage captures both dimensions in a single metric</text>
+            </svg>
+
+            <h4 className="cm-edge-heading">Parent Entry Does Not Affect Leaf Coverage</h4>
+            <p className="cm-metric-desc">
+              Just like Reachability, Leaf Coverage only counts leaf nodes. A parent having a database entry
+              does <strong>not</strong> add to the unique record count for its children &mdash; only the leaf&rsquo;s own resolved record counts.
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 180" aria-label="Parent does not affect leaf coverage">
+              <circle cx="210" cy="25" r="13" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />
+              <text x="210" y="29" textAnchor="middle" fontSize="8" fontWeight="700" fill="#92400e">01</text>
+              <text x="258" y="20" fontSize="7" fill="#92400e">has DB entry</text>
+              <text x="258" y="31" fontSize="7" fill="#92400e">(doesn&rsquo;t count)</text>
+              <line x1="200" y1="38" x2="130" y2="68" stroke="#d1d5db" strokeWidth="1.5" />
+              <line x1="220" y1="38" x2="290" y2="68" stroke="#d1d5db" strokeWidth="1.5" />
+              <circle cx="130" cy="78" r="11" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="130" y="82" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0101</text>
+              <circle cx="290" cy="78" r="11" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+              <text x="290" y="82" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0102</text>
+              <text x="130" y="102" textAnchor="middle" fontSize="7" fill="#16a34a">resolves to rec #1</text>
+              <text x="290" y="102" textAnchor="middle" fontSize="7" fill="#ef4444">no match</text>
+              <rect x="30" y="118" width="360" height="50" rx="6" fill="#f9fafb" stroke="#d1d5db" strokeWidth="1" />
+              <text x="210" y="136" textAnchor="middle" fontSize="10" fontWeight="600" fill="#374151">Leaf Coverage = 1 unique / 2 total = 50%</text>
+              <text x="210" y="151" textAnchor="middle" fontSize="9" fill="#78716c">Parent &ldquo;01&rdquo; has data but is not a leaf &mdash; excluded from the metric</text>
+              <text x="210" y="164" textAnchor="middle" fontSize="9" fill="#78716c">Only leaf &ldquo;0101&rdquo;&rsquo;s own resolved record is counted</text>
+            </svg>
+          </details>
         </>)}
       </div>
 

@@ -2300,13 +2300,67 @@
   height: auto;
 }
 
+.cm-edge-details {
+  margin-top: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cm-edge-details[open] {
+  padding-bottom: 8px;
+}
+
+.cm-edge-summary {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  background: #f9fafb;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.cm-edge-summary::-webkit-details-marker {
+  display: none;
+}
+
+.cm-edge-summary::before {
+  content: "\25B6";
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+
+.cm-edge-details[open] > .cm-edge-summary::before {
+  transform: rotate(90deg);
+}
+
+.cm-edge-summary:hover {
+  background: #f3f4f6;
+}
+
+.cm-edge-details > .cm-edge-heading,
+.cm-edge-details > .cm-metric-desc,
+.cm-edge-details > .cm-tree-diagram {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+
 .cm-edge-heading {
   font-size: 13px;
   font-weight: 600;
   color: #374151;
-  margin: 18px 0 4px;
-  padding-top: 12px;
+  margin: 14px 14px 4px;
+  padding-top: 10px;
   border-top: 1px solid #e5e7eb;
+}
+
+.cm-edge-details > .cm-edge-heading:first-of-type {
+  border-top: none;
+  margin-top: 8px;
 }
 
 /* ===== Resolution Methods Tab ===== */
