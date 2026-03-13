@@ -1808,71 +1808,84 @@ function CoverageMatrixTab({ data, onNavigateToNode, onHighlightGaps, onCloseMod
           <details className="cm-edge-details">
             <summary className="cm-edge-summary">Edge Cases &amp; Examples</summary>
 
-            <h4 className="cm-edge-heading">Parent Has LCA Entry</h4>
+            <h4 className="cm-edge-heading">Exact-Match Databases (EPA, US LCI)</h4>
             <p className="cm-metric-desc">
-              A parent node having an LCA database match does <strong>not</strong> propagate coverage to its children.
-              Each leaf is evaluated <strong>independently</strong> using its own code through the concordance chain.
+              Databases with <strong>exact-match</strong> semantics (EPA at HS-6, US LCI at HS-6) only match nodes whose own code
+              appears in the database. A parent node having an LCA match does <strong>not</strong> mean its children are covered &mdash;
+              each is evaluated independently. If the parent&rsquo;s code &ldquo;010100&rdquo; has an EPA entry but the child&rsquo;s code &ldquo;010200&rdquo;
+              does not, the child is unreachable.
             </p>
-            <svg className="cm-tree-diagram" viewBox="0 0 420 200" aria-label="Parent coverage does not propagate">
-              <circle cx="210" cy="28" r="14" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />
-              <text x="210" y="32" textAnchor="middle" fontSize="8" fontWeight="700" fill="#92400e">01</text>
-              <text x="262" y="22" fontSize="8" fill="#92400e" fontWeight="600">parent &ldquo;01&rdquo;</text>
-              <text x="262" y="33" fontSize="8" fill="#92400e">has ecoinvent match</text>
-              <line x1="200" y1="42" x2="110" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
-              <line x1="210" y1="42" x2="210" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
-              <line x1="220" y1="42" x2="310" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
-              <circle cx="110" cy="90" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
-              <text x="110" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0101</text>
-              <circle cx="210" cy="90" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
-              <text x="210" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0102</text>
-              <circle cx="310" cy="90" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
-              <text x="310" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0103</text>
-              <text x="110" y="116" textAnchor="middle" fontSize="7" fill="#16a34a">own HS-6 match</text>
-              <text x="210" y="116" textAnchor="middle" fontSize="7" fill="#ef4444">no HS-6 match</text>
-              <text x="310" y="116" textAnchor="middle" fontSize="7" fill="#16a34a">own HS-6 match</text>
-              <line x1="210" y1="42" x2="210" y2="64" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
-              <line x1="195" y1="52" x2="225" y2="68" stroke="#ef4444" strokeWidth="2" />
-              <line x1="225" y1="52" x2="195" y2="68" stroke="#ef4444" strokeWidth="2" />
-              <rect x="30" y="135" width="360" height="52" rx="6" fill="#fff7ed" stroke="#f59e0b" strokeWidth="1" />
-              <text x="210" y="153" textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">Parent &ldquo;01&rdquo; has data, but leaf &ldquo;0102&rdquo; is NOT covered</text>
-              <text x="210" y="168" textAnchor="middle" fontSize="9" fill="#78716c">Each leaf resolves through its own code &mdash; no downward inheritance</text>
-              <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#78716c">Reachability = 2 / 3 = 67% (parent&rsquo;s match is irrelevant)</text>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 200" aria-label="Exact-match databases: parent coverage does not imply child coverage">
+              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">EPA DATABASE (HS-6)</text>
+              <rect x="280" y="22" width="100" height="20" rx="5" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <text x="330" y="36" textAnchor="middle" fontSize="8" fontWeight="600" fill="#166534">010100 &check;</text>
+              <rect x="280" y="48" width="100" height="20" rx="5" fill="#fef2f2" stroke="#ef4444" strokeWidth="1" />
+              <text x="330" y="62" textAnchor="middle" fontSize="8" fill="#991b1b">010200 &times;</text>
+              <rect x="280" y="74" width="100" height="20" rx="5" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <text x="330" y="88" textAnchor="middle" fontSize="8" fontWeight="600" fill="#166534">010300 &check;</text>
+              <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY TREE</text>
+              <circle cx="100" cy="35" r="14" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+              <text x="100" y="39" textAnchor="middle" fontSize="8" fill="#6b7280">01</text>
+              <line x1="90" y1="49" x2="50" y2="85" stroke="#d1d5db" strokeWidth="1.5" />
+              <line x1="100" y1="49" x2="100" y2="85" stroke="#d1d5db" strokeWidth="1.5" />
+              <line x1="110" y1="49" x2="150" y2="85" stroke="#d1d5db" strokeWidth="1.5" />
+              <circle cx="50" cy="97" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="50" y="101" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0101</text>
+              <circle cx="100" cy="97" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+              <text x="100" y="101" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0102</text>
+              <circle cx="150" cy="97" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+              <text x="150" y="101" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0103</text>
+              <text x="50" y="122" textAnchor="middle" fontSize="7" fill="#16a34a">exact match</text>
+              <text x="100" y="122" textAnchor="middle" fontSize="7" fill="#ef4444">no match</text>
+              <text x="150" y="122" textAnchor="middle" fontSize="7" fill="#16a34a">exact match</text>
+              <rect x="30" y="140" width="360" height="52" rx="6" fill="#fff7ed" stroke="#f59e0b" strokeWidth="1" />
+              <text x="210" y="158" textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">Each leaf needs its own exact HS-6 code in the database</text>
+              <text x="210" y="173" textAnchor="middle" fontSize="9" fill="#78716c">Reachability = 2 / 3 = 67% &mdash; no inheritance from parent &ldquo;01&rdquo;</text>
+              <text x="210" y="186" textAnchor="middle" fontSize="9" fill="#78716c">Applies to: EPA/USEEIO (HS-6), US LCI (HS-6), ecoinvent (CPC/HS exact)</text>
             </svg>
 
-            <h4 className="cm-edge-heading">Ancestor Code Inheritance</h4>
+            <h4 className="cm-edge-heading">Ancestor-Aware Databases (ecoinvent ISIC, BAFU/GaBi)</h4>
             <p className="cm-metric-desc">
-              Some databases (e.g., ecoinvent) only have entries at a <strong>broader code level</strong> (e.g., CPC &ldquo;011&rdquo;) rather than the
-              leaf&rsquo;s exact code (e.g., &ldquo;0111&rdquo;). The matrix uses <strong>prefix matching</strong>: the leaf tries progressively shorter
-              prefixes of its own code until it finds a database entry. This is the leaf resolving <em>itself</em>, not a parent pushing data down.
+              Some database-taxonomy pairs use <strong>broader resolution</strong> that covers entire subtrees.
+              For <strong>ecoinvent + ISIC/NACE</strong>, a pre-computed ancestor list marks parent codes that have descendant entries &mdash;
+              both the parent and its children independently match, so coverage effectively spans the subtree.
+              For <strong>BAFU/GaBi</strong>, every node independently extracts its HS-2 chapter (e.g., both HS-4 &ldquo;0101&rdquo; and
+              HS-6 &ldquo;010121&rdquo; resolve to chapter &ldquo;01&rdquo;), so all nodes under a covered chapter are reachable.
             </p>
-            <svg className="cm-tree-diagram" viewBox="0 0 420 210" aria-label="Ancestor code inheritance">
-              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT DATABASE</text>
-              <rect x="290" y="25" width="80" height="24" rx="5" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
-              <text x="330" y="41" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">CPC &ldquo;011&rdquo;</text>
-              <text x="330" y="62" fontSize="7" fill="#6b7280" textAnchor="middle">(3-digit group)</text>
+            <p className="cm-metric-desc" style={{ marginTop: "4px", fontStyle: "italic", color: "#6b7280" }}>
+              This is <strong>not</strong> downward propagation &mdash; each node resolves itself independently. But the functional result is
+              that a parent having coverage strongly predicts its descendants will too, because they share the same code prefix or chapter.
+              The trade-off: high reachability but low specificity (many nodes share one coarse-grained record).
+            </p>
+            <svg className="cm-tree-diagram" viewBox="0 0 420 210" aria-label="Ancestor-aware databases: broad coverage">
+              <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">BAFU DATABASE (HS-2)</text>
+              <rect x="280" y="22" width="100" height="24" rx="5" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+              <text x="330" y="38" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">chapter &ldquo;01&rdquo;</text>
+              <text x="330" y="58" fontSize="7" fill="#6b7280" textAnchor="middle">(covers all 01xx codes)</text>
               <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY TREE</text>
-              <circle cx="100" cy="35" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
-              <text x="100" y="39" textAnchor="middle" fontSize="8" fill="#6b7280">01</text>
+              <circle cx="100" cy="35" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <text x="100" y="39" textAnchor="middle" fontSize="8" fill="#16a34a">01</text>
               <line x1="100" y1="45" x2="100" y2="65" stroke="#d1d5db" strokeWidth="1.5" />
-              <circle cx="100" cy="75" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
-              <text x="100" y="79" textAnchor="middle" fontSize="8" fill="#6b7280">011</text>
+              <circle cx="100" cy="75" r="10" fill="#dcfce7" stroke="#22c55e" strokeWidth="1.5" />
+              <text x="100" y="79" textAnchor="middle" fontSize="8" fill="#16a34a">011</text>
               <line x1="93" y1="85" x2="60" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
               <line x1="107" y1="85" x2="140" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
               <circle cx="60" cy="125" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
               <text x="60" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0111</text>
               <circle cx="140" cy="125" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
               <text x="140" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0112</text>
-              <path d="M 72 122 Q 200 80 288 37" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
-              <path d="M 152 122 Q 200 110 288 40" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
+              <path d="M 72 122 Q 200 80 278 34" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
+              <path d="M 152 122 Q 220 110 278 37" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
               <defs>
                 <marker id="arrowGreen" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#22c55e" /></marker>
               </defs>
-              <text x="210" y="95" textAnchor="middle" fontSize="7" fill="#16a34a" fontWeight="600">exact &ldquo;0111&rdquo; not found</text>
-              <text x="210" y="106" textAnchor="middle" fontSize="7" fill="#16a34a">prefix &ldquo;011&rdquo; matches!</text>
+              <text x="210" y="82" textAnchor="middle" fontSize="7" fill="#16a34a" fontWeight="600">&ldquo;0111&rdquo; &rarr; chapter &ldquo;01&rdquo; &check;</text>
+              <text x="210" y="93" textAnchor="middle" fontSize="7" fill="#16a34a">&ldquo;0112&rdquo; &rarr; chapter &ldquo;01&rdquo; &check;</text>
+              <text x="210" y="104" textAnchor="middle" fontSize="7" fill="#6b7280">(each node derives its own chapter independently)</text>
               <rect x="30" y="148" width="360" height="52" rx="6" fill="#ecfdf5" stroke="#22c55e" strokeWidth="1" />
-              <text x="210" y="166" textAnchor="middle" fontSize="10" fontWeight="600" fill="#065f46">Leaf &ldquo;0111&rdquo; covered via its prefix code &ldquo;011&rdquo;</text>
-              <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#6b7280">The leaf walks up its own code hierarchy to find data</text>
-              <text x="210" y="194" textAnchor="middle" fontSize="9" fill="#6b7280">Both leaves are &ldquo;covered&rdquo; but share 1 record (low specificity)</text>
+              <text x="210" y="166" textAnchor="middle" fontSize="10" fontWeight="600" fill="#065f46">Reachability = 100% &mdash; all nodes resolve to chapter &ldquo;01&rdquo;</text>
+              <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#6b7280">High reachability, but low specificity (1 shared record)</text>
+              <text x="210" y="194" textAnchor="middle" fontSize="9" fill="#6b7280">Applies to: BAFU/GaBi (HS-2), ecoinvent (ISIC/NACE ancestor lists)</text>
             </svg>
 
             <h4 className="cm-edge-heading">No Concordance Path</h4>
