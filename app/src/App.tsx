@@ -2205,8 +2205,7 @@ function computeBafuCoverage(
   concordance: ConcordanceData,
   strict: boolean,
 ): Map<string, CoverageInfo> {
-  // BAFU only has HS-2 chapter-level matching — disabled entirely in strict mode
-  if (strict) return new Map();
+  // BAFU maps at HS-2 chapter level — this IS the native resolution, not a fallback
   if (!bafuCoverage) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
   // Use kg-unit process count to match what the comparison panel displays
@@ -2257,8 +2256,7 @@ function computeGabiCoverage(
   concordance: ConcordanceData,
   strict: boolean,
 ): Map<string, CoverageInfo> {
-  // GaBi only has HS-2 chapter-level matching — disabled entirely in strict mode
-  if (strict) return new Map();
+  // GaBi maps at HS-2 chapter level — this IS the native resolution, not a fallback
   if (!gabiCoverage) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
   const coverageMap = new Map(

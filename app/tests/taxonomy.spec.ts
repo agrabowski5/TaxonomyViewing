@@ -429,7 +429,7 @@ test.describe('GaBi/Sphera Integration', () => {
     expect(badgeText).toMatch(/^G /);
   });
 
-  test('GaBi badges do NOT appear in Exact mode', async ({ page }) => {
+  test('GaBi badges appear in Exact mode too (HS-2 is native resolution)', async ({ page }) => {
     // Switch back to Exact mode
     const toggle = page.locator('.match-mode-track');
     await toggle.click();
@@ -441,9 +441,10 @@ test.describe('GaBi/Sphera Integration', () => {
     await leftPane.locator('.tree-node .toggle').first().click();
     await page.waitForTimeout(300);
 
-    // GaBi badges should NOT appear in strict/exact mode
+    // GaBi badges should still appear — HS-2 chapter is GaBi's native resolution
     const gabiBadges = leftPane.locator('.ef-badge.ef-gabi');
-    expect(await gabiBadges.count()).toBe(0);
+    await expect(gabiBadges.first()).toBeVisible({ timeout: 5000 });
+    expect(await gabiBadges.count()).toBeGreaterThan(0);
   });
 
   test('GaBi comparison card appears when selecting a covered node', async ({ page }) => {
