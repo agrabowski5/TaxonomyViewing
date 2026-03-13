@@ -700,18 +700,6 @@ function traceResolutionChain(
     return [];
   }
 
-  // Helper: get HS-6 base from HS-family or combined taxonomies
-  function getHs6(): string | null {
-    if (isHs || isT1Hts || isT2Hts) {
-      const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
-      if (!hsBase || hsBase.length < 6) return null;
-      const hs6 = hsBase.substring(0, 6);
-      if (!isHs) steps.push({ label: "HS-6 extract", code: hs6, system: "HS" });
-      return hs6;
-    }
-    return null;
-  }
-
   // Helper: get CPC code from CPC or combined taxonomies
   function getCpcCode(): string | null {
     if (isCpc) {
@@ -741,14 +729,15 @@ function traceResolutionChain(
     if (!factors) return null;
 
     // Try direct HS
-    const hs6 = getHs6();
-    if (hs6) {
+    if (isHs || isT1Hts || isT2Hts) {
+      const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
+      if (!hsBase || hsBase.length < 6) return null;
+      const hs6 = hsBase.substring(0, 6);
+      steps.push({ label: "HS-6 code (EPA key)", code: hs6, system: "HS" });
       const ef = factors[hs6];
-      if (ef) {
-        steps.push({ label: "EPA/USEEIO factor", code: ef.naicsCode, description: ef.naicsDescription, system: "EPA", lcaDb: "epa", searchCode: hs6 });
-        return { steps, database: "EPA/USEEIO" };
-      }
-      return null;
+      if (!ef) return null;
+      steps.push({ label: "EPA/USEEIO factor", code: ef.naicsCode, description: ef.naicsDescription, system: "EPA", lcaDb: "epa", searchCode: hs6 });
+      return { steps, database: "EPA/USEEIO" };
     }
 
     // Try CPC→HS
@@ -756,9 +745,11 @@ function traceResolutionChain(
     if (cpcCode) {
       const hsCode = cpcToHs(cpcCode);
       if (hsCode) {
-        const ef = factors[hsCode];
+        const hs6 = hsCode.substring(0, 6);
+        if (hs6 !== hsCode) steps.push({ label: "HS-6 extract", code: hs6, system: "HS" });
+        const ef = factors[hs6];
         if (ef) {
-          steps.push({ label: "EPA/USEEIO factor", code: ef.naicsCode, description: ef.naicsDescription, system: "EPA", lcaDb: "epa", searchCode: hsCode });
+          steps.push({ label: "EPA/USEEIO factor", code: ef.naicsCode, description: ef.naicsDescription, system: "EPA", lcaDb: "epa", searchCode: hs6 });
           return { steps, database: "EPA/USEEIO" };
         }
       }
@@ -772,6 +763,7 @@ function traceResolutionChain(
         const hs6Code = hs.substring(0, 6);
         const ef = factors[hs6Code];
         if (ef) {
+          if (hs6Code !== hs) steps.push({ label: "HS-6 extract", code: hs6Code, system: "HS" });
           steps.push({ label: "EPA/USEEIO factor", code: ef.naicsCode, description: ef.naicsDescription, system: "EPA", lcaDb: "epa", searchCode: hs6Code });
           return { steps, database: "EPA/USEEIO" };
         }
@@ -799,14 +791,11 @@ function traceResolutionChain(
     if (isHs || isT1Hts || isT2Hts) {
       const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
       if (!hsBase) return null;
-      if (!isHs && !isT1Hts && !isT2Hts) {
-        // already added in getHs6, but we handle separately here
-      }
       for (let len = Math.min(6, hsBase.length); len >= 4; len--) {
         const prefix = hsBase.substring(0, len);
         const exioCodes = c.hsToExio[prefix];
         if (exioCodes && exioCodes.length > 0) {
-          if (!isHs) steps.push({ label: "HS extract", code: prefix, system: "HS" });
+          if (prefix !== hsBase) steps.push({ label: `HS-${prefix.length} prefix (EXIOBASE key)`, code: prefix, system: "HS" });
           return addExioProducts(exioCodes, "HS→EXIOBASE", "exioHs", prefix);
         }
       }
@@ -929,7 +918,7 @@ function traceResolutionChain(
         for (let len = Math.min(6, hsBase.length); len >= 2; len -= 2) {
           const prefix = hsBase.substring(0, len);
           if (em.hs[prefix]) {
-            if (prefix.length < hsBase.length) steps.push({ label: `HS prefix match (${prefix.length}-digit)`, code: prefix, system: "HS" });
+            steps.push({ label: `HS-${prefix.length} code (ecoinvent key)`, code: prefix, system: "HS" });
             steps.push({ label: "ecoinvent HS lookup", code: prefix, description: `${em.hs[prefix].count} product(s)`, system: "ecoinvent", lcaDb: "ecoinvent", searchCode: prefix });
             return { steps, database: "ecoinvent" };
           }
@@ -1019,7 +1008,8 @@ function traceResolutionChain(
     if (isHs || isT1Hts || isT2Hts) {
       const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
       if (!hsBase) return null;
-      if (!isHs) steps.push({ label: "HS extract", code: hsBase.substring(0, 6), system: "HS" });
+      const lookupKey = isUslci ? hsBase.substring(0, 6) : hsBase.substring(0, 2);
+      steps.push({ label: `HS-${lookupKey.length} ${isUslci ? "code" : "chapter"} (${dbLabel} key)`, code: lookupKey, system: "HS" });
       return lookupHs(hsBase);
     }
 
@@ -1048,18 +1038,24 @@ function traceResolutionChain(
 
 /* =============================== Resolution Chain Display =============================== */
 
-function ResolutionChainToggle({ chain, onOpenTab }: {
-  chain: ResolutionChain;
+function ResolutionChainToggle({ getChain, onOpenTab }: {
+  getChain: () => ResolutionChain | null;
   onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [chain, setChain] = React.useState<ResolutionChain | null>(null);
+
+  const handleToggle = React.useCallback(() => {
+    if (!open && !chain) setChain(getChain());
+    setOpen(o => !o);
+  }, [open, chain, getChain]);
 
   return (
     <div className="resolution-chain-toggle">
-      <button className="resolution-toggle-btn" onClick={() => setOpen(!open)}>
+      <button className="resolution-toggle-btn" onClick={handleToggle}>
         {open ? "Hide" : "Show"} resolution path
       </button>
-      {open && (
+      {open && chain && (
         <div className="resolution-chain">
           <div className="resolution-chain-steps">
             {chain.steps.map((step, i) => (
@@ -1091,11 +1087,18 @@ function ResolutionChainToggle({ chain, onOpenTab }: {
           </div>
         </div>
       )}
+      {open && !chain && (
+        <div className="resolution-chain">
+          <div className="resolution-chain-steps">
+            <span style={{ color: "#94a3b8", fontStyle: "italic" }}>No resolution path found</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function EmissionFactorDisplay({ entry, chain, onOpenTab }: { entry: EmissionFactorEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
+function EmissionFactorDisplay({ entry, getChain, onOpenTab }: { entry: EmissionFactorEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   const total = entry.factor;
   const prodPct = total > 0 ? (entry.factorWithoutMargins / total) * 100 : 0;
   const marginPct = total > 0 ? (entry.margins / total) * 100 : 0;
@@ -1129,12 +1132,12 @@ function EmissionFactorDisplay({ entry, chain, onOpenTab }: { entry: EmissionFac
         NAICS {entry.naicsCode}: {entry.naicsDescription}
       </div>
       <div className="emission-source">{entry.source}</div>
-      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
+      {getChain && <ResolutionChainToggle getChain={getChain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
 
-function ExiobaseFactorDisplay({ entry, chain, onOpenTab }: { entry: ExiobaseFactorEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
+function ExiobaseFactorDisplay({ entry, getChain, onOpenTab }: { entry: ExiobaseFactorEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return (
     <div className="emission-factor-card exiobase-card">
       <h4>Carbon Intensity (EXIOBASE)</h4>
@@ -1148,7 +1151,7 @@ function ExiobaseFactorDisplay({ entry, chain, onOpenTab }: { entry: ExiobaseFac
         ))}
       </div>
       <div className="emission-source">{entry.source}</div>
-      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
+      {getChain && <ResolutionChainToggle getChain={getChain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -1290,7 +1293,7 @@ function getExiobaseProducts(
   return null;
 }
 
-function ExiobaseProductDisplay({ match, chain, onOpenTab }: { match: ExiobaseProductMatch; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
+function ExiobaseProductDisplay({ match, getChain, onOpenTab }: { match: ExiobaseProductMatch; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return (
     <div className="emission-factor-card exiobase-products-card">
       <h4>EXIOBASE Product Mapping</h4>
@@ -1308,7 +1311,7 @@ function ExiobaseProductDisplay({ match, chain, onOpenTab }: { match: ExiobasePr
           <div className="exiobase-more">+{match.products.length - 8} more</div>
         )}
       </div>
-      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
+      {getChain && <ResolutionChainToggle getChain={getChain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -1377,12 +1380,12 @@ function getBafuChapterData(
   return null;
 }
 
-function BafuFactorDisplay({ entry, chain, onOpenTab }: { entry: BafuCoverageEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
-  return <LciFactorDisplay entry={entry} title="Direct Emissions (BAFU)" source="BAFU:2025 (direct process emissions only, GWP-100 AR6)" cardClass="bafu-card" chain={chain} onOpenTab={onOpenTab} />;
+function BafuFactorDisplay({ entry, getChain, onOpenTab }: { entry: BafuCoverageEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
+  return <LciFactorDisplay entry={entry} title="Direct Emissions (BAFU)" source="BAFU:2025 (direct process emissions only, GWP-100 AR6)" cardClass="bafu-card" getChain={getChain} onOpenTab={onOpenTab} />;
 }
 
-function UslciFactorDisplay({ entry, chain, onOpenTab }: { entry: UslciCoverageEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
-  return <LciFactorDisplay entry={entry} title="Direct Emissions (US LCI)" source="NREL USLCI (direct process emissions only, GWP-100 AR6)" cardClass="uslci-card" chain={chain} onOpenTab={onOpenTab} />;
+function UslciFactorDisplay({ entry, getChain, onOpenTab }: { entry: UslciCoverageEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
+  return <LciFactorDisplay entry={entry} title="Direct Emissions (US LCI)" source="NREL USLCI (direct process emissions only, GWP-100 AR6)" cardClass="uslci-card" getChain={getChain} onOpenTab={onOpenTab} />;
 }
 
 // Look up USLCI data for a selected node (keyed by HS-6 code)
@@ -1594,12 +1597,12 @@ function formatGhg(v: number): string {
   return v.toFixed(digits);
 }
 
-function LciFactorDisplay({ entry, title, source, cardClass, chain, onOpenTab }: {
+function LciFactorDisplay({ entry, title, source, cardClass, getChain, onOpenTab }: {
   entry: { withGhgData: number; unitStats: Record<string, LciUnitStats>; topProcesses: { name: string; ghg: number; unit: string }[] };
   title: string;
   source: string;
   cardClass: string;
-  chain?: ResolutionChain | null;
+  getChain?: () => ResolutionChain | null;
   onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void;
 }) {
   if (entry.withGhgData === 0) return null;
@@ -1635,7 +1638,7 @@ function LciFactorDisplay({ entry, title, source, cardClass, chain, onOpenTab }:
         </div>
       )}
       <div className="emission-source">{source}</div>
-      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
+      {getChain && <ResolutionChainToggle getChain={getChain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -2150,14 +2153,14 @@ function computeBafuCoverage(
   return assignDirectionality(raw);
 }
 
-function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode, chain, onOpenTab }: {
+function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode, getChain, onOpenTab }: {
   cpc: EcoinventCodeMapping | null;
   hs: EcoinventCodeMapping | null;
   isic: EcoinventCodeMapping | null;
   cpcCode: string | null;
   hsCode: string | null;
   isicCode: string | null;
-  chain?: ResolutionChain | null;
+  getChain?: () => ResolutionChain | null;
   onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void;
 }) {
   if (!cpc && !hs && !isic) return null;
@@ -2222,7 +2225,7 @@ function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode, chain, onO
           </div>
         </div>
       )}
-      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
+      {getChain && <ResolutionChainToggle getChain={getChain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -3308,17 +3311,16 @@ function AppContent() {
     return getEcoinventInfo(selectedNode, selectedFrom, data.ecoinventMapping, data.concordance);
   }, [selectedNode, selectedFrom, data]);
 
-  // Resolution chains for selected node (traces how each LCA database was linked)
-  const resolutionChains = useMemo(() => {
-    if (!selectedNode || !selectedFrom || !data) return {} as Record<string, ResolutionChain | null>;
-    return {
-      epa: traceResolutionChain(selectedNode, selectedFrom, "epa", data),
-      exiobase: traceResolutionChain(selectedNode, selectedFrom, "exiobase", data),
-      ecoinvent: traceResolutionChain(selectedNode, selectedFrom, "ecoinvent", data),
-      uslci: traceResolutionChain(selectedNode, selectedFrom, "uslci", data),
-      bafu: traceResolutionChain(selectedNode, selectedFrom, "bafu", data),
-    };
+  // Lazy resolution chain factories — only computed when user clicks "Show resolution path"
+  const getResolutionChain = useCallback((db: "epa" | "exiobase" | "ecoinvent" | "uslci" | "bafu") => {
+    if (!selectedNode || !selectedFrom || !data) return null;
+    return traceResolutionChain(selectedNode, selectedFrom, db, data);
   }, [selectedNode, selectedFrom, data]);
+  const getEpaChain = useCallback(() => getResolutionChain("epa"), [getResolutionChain]);
+  const getExiobaseChain = useCallback(() => getResolutionChain("exiobase"), [getResolutionChain]);
+  const getEcoinventChain = useCallback(() => getResolutionChain("ecoinvent"), [getResolutionChain]);
+  const getUslciChain = useCallback(() => getResolutionChain("uslci"), [getResolutionChain]);
+  const getBafuChain = useCallback(() => getResolutionChain("bafu"), [getResolutionChain]);
 
   // Helper to open the about panel to a specific tab with optional navigation context
   const openAboutTab = useCallback((tab: "concordances" | "browser", ctx?: TabNavContext) => {
@@ -3689,22 +3691,22 @@ function AppContent() {
             })()}
 
             {emissionFactor && (
-              <EmissionFactorDisplay entry={emissionFactor} chain={resolutionChains.epa} onOpenTab={openAboutTab} />
+              <EmissionFactorDisplay entry={emissionFactor} getChain={getEpaChain} onOpenTab={openAboutTab} />
             )}
 
             {exiobaseFactor && (
-              <ExiobaseFactorDisplay entry={exiobaseFactor} chain={resolutionChains.exiobase} onOpenTab={openAboutTab} />
+              <ExiobaseFactorDisplay entry={exiobaseFactor} getChain={getExiobaseChain} onOpenTab={openAboutTab} />
             )}
             {exiobaseProducts && (
-              <ExiobaseProductDisplay match={exiobaseProducts} chain={resolutionChains.exiobase} onOpenTab={openAboutTab} />
+              <ExiobaseProductDisplay match={exiobaseProducts} getChain={getExiobaseChain} onOpenTab={openAboutTab} />
             )}
 
             {bafuFactor && bafuFactor.withGhgData > 0 && (
-              <BafuFactorDisplay entry={bafuFactor} chain={resolutionChains.bafu} onOpenTab={openAboutTab} />
+              <BafuFactorDisplay entry={bafuFactor} getChain={getBafuChain} onOpenTab={openAboutTab} />
             )}
 
             {uslciFactor && uslciFactor.withGhgData > 0 && (
-              <UslciFactorDisplay entry={uslciFactor} chain={resolutionChains.uslci} onOpenTab={openAboutTab} />
+              <UslciFactorDisplay entry={uslciFactor} getChain={getUslciChain} onOpenTab={openAboutTab} />
             )}
 
             {(ecoinventInfo.cpc || ecoinventInfo.hs || ecoinventInfo.isic) && (
@@ -3715,7 +3717,7 @@ function AppContent() {
                 cpcCode={ecoinventInfo.cpcCode}
                 hsCode={ecoinventInfo.hsCode}
                 isicCode={ecoinventInfo.isicCode}
-                chain={resolutionChains.ecoinvent}
+                getChain={getEcoinventChain}
                 onOpenTab={openAboutTab}
               />
             )}
