@@ -3,6 +3,7 @@ import type { AppData, TreeNode, TaxonomyType, GenericConcordance, LookupEntry }
 
 export type AboutSectionHandle = {
   openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances") => void;
+  close: () => void;
 };
 
 /* Data-source URLs for every taxonomy and concordance */
@@ -1157,6 +1158,301 @@ function computeMatrix(data: AppData): Record<string, MatrixRow> {
   return result;
 }
 
+/* =============================== Gap Drilldown =============================== */
+
+interface GapLeaf {
+  node: TreeNode;
+  reason: "concordance" | "data";
+  section: string;
+  sectionCode: string;
+}
+
+interface GapDrilldownResult {
+  taxonomy: TaxonomyType;
+  taxLabel: string;
+  db: string;
+  dbLabel: string;
+  total: number;
+  covered: number;
+  concordanceGap: number;
+  dataGap: number;
+  leaves: GapLeaf[];
+  sectionBreakdown: {
+    section: string;
+    sectionCode: string;
+    concordanceGap: number;
+    dataGap: number;
+    covered: number;
+    total: number;
+  }[];
+}
+
+/** Map each leaf node id → its root-level section name and code */
+function buildLeafToSection(tree: TreeNode[]): Map<string, { section: string; sectionCode: string }> {
+  const map = new Map<string, { section: string; sectionCode: string }>();
+  function walk(node: TreeNode, root: TreeNode) {
+    if (!node.children || node.children.length === 0) {
+      map.set(node.id, { section: root.name, sectionCode: root.code });
+    } else {
+      for (const c of node.children) walk(c, root);
+    }
+  }
+  for (const root of tree) walk(root, root);
+  return map;
+}
+
+function computeGapDrilldown(
+  taxKey: TaxonomyType,
+  dbKey: string,
+  data: AppData,
+): GapDrilldownResult {
+  const treeMap: Record<string, TreeNode[]> = {
+    hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree,
+    cpc: data.cpcTree, cpa: data.cpaTree, unspsc: data.unspscTree,
+    naics: data.naicsTree, isic: data.isicTree, nace: data.naceTree,
+    bea: data.beaTree, t1: data.t1Tree, t2: data.t2Tree,
+  };
+  const tree = treeMap[taxKey] ?? [];
+  const leaves = collectLeaves(tree);
+  const leafSectionMap = buildLeafToSection(tree);
+
+  const dbResolverMap: Record<string, (r: ResolvedLeaf, d: AppData) => string | null> = {
+    ecoinvent: resolveEcoinventKey,
+    epa: resolveEpaKey,
+    exiobase: resolveExiobaseKey,
+    uslci: resolveUslciKey,
+    bafu: resolveBafuKey,
+  };
+  const resolveFn = dbResolverMap[dbKey];
+  if (!resolveFn) return { taxonomy: taxKey, taxLabel: taxKey, db: dbKey, dbLabel: dbKey, total: 0, covered: 0, concordanceGap: 0, dataGap: 0, leaves: [], sectionBreakdown: [] };
+
+  const gapLeaves: GapLeaf[] = [];
+  let covered = 0;
+
+  // Track section stats
+  const sectionStats = new Map<string, { section: string; sectionCode: string; concordanceGap: number; dataGap: number; covered: number; total: number }>();
+
+  for (const leaf of leaves) {
+    const sec = leafSectionMap.get(leaf.id) ?? { section: "Unknown", sectionCode: "" };
+    let ss = sectionStats.get(sec.section);
+    if (!ss) {
+      ss = { section: sec.section, sectionCode: sec.sectionCode, concordanceGap: 0, dataGap: 0, covered: 0, total: 0 };
+      sectionStats.set(sec.section, ss);
+    }
+    ss.total++;
+
+    const resolved = resolveLeaf(leaf, taxKey, data);
+    const hasAnyCode = resolved.hsCodes.length > 0 || resolved.cpcCodes.length > 0 || resolved.isicCodes.length > 0;
+
+    if (!hasAnyCode) {
+      gapLeaves.push({ node: leaf, reason: "concordance", ...sec });
+      ss.concordanceGap++;
+      continue;
+    }
+
+    const key = resolveFn(resolved, data);
+    if (key !== null) {
+      covered++;
+      ss.covered++;
+    } else {
+      gapLeaves.push({ node: leaf, reason: "data", ...sec });
+      ss.dataGap++;
+    }
+  }
+
+  const taxItem = TAXONOMY_GROUPS.flatMap(g => g.items).find(i => i.key === taxKey);
+  const dbCol = DB_COLUMNS.find(d => d.key === dbKey);
+
+  const sectionBreakdown = [...sectionStats.values()]
+    .filter(s => s.concordanceGap > 0 || s.dataGap > 0)
+    .sort((a, b) => (b.concordanceGap + b.dataGap) - (a.concordanceGap + a.dataGap));
+
+  return {
+    taxonomy: taxKey,
+    taxLabel: taxItem?.label ?? taxKey,
+    db: dbKey,
+    dbLabel: dbCol?.label ?? dbKey,
+    total: leaves.length,
+    covered,
+    concordanceGap: gapLeaves.filter(l => l.reason === "concordance").length,
+    dataGap: gapLeaves.filter(l => l.reason === "data").length,
+    leaves: gapLeaves,
+    sectionBreakdown,
+  };
+}
+
+const GAP_PAGE_SIZE = 50;
+
+function GapDrilldownPanel({ gap, onNavigateToNode, onClose }: {
+  gap: GapDrilldownResult;
+  onNavigateToNode?: (taxonomy: TaxonomyType, nodeId: string) => void;
+  onClose: () => void;
+}) {
+  const [gapSearch, setGapSearch] = useState("");
+  const [gapPage, setGapPage] = useState(0);
+  const [reasonFilter, setReasonFilter] = useState<"all" | "concordance" | "data">("all");
+  const [showAllSections, setShowAllSections] = useState(false);
+
+  const searchTerms = useMemo(() => gapSearch.toLowerCase().split(/\s+/).filter(Boolean), [gapSearch]);
+
+  const filteredLeaves = useMemo(() => {
+    let result = gap.leaves;
+    if (reasonFilter !== "all") result = result.filter(l => l.reason === reasonFilter);
+    if (searchTerms.length) result = result.filter(l =>
+      searchTerms.every(t =>
+        l.node.code.toLowerCase().includes(t) ||
+        l.node.name.toLowerCase().includes(t) ||
+        l.section.toLowerCase().includes(t)
+      )
+    );
+    return result;
+  }, [gap.leaves, reasonFilter, searchTerms]);
+
+  const pageCount = Math.ceil(filteredLeaves.length / GAP_PAGE_SIZE);
+  const pageLeaves = filteredLeaves.slice(gapPage * GAP_PAGE_SIZE, (gapPage + 1) * GAP_PAGE_SIZE);
+
+  const coveredPct = gap.total > 0 ? (gap.covered / gap.total) * 100 : 0;
+  const dataGapPct = gap.total > 0 ? (gap.dataGap / gap.total) * 100 : 0;
+  const concGapPct = gap.total > 0 ? (gap.concordanceGap / gap.total) * 100 : 0;
+
+  const maxSectionGap = Math.max(1, ...gap.sectionBreakdown.map(s => s.concordanceGap + s.dataGap));
+  const visibleSections = showAllSections ? gap.sectionBreakdown : gap.sectionBreakdown.slice(0, 10);
+
+  return (
+    <div className="gap-drilldown">
+      <div className="gap-drilldown-header">
+        <div>
+          <div className="gap-drilldown-title">{gap.taxLabel} × {gap.dbLabel} — Gap Analysis</div>
+          <div className="gap-drilldown-subtitle">
+            {gap.leaves.length.toLocaleString()} of {gap.total.toLocaleString()} leaves uncovered
+          </div>
+        </div>
+        <button className="gap-drilldown-close" onClick={onClose}>✕ Close</button>
+      </div>
+
+      {/* Stacked bar */}
+      <div className="gap-bar">
+        {coveredPct > 0 && (
+          <div className="gap-bar-covered" style={{ width: `${Math.max(coveredPct, 2)}%` }}>
+            {coveredPct >= 8 ? `${gap.covered.toLocaleString()} covered` : ""}
+          </div>
+        )}
+        {dataGapPct > 0 && (
+          <div className="gap-bar-data" style={{ width: `${Math.max(dataGapPct, 2)}%` }}>
+            {dataGapPct >= 8 ? `${gap.dataGap.toLocaleString()} data gap` : ""}
+          </div>
+        )}
+        {concGapPct > 0 && (
+          <div className="gap-bar-concordance" style={{ width: `${Math.max(concGapPct, 2)}%` }}>
+            {concGapPct >= 8 ? `${gap.concordanceGap.toLocaleString()} no path` : ""}
+          </div>
+        )}
+      </div>
+      <div className="gap-bar-legend">
+        <span className="gap-legend-covered">Covered ({coveredPct.toFixed(1)}%)</span>
+        <span className="gap-legend-data">Data Gap ({dataGapPct.toFixed(1)}%) — code resolved but no LCA entry</span>
+        <span className="gap-legend-concordance">No Concordance Path ({concGapPct.toFixed(1)}%) — can't resolve to target codes</span>
+      </div>
+
+      {/* Section breakdown */}
+      {gap.sectionBreakdown.length > 0 && (
+        <div className="gap-section-breakdown">
+          <h4 className="gap-section-title">Gap by Section</h4>
+          {visibleSections.map(s => {
+            const total = s.concordanceGap + s.dataGap;
+            const dataPct = (s.dataGap / maxSectionGap) * 100;
+            const concPct = (s.concordanceGap / maxSectionGap) * 100;
+            return (
+              <div key={s.sectionCode} className="gap-section-row">
+                <span className="gap-section-label" title={s.section}>{s.section}</span>
+                <div className="gap-section-bar">
+                  {s.dataGap > 0 && <div className="gap-bar-data" style={{ width: `${dataPct}%` }} />}
+                  {s.concordanceGap > 0 && <div className="gap-bar-concordance" style={{ width: `${concPct}%` }} />}
+                </div>
+                <span className="gap-section-count">{total.toLocaleString()} / {s.total.toLocaleString()}</span>
+              </div>
+            );
+          })}
+          {gap.sectionBreakdown.length > 10 && (
+            <button className="gap-show-all-sections" onClick={() => setShowAllSections(v => !v)}>
+              {showAllSections ? "Show top 10 only" : `Show all ${gap.sectionBreakdown.length} sections`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Uncovered leaf table */}
+      <h4 className="gap-section-title">Uncovered Leaves</h4>
+      <div className="gap-table-controls">
+        <input
+          type="text"
+          className="gap-search-input"
+          placeholder="Search by code, name, or section..."
+          value={gapSearch}
+          onChange={e => { setGapSearch(e.target.value); setGapPage(0); }}
+        />
+        <select
+          className="gap-filter-select"
+          value={reasonFilter}
+          onChange={e => { setReasonFilter(e.target.value as any); setGapPage(0); }}
+        >
+          <option value="all">All gaps ({gap.leaves.length.toLocaleString()})</option>
+          <option value="data">Data gap ({gap.dataGap.toLocaleString()})</option>
+          <option value="concordance">No concordance path ({gap.concordanceGap.toLocaleString()})</option>
+        </select>
+        <span className="gap-filter-count">{filteredLeaves.length.toLocaleString()} results</span>
+      </div>
+
+      <div className="lca-browser-table-wrapper">
+        <table className="gap-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Description</th>
+              <th>Section</th>
+              <th>Reason</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageLeaves.map((l, i) => (
+              <tr key={i}>
+                <td className="lca-code">{l.node.code}</td>
+                <td className="gap-leaf-name">{l.node.name}</td>
+                <td className="gap-leaf-section" title={l.section}>{l.section}</td>
+                <td>
+                  <span className={`gap-reason-badge ${l.reason === "data" ? "gap-reason-data" : "gap-reason-concordance"}`}>
+                    {l.reason === "data" ? "Data gap" : "No path"}
+                  </span>
+                </td>
+                <td>
+                  {onNavigateToNode && (
+                    <button
+                      className="gap-jump-btn"
+                      onClick={() => onNavigateToNode(gap.taxonomy, l.node.id)}
+                      title={`Show ${l.node.code} in the tree pane`}
+                    >
+                      Show in tree ↗
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {pageCount > 1 && (
+        <div className="gap-pagination">
+          <button disabled={gapPage === 0} onClick={() => setGapPage(p => p - 1)}>← Prev</button>
+          <span>Page {gapPage + 1} of {pageCount}</span>
+          <button disabled={gapPage >= pageCount - 1} onClick={() => setGapPage(p => p + 1)}>Next →</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function heatColor(pct: number): string {
   if (pct === 0) return "#f8fafc";
   if (pct < 5) return "#fef2f2";
@@ -1374,13 +1670,33 @@ function ResolutionMethodsTab() {
   );
 }
 
-function CoverageMatrixTab({ data }: { data: AppData | null }) {
+function CoverageMatrixTab({ data, onNavigateToNode, onCloseModal }: {
+  data: AppData | null;
+  onNavigateToNode?: (taxonomy: TaxonomyType, nodeId: string) => void;
+  onCloseModal?: () => void;
+}) {
   const [mode, setMode] = useState<MatrixMode>("leafCoverage");
+  const [drilldown, setDrilldown] = useState<{ taxKey: TaxonomyType; dbKey: string } | null>(null);
 
   const matrix = useMemo(() => {
     if (!data) return null;
     return computeMatrix(data);
   }, [data]);
+
+  const gapData = useMemo(() => {
+    if (!drilldown || !data) return null;
+    return computeGapDrilldown(drilldown.taxKey, drilldown.dbKey, data);
+  }, [drilldown, data]);
+
+  // Wrap onNavigateToNode to close the modal first
+  const handleJumpToNode = useMemo(() => {
+    if (!onNavigateToNode) return undefined;
+    return (taxonomy: TaxonomyType, nodeId: string) => {
+      if (onCloseModal) onCloseModal();
+      // Small delay for modal close before navigating
+      setTimeout(() => onNavigateToNode(taxonomy, nodeId), 200);
+    };
+  }, [onNavigateToNode, onCloseModal]);
 
   if (!matrix) {
     return <p style={{ textAlign: "center", padding: 32, color: "#6b7280" }}>Loading data&hellip;</p>;
@@ -1837,13 +2153,16 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
                       {DB_COLUMNS.map(db => {
                         const cell = row.cells[db.key];
                         if (!cell) return <td key={db.key} className="cm-cell" />;
+                        const isSelected = drilldown?.taxKey === item.key && drilldown?.dbKey === db.key;
+                        const cellClick = () => setDrilldown(isSelected ? null : { taxKey: item.key, dbKey: db.key });
                         if (mode === "coverage") {
                           return (
                             <td
                               key={db.key}
-                              className="cm-cell"
+                              className={`cm-cell cm-cell-clickable ${isSelected ? "cm-cell-selected" : ""}`}
                               style={{ backgroundColor: heatColor(cell.pct) }}
-                              title={`${item.label} \u00d7 ${db.label}: ${cell.covered.toLocaleString()} / ${cell.total.toLocaleString()} leaves (${cell.pct.toFixed(1)}%)`}
+                              title={`${item.label} × ${db.label}: ${cell.covered.toLocaleString()} / ${cell.total.toLocaleString()} leaves (${cell.pct.toFixed(1)}%) — click for gap analysis`}
+                              onClick={cellClick}
                             >
                               <div className="cm-pct">{cell.pct < 0.05 ? "0%" : `${cell.pct.toFixed(1)}%`}</div>
                               <div className="cm-count">{cell.covered.toLocaleString()} / {cell.total.toLocaleString()}</div>
@@ -1855,9 +2174,10 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
                           return (
                             <td
                               key={db.key}
-                              className="cm-cell"
+                              className={`cm-cell cm-cell-clickable ${isSelected ? "cm-cell-selected" : ""}`}
                               style={{ backgroundColor: cell.covered === 0 ? "#f8fafc" : specificityColor(sp) }}
-                              title={`${item.label} \u00d7 ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.covered.toLocaleString()} covered leaves (${sp.toFixed(1)}% specificity)`}
+                              title={`${item.label} × ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.covered.toLocaleString()} covered leaves (${sp.toFixed(1)}% specificity) — click for gap analysis`}
+                              onClick={cellClick}
                             >
                               <div className="cm-pct">{cell.covered === 0 ? "n/a" : `${sp.toFixed(1)}%`}</div>
                               <div className="cm-count">{cell.uniqueKeys.toLocaleString()} / {cell.covered.toLocaleString()}</div>
@@ -1869,9 +2189,10 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
                         return (
                           <td
                             key={db.key}
-                            className="cm-cell"
+                            className={`cm-cell cm-cell-clickable ${isSelected ? "cm-cell-selected" : ""}`}
                             style={{ backgroundColor: cell.uniqueKeys === 0 ? "#f8fafc" : leafCoverageColor(dp) }}
-                            title={`${item.label} \u00d7 ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.total.toLocaleString()} total leaves (${dp.toFixed(1)}% leaf coverage)`}
+                            title={`${item.label} × ${db.label}: ${cell.uniqueKeys.toLocaleString()} unique entries / ${cell.total.toLocaleString()} total leaves (${dp.toFixed(1)}% leaf coverage) — click for gap analysis`}
+                            onClick={cellClick}
                           >
                             <div className="cm-pct">{cell.uniqueKeys === 0 ? "0%" : `${dp.toFixed(1)}%`}</div>
                             <div className="cm-count">{cell.uniqueKeys.toLocaleString()} / {cell.total.toLocaleString()}</div>
@@ -1924,6 +2245,15 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
           )}
         </ul>
       </div>
+
+      {/* Gap Drilldown Panel */}
+      {gapData && (
+        <GapDrilldownPanel
+          gap={gapData}
+          onNavigateToNode={handleJumpToNode}
+          onClose={() => setDrilldown(null)}
+        />
+      )}
     </>
   );
 }
@@ -2556,12 +2886,18 @@ function reportBugUrl() {
 
 /* =============================== Main Component =============================== */
 
-export const AboutSection = forwardRef<AboutSectionHandle, { data: AppData | null }>(function AboutSection({ data }, ref) {
+interface AboutSectionProps {
+  data: AppData | null;
+  onNavigateToNode?: (taxonomy: TaxonomyType, nodeId: string) => void;
+}
+
+export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(function AboutSection({ data, onNavigateToNode }, ref) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances">("taxonomies");
 
   useImperativeHandle(ref, () => ({
     openToTab(t) { setTab(t); setOpen(true); },
+    close() { setOpen(false); },
   }));
 
   if (!open) {
@@ -2636,7 +2972,7 @@ export const AboutSection = forwardRef<AboutSectionHandle, { data: AppData | nul
           {tab === "taxonomies" && <TaxonomyMapTab />}
           {tab === "lca" && <LcaDatabasesTab />}
           {tab === "methods" && <ResolutionMethodsTab />}
-          {tab === "matrix" && <CoverageMatrixTab data={data} />}
+          {tab === "matrix" && <CoverageMatrixTab data={data} onNavigateToNode={onNavigateToNode} onCloseModal={() => setOpen(false)} />}
           {tab === "browser" && <LcaDataBrowserTab data={data} />}
           {tab === "concordances" && <ConcordanceBrowserTab data={data} />}
         </div>

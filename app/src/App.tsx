@@ -2464,6 +2464,48 @@ function AppContent() {
     [leftTaxonomy, rightTaxonomy, data, getLookup, findAnyMappedEntry, treeRefs, getTreeData]
   );
 
+  // Handle gap drilldown "Show in tree" navigation
+  const handleNavigateToNode = useCallback(
+    (taxonomy: TaxonomyType, nodeId: string) => {
+      // Switch left pane to the target taxonomy if it's not already showing
+      if (leftTaxonomy !== taxonomy && rightTaxonomy !== taxonomy) {
+        setLeftTaxonomy(taxonomy);
+      }
+
+      // Determine which pane has this taxonomy
+      const targetPane = leftTaxonomy === taxonomy ? "left" : rightTaxonomy === taxonomy ? "right" : "left";
+      const treeRef = treeRefs[taxonomy];
+      const treeData = getTreeData(taxonomy);
+
+      // Allow time for taxonomy switch + modal close before navigating
+      setTimeout(() => {
+        const ancestorPath = findPathToNode(treeData, nodeId);
+        let delay = 50;
+        for (const ancestorId of ancestorPath) {
+          setTimeout(() => {
+            const tree = treeRef.current;
+            if (tree) {
+              const ancestor = tree.get(ancestorId);
+              if (ancestor && !ancestor.isOpen) ancestor.open();
+            }
+          }, delay);
+          delay += 80;
+        }
+        setTimeout(() => {
+          const tree = treeRef.current;
+          if (tree) {
+            const targetNode = tree.get(nodeId);
+            if (targetNode) {
+              tree.scrollTo(targetNode.id);
+              targetNode.select();
+            }
+          }
+        }, delay + 100);
+      }, 300);
+    },
+    [leftTaxonomy, rightTaxonomy, treeRefs, getTreeData]
+  );
+
   // Handle builder custom node click → map to left pane via sourceOrigin
   const handleBuilderNodeSelect = useCallback(
     (node: TreeNode) => {
@@ -2864,7 +2906,7 @@ function AppContent() {
             </button>
           )}
         </div>
-        <AboutSection ref={aboutRef} data={data} />
+        <AboutSection ref={aboutRef} data={data} onNavigateToNode={handleNavigateToNode} />
       </header>
 
       <BuilderBanner />
