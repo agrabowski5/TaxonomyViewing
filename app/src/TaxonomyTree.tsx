@@ -66,15 +66,18 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
           <span className={`taxonomy-label ${taxonomyClass}`}>{label}</span>
           {fullName}
         </h2>
-        <div className="panel-legend">{legend}</div>
-        {side !== "right" && (
-          <div className="panel-badge-key">
-            <span className="badge-key-label">LCA badges:</span>
-            <span className="badge-key-item">1:1 = exclusive match</span>
-            <span className="badge-key-item">1:N = one code → N entries</span>
-            <span className="badge-key-item">N:1 = many codes → one entry</span>
-          </div>
-        )}
+        <div className="panel-legend">
+          {legend}
+          {side !== "right" && (
+            <span className="panel-badge-key">
+              <span className="badge-key-sep">|</span>
+              <span className="badge-key-label">LCA:</span>
+              <span className="badge-key-item">1:1 exclusive</span>
+              <span className="badge-key-item">1:N one→many</span>
+              <span className="badge-key-item">N:1 many→one</span>
+            </span>
+          )}
+        </div>
       </div>
       {gapHighlight && (
         <div className="gap-highlight-banner">

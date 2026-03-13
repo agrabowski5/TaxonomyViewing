@@ -1497,18 +1497,22 @@
 
 /* ===== Badge Key (Panel Header) ===== */
 .panel-badge-key {
-  display: flex;
-  gap: 8px;
+  display: inline;
   font-size: 10px;
   color: #9ca3af;
-  margin-top: 2px;
+}
+.badge-key-sep {
+  margin: 0 6px;
+  color: #d1d5db;
 }
 .badge-key-label {
   font-weight: 600;
   color: #6b7280;
+  margin-right: 4px;
 }
 .badge-key-item {
   font-style: italic;
+  margin-right: 5px;
 }
 
 /* ===== EF Database Coverage Badges (Tree Node) ===== */
