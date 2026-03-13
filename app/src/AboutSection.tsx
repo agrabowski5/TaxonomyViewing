@@ -62,11 +62,11 @@ function TaxonomyMapTab() {
 
       <h3>Taxonomy Interconnection Map</h3>
       <div className="about-diagram-container">
-        <svg viewBox="0 0 900 500" className="about-diagram">
+        <svg viewBox="0 0 1020 500" className="about-diagram">
 
           {/* === Background Region: HS-Family === */}
-          <rect x="30" y="15" width="840" height="145" rx="12" fill="#eef2ff" stroke="#c7d2fe" strokeWidth="1.5" />
-          <text x="450" y="38" textAnchor="middle" className="about-region-label">
+          <rect x="30" y="15" width="960" height="145" rx="12" fill="#eef2ff" stroke="#c7d2fe" strokeWidth="1.5" />
+          <text x="510" y="38" textAnchor="middle" className="about-region-label">
             HS-Family Taxonomies (Shared 6-Digit Base)
           </text>
 
@@ -552,6 +552,16 @@ function LcaDatabasesTab() {
           <text x="800" y="253" textAnchor="middle" className="about-node-detail">~3,000 processes</text>
           <text x="800" y="265" textAnchor="middle" className="about-node-source">FOEN</text>
 
+          {/* GaBi/Sphera */}
+          <g className="about-node-hover">
+            <title>{"GaBi/Sphera 2026.1\nSpheraverse MLC Databases\n~10,500 processes mapped to HS chapters\nClick to open data source"}</title>
+            <rect x="875" y="185" width="130" height="52" rx="8" fill="#7c3aed" />
+            <text x="940" y="207" textAnchor="middle" className="about-node-text-sm">GaBi/Sphera</text>
+            <text x="940" y="224" textAnchor="middle" style={{ fontSize: "8.5px", fill: "#ede9fe" }}>2026.1 MLC</text>
+          </g>
+          <text x="940" y="253" textAnchor="middle" className="about-node-detail">~10,500 processes</text>
+          <text x="940" y="265" textAnchor="middle" className="about-node-source">Sphera</text>
+
           {/* === CONNECTION LINES === */}
 
           {/* ecoinvent -> CPC (direct, green solid) */}
@@ -599,9 +609,15 @@ function LcaDatabasesTab() {
           </path>
           <text x="640" y="120" textAnchor="middle" className="about-edge-label" fill="#d97706">HS-2 chapters</text>
 
+          {/* GaBi -> HS (orange dotted, chapter-level) */}
+          <path d="M 910 185 Q 700 120 490 92" fill="none" stroke="#d97706" strokeWidth="2.5" strokeDasharray="3,3">
+            <title>{"GaBi/Sphera \u2192 HS\nChapter-level approximate mapping\nResolution: HS-2 chapters"}</title>
+          </path>
+          <text x="720" y="108" textAnchor="middle" className="about-edge-label" fill="#d97706">HS-2 chapters</text>
+
           {/* === RESOLUTION ANNOTATIONS === */}
-          <rect x="30" y="290" width="840" height="120" rx="10" fill="#fafafa" stroke="#e5e7eb" strokeWidth="1" />
-          <text x="450" y="312" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Mapping Resolution Comparison</text>
+          <rect x="30" y="290" width="960" height="120" rx="10" fill="#fafafa" stroke="#e5e7eb" strokeWidth="1" />
+          <text x="510" y="312" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Mapping Resolution Comparison</text>
 
           {/* Fine-grained bar */}
           <rect x="80" y="325" width="360" height="22" rx="4" fill="#dcfce7" stroke="#059669" strokeWidth="1" />
@@ -613,7 +629,7 @@ function LcaDatabasesTab() {
           {/* Coarse-grained bar */}
           <rect x="480" y="325" width="360" height="22" rx="4" fill="#fef9c3" stroke="#d97706" strokeWidth="1" />
           <text x="660" y="340" textAnchor="middle" fontSize="10" fontWeight="600" fill="#854d0e">Chapter-level (HS-2)</text>
-          <text x="480" y="360" fontSize="9" fill="#6b7280">BAFU (category {"\u2192"} HS-2 chapter mapping)</text>
+          <text x="480" y="360" fontSize="9" fill="#6b7280">BAFU, GaBi/Sphera (category {"\u2192"} HS-2 chapter mapping)</text>
 
         </svg>
       </div>
@@ -713,6 +729,10 @@ function LcaDatabasesTab() {
             <strong>BAFU:2025 (Swiss FOEN)</strong>
             <p>Swiss Federal Office for the Environment LCI database. ~3,000 processes mapped to HS-2 chapters via category-to-chapter correspondence.</p>
             <ExtLink href={URLS.bafu}>Data source</ExtLink>
+          </div>
+          <div className="about-detail-card" style={{ borderLeftColor: "#7c3aed" }}>
+            <strong>GaBi/Sphera 2026.1</strong>
+            <p>Sphera MLC (Managed LCA Content) Databases. ~10,500 processes mapped to HS-2 chapters via folder category-to-chapter correspondence.</p>
           </div>
         </div>
       </div>
@@ -888,6 +908,7 @@ const DB_COLUMNS = [
   { key: "exiobase", label: "EXIOBASE" },
   { key: "uslci", label: "US LCI" },
   { key: "bafu", label: "BAFU" },
+  { key: "gabi", label: "GaBi" },
 ];
 
 function mStripCode(code: string): string {
@@ -1081,6 +1102,15 @@ function resolveBafuKey(resolved: ResolvedLeaf, data: AppData): string | null {
   return null;
 }
 
+function resolveGabiKey(resolved: ResolvedLeaf, data: AppData): string | null {
+  if (!data.gabiCoverage) return null;
+  for (const hs of resolved.hsCodes) {
+    const ch = hs.substring(0, 2);
+    if (data.gabiCoverage.coverage[ch]) return ch; // HS-2 chapter
+  }
+  return null;
+}
+
 interface MatrixCell {
   covered: number;
   total: number;
@@ -1121,6 +1151,7 @@ function computeMatrix(data: AppData): Record<string, MatrixRow> {
     ["exiobase", resolveExiobaseKey],
     ["uslci", resolveUslciKey],
     ["bafu", resolveBafuKey],
+    ["gabi", resolveGabiKey],
   ];
 
   for (const [taxKey, tree] of Object.entries(treeMap)) {
@@ -1228,6 +1259,7 @@ function computeGapDrilldown(
     exiobase: resolveExiobaseKey,
     uslci: resolveUslciKey,
     bafu: resolveBafuKey,
+    gabi: resolveGabiKey,
   };
   const resolveFn = dbResolverMap[dbKey];
   if (!resolveFn) return { taxonomy: taxKey, taxLabel: taxKey, db: dbKey, dbLabel: dbKey, total: 0, covered: 0, concordanceGap: 0, dataGap: 0, leaves: [], sectionBreakdown: [] };
@@ -1539,6 +1571,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
       exiobase:  { tag: "hs6", chain: "HS-6 → EXIO product (HS-4 fallback)", note: "~190 product categories" },
       uslci:     { tag: "hs6", chain: "HS-6 → NAICS → process", note: "~59 NAICS sectors" },
       bafu:      { tag: "hs2", chain: "HS-2 chapter lookup", note: "81 chapters; very coarse" },
+      gabi:      { tag: "hs2", chain: "HS-2 chapter lookup", note: "73 chapters; very coarse" },
     };
   }
 
@@ -1548,6 +1581,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
     exiobase:  { tag: "conc", chain: "CPC ≈ CPA → EXIO; fallback CPC → HS → EXIO", note: "CPA bridge at 2-4 digits" },
     uslci:     { tag: "conc", chain: "CPC → HS-6 → NAICS → process", note: "Same concordance as EPA path" },
     bafu:      { tag: "conc", chain: "CPC → HS-6 → HS-2 chapter", note: "First HS match → chapter" },
+    gabi:      { tag: "conc", chain: "CPC → HS-6 → HS-2 chapter", note: "First HS match → chapter" },
   };
 
   m["cpa"] = {
@@ -1556,6 +1590,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
     exiobase:  { tag: "direct", chain: "CPA → EXIO (direct concordance)", note: "2,608 CPA codes mapped" },
     uslci:     { tag: "conc", chain: "CPA → HS-6 → NAICS → process", note: "Via CPA-to-HS concordance" },
     bafu:      { tag: "conc", chain: "CPA → HS-6 → HS-2 chapter", note: "Via CPA-to-HS concordance" },
+    gabi:      { tag: "conc", chain: "CPA → HS-6 → HS-2 chapter", note: "Via CPA-to-HS concordance" },
   };
 
   m["unspsc"] = {
@@ -1564,6 +1599,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
     exiobase:  { tag: "fuzzy", chain: "Fuzzy text → HS-6 → EXIO", note: "Same fuzzy HS path" },
     uslci:     { tag: "fuzzy", chain: "Fuzzy text → HS-6 → NAICS", note: "Same fuzzy HS path" },
     bafu:      { tag: "fuzzy", chain: "Fuzzy text → HS-6 → HS-2", note: "Same fuzzy HS path" },
+    gabi:      { tag: "fuzzy", chain: "Fuzzy text → HS-6 → HS-2", note: "Same fuzzy HS path" },
   };
 
   m["naics"] = {
@@ -1572,6 +1608,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
     exiobase:  { tag: "conc", chain: "NAICS → HS-6 → EXIO product", note: "Via NAICS-to-HS concordance" },
     uslci:     { tag: "direct", chain: "Direct NAICS → process (prefix match)", note: "38 NAICS sectors in USLCI" },
     bafu:      { tag: "conc", chain: "NAICS → HS-6 → HS-2 chapter", note: "Via NAICS-to-HS concordance" },
+    gabi:      { tag: "conc", chain: "NAICS → HS-6 → HS-2 chapter", note: "Via NAICS-to-HS concordance" },
   };
 
   m["isic"] = {
@@ -1580,6 +1617,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
     exiobase:  { tag: "direct", chain: "Direct ISIC → EXIO concordance", note: "502 ISIC codes mapped" },
     uslci:     { tag: "2hop", chain: "ISIC → CPC → HS-6 → NAICS", note: "Two concordance hops" },
     bafu:      { tag: "2hop", chain: "ISIC → CPC → HS-6 → HS-2", note: "Two concordance hops" },
+    gabi:      { tag: "2hop", chain: "ISIC → CPC → HS-6 → HS-2", note: "Two concordance hops" },
   };
 
   m["nace"] = {
@@ -1588,6 +1626,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
     exiobase:  { tag: "direct", chain: "NACE → EXIO (direct + ISIC fallback)", note: "664 NACE codes mapped" },
     uslci:     { tag: "2hop", chain: "NACE → CPC → HS-6 → NAICS", note: "Via ISIC-CPC concordance" },
     bafu:      { tag: "2hop", chain: "NACE → CPC → HS-6 → HS-2", note: "Via ISIC-CPC concordance" },
+    gabi:      { tag: "2hop", chain: "NACE → CPC → HS-6 → HS-2", note: "Via ISIC-CPC concordance" },
   };
 
   m["bea"] = {
@@ -1596,6 +1635,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
     exiobase:  { tag: "conc", chain: "BEA → HS-6 → EXIO product", note: "Via BEA-to-HS concordance" },
     uslci:     { tag: "conc", chain: "BEA → HS-6 → NAICS → process", note: "Via BEA-to-HS concordance" },
     bafu:      { tag: "conc", chain: "BEA → HS-6 → HS-2 chapter", note: "Via BEA-to-HS concordance" },
+    gabi:      { tag: "conc", chain: "BEA → HS-6 → HS-2 chapter", note: "Via BEA-to-HS concordance" },
   };
 
   for (const tk of ["t1", "t2"]) {
@@ -1605,6 +1645,7 @@ function buildMethodMatrix(): Record<string, Record<string, MethodCell>> {
       exiobase:  { tag: "hs6", chain: "HTS-origin → HS-6 → EXIO; CPC → CPA/HS → EXIO", note: "Split by node origin" },
       uslci:     { tag: "hs6", chain: "HTS-origin → HS-6 → NAICS; CPC → HS-6 → NAICS", note: "Split by node origin" },
       bafu:      { tag: "hs2", chain: "HTS-origin → HS-2; CPC → HS → HS-2", note: "Split by node origin" },
+      gabi:      { tag: "hs2", chain: "HTS-origin → HS-2; CPC → HS → HS-2", note: "Split by node origin" },
     };
   }
 
@@ -2245,7 +2286,7 @@ function CoverageMatrixTab({ data, onNavigateToNode, onHighlightGaps, onCloseMod
             <>
               <li><strong>ecoinvent</strong> is checked via direct CPC/HS/ISIC code mapping (with parent-code inheritance).</li>
               <li><strong>EPA/USEEIO</strong> and <strong>US LCI</strong> are checked at HS-6 resolution (via NAICS concordance).</li>
-              <li><strong>EXIOBASE</strong> uses precise HS-6/CPA concordance tables; <strong>BAFU</strong> is checked at HS-2 chapter level.</li>
+              <li><strong>EXIOBASE</strong> uses precise HS-6/CPA concordance tables; <strong>BAFU</strong> and <strong>GaBi</strong> are checked at HS-2 chapter level.</li>
               <li><strong>UNSPSC</strong> uses fuzzy text matching (~4.4% of codes have HS mappings).</li>
               <li><strong>ISIC/NACE</strong> resolve through CPC (ISIC&rarr;CPC concordance), then CPC&rarr;HS.</li>
             </>
@@ -2257,6 +2298,7 @@ function CoverageMatrixTab({ data, onNavigateToNode, onHighlightGaps, onCloseMod
               <li><strong>EPA/USEEIO</strong> and <strong>US LCI</strong>: source key is the underlying NAICS sector (~400 and ~59 sectors respectively). Multiple HS-6 codes share the same sector factor.</li>
               <li><strong>EXIOBASE</strong>: source key is the EXIOBASE product category (~190 categories). Many HS codes map to the same category.</li>
               <li><strong>BAFU</strong>: source key is the HS-2 chapter (~81 chapters). Very coarse &mdash; each chapter covers hundreds of leaf codes.</li>
+              <li><strong>GaBi/Sphera</strong>: source key is the HS-2 chapter (~73 chapters). Same coarse mapping as BAFU.</li>
             </>
           )}
           {mode === "leafCoverage" && (
@@ -2285,13 +2327,14 @@ function CoverageMatrixTab({ data, onNavigateToNode, onHighlightGaps, onCloseMod
 
 /* =============================== LCA Data Browser Tab =============================== */
 
-type LcaDb = "ecoinvent" | "epa" | "exiobase" | "uslci" | "bafu";
+type LcaDb = "ecoinvent" | "epa" | "exiobase" | "uslci" | "bafu" | "gabi";
 const LCA_DB_OPTIONS: { key: LcaDb; label: string; color: string }[] = [
   { key: "ecoinvent", label: "ecoinvent v3.12", color: "#b45309" },
   { key: "epa", label: "EPA / USEEIO v2.1", color: "#15803d" },
   { key: "exiobase", label: "EXIOBASE 3.8.2", color: "#6d28d9" },
   { key: "uslci", label: "US LCI (NREL)", color: "#0369a1" },
   { key: "bafu", label: "BAFU:2025", color: "#be123c" },
+  { key: "gabi", label: "GaBi/Sphera 2026.1", color: "#7c3aed" },
 ];
 
 // Multi-word search: every whitespace-separated term must appear somewhere in the text
@@ -2441,7 +2484,27 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
     if (db === "bafu" && data.bafuCoverage) {
       const out: { chapter: string; processes: number; withGhg: number; unitSummary: string; processDetails: { name: string; ghg: number; unit: string }[] }[] = [];
       for (const [ch, entry] of Object.entries(data.bafuCoverage.coverage)) {
-        // Build unit summary with ranges
+        const unitParts: string[] = [];
+        for (const [unit, stats] of Object.entries(entry.unitStats)) {
+          unitParts.push(`${unit}: ${stats.count} (${stats.min.toFixed(4)}\u2013${stats.max.toFixed(4)})`);
+        }
+        out.push({
+          chapter: ch,
+          processes: entry.processCount,
+          withGhg: entry.withGhgData,
+          unitSummary: unitParts.join("; "),
+          processDetails: entry.topProcesses,
+        });
+      }
+      if (searchTerms.length) {
+        return out.filter(r => matchesSearch(searchTerms, r.chapter, r.unitSummary, ...r.processDetails.map(p => p.name)));
+      }
+      return out;
+    }
+
+    if (db === "gabi" && data.gabiCoverage) {
+      const out: { chapter: string; processes: number; withGhg: number; unitSummary: string; processDetails: { name: string; ghg: number; unit: string }[] }[] = [];
+      for (const [ch, entry] of Object.entries(data.gabiCoverage.coverage)) {
         const unitParts: string[] = [];
         for (const [unit, stats] of Object.entries(entry.unitStats)) {
           unitParts.push(`${unit}: ${stats.count} (${stats.min.toFixed(4)}\u2013${stats.max.toFixed(4)})`);
@@ -2510,6 +2573,9 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
         )}
         {db === "bafu" && data?.bafuCoverage && (
           <>{data.bafuCoverage.stats.totalProcesses.toLocaleString()} total processes &middot; {data.bafuCoverage.stats.mappedProcesses.toLocaleString()} mapped &middot; {data.bafuCoverage.stats.mappedWithGhg.toLocaleString()} w/ GHG &middot; {data.bafuCoverage.stats.coveredHsChapters} HS chapters</>
+        )}
+        {db === "gabi" && data?.gabiCoverage && (
+          <>{data.gabiCoverage.stats.totalProcesses.toLocaleString()} total processes &middot; {data.gabiCoverage.stats.mappedProcesses.toLocaleString()} mapped &middot; {data.gabiCoverage.stats.mappedWithGhg.toLocaleString()} w/ GHG &middot; {data.gabiCoverage.stats.coveredHsChapters} HS chapters</>
         )}
       </div>
 
@@ -2624,7 +2690,7 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
           </table>
         )}
 
-        {db === "bafu" && (
+        {(db === "bafu" || db === "gabi") && (
           <table className="lca-browser-table">
             <thead>
               <tr>

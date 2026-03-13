@@ -143,6 +143,26 @@ export interface BafuCoverage {
   };
 }
 
+export interface GabiCoverageEntry {
+  processCount: number;
+  withGhgData: number;
+  unitStats: Record<string, LciUnitStats>;
+  topProcesses: LciProcess[];
+}
+
+export interface GabiCoverage {
+  coverage: Record<string, GabiCoverageEntry>;
+  stats: {
+    totalProcesses: number;
+    mappedProcesses: number;
+    mappedWithGhg: number;
+    unmappedProcesses: number;
+    coveredHsChapters: number;
+    source: string;
+    note: string;
+  };
+}
+
 export interface ExiobaseConcordance {
   products: Record<string, string>;
   hsToExio: Record<string, string[]>;
@@ -209,4 +229,5 @@ export interface AppData {
   ecoinventMapping: EcoinventMapping | null;
   uslciCoverage: UslciCoverage | null;
   bafuCoverage: BafuCoverage | null;
+  gabiCoverage: GabiCoverage | null;
 }

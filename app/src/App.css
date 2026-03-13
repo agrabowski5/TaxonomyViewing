@@ -1469,6 +1469,19 @@
 .bafu-card .lci-process-name { color: #4c0519; }
 .bafu-card .lci-process-value { color: #be123c; }
 
+/* GaBi/Sphera card */
+.gabi-card {
+  border-color: #7c3aed;
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+}
+
+.gabi-card h4 { color: #6d28d9; }
+.gabi-card .emission-value { color: #7c3aed; }
+.gabi-card .emission-source { color: #6d28d9; }
+.gabi-card .lci-range { color: #5b21b6; }
+.gabi-card .lci-process-name { color: #3b0764; }
+.gabi-card .lci-process-value { color: #7c3aed; }
+
 /* USLCI card */
 .uslci-card {
   border-color: #1d4ed8;
@@ -1550,6 +1563,12 @@
   background: #fce7f3;
   color: #831843;
   box-shadow: 0 0 2px rgba(236, 72, 153, 0.4);
+}
+
+.ef-gabi {
+  background: #ede9fe;
+  color: #5b21b6;
+  box-shadow: 0 0 2px rgba(124, 58, 237, 0.4);
 }
 
 /* ===== ecoinvent Card (Comparison Panel) ===== */
@@ -1776,6 +1795,7 @@
 .dr-exiobase { background: #ede9fe; color: #5b21b6; }
 .dr-uslci { background: #dbeafe; color: #1e40af; }
 .dr-bafu { background: #fce7f3; color: #9d174d; }
+.dr-gabi { background: #ede9fe; color: #5b21b6; }
 
 .dr-value {
   font-size: 12px;

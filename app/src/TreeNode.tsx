@@ -11,6 +11,7 @@ interface Props extends NodeRendererProps<TNode> {
   exiobaseCoverage?: Map<string, CoverageInfo>;
   bafuCoverage?: Map<string, CoverageInfo>;
   uslciCoverage?: Map<string, CoverageInfo>;
+  gabiCoverage?: Map<string, CoverageInfo>;
   gapHighlight?: GapHighlightData;
 }
 
@@ -27,7 +28,7 @@ function countDescendants(n: TNode): number {
   return count;
 }
 
-export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage, uslciCoverage, bafuCoverage, gapHighlight }: Props) {
+export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage, uslciCoverage, bafuCoverage, gabiCoverage, gapHighlight }: Props) {
   const data = node.data;
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
@@ -37,6 +38,7 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
   const ex = exiobaseCoverage?.get(data.id);
   const us = uslciCoverage?.get(data.id);
   const ba = bafuCoverage?.get(data.id);
+  const ga = gabiCoverage?.get(data.id);
 
   // Gap highlighting
   const isGapLeaf = gapHighlight?.leafIds.has(data.id) ?? false;
@@ -78,13 +80,14 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
           {descendantCount.toLocaleString()}
         </span>
       )}
-      {(ei || ep || ex || us || ba) && (
+      {(ei || ep || ex || us || ba || ga) && (
         <span className="ef-badges">
           {ei && <span className="ef-badge ef-ecoinvent" title={`ecoinvent v3.12: ${ei.dir} (${ei.count} product${ei.count > 1 ? "s" : ""})`}>{fmtBadge("e", ei)}</span>}
           {ep && <span className="ef-badge ef-epa" title={`EPA/USEEIO: ${ep.dir} (${ep.count} factor${ep.count > 1 ? "s" : ""})`}>{fmtBadge("U", ep)}</span>}
           {ex && <span className="ef-badge ef-exiobase" title={`EXIOBASE 3.8.2: ${ex.dir} (${ex.count} categor${ex.count > 1 ? "ies" : "y"})`}>{fmtBadge("X", ex)}</span>}
           {us && <span className="ef-badge ef-uslci" title={`US LCI (NREL): ${us.dir} (${us.count} process${us.count > 1 ? "es" : ""})`}>{fmtBadge("L", us)}</span>}
           {ba && <span className="ef-badge ef-bafu" title={`BAFU:2025: ${ba.dir} (${ba.count} process${ba.count > 1 ? "es" : ""})`}>{fmtBadge("B", ba)}</span>}
+          {ga && <span className="ef-badge ef-gabi" title={`GaBi/Sphera: ${ga.dir} (${ga.count} process${ga.count > 1 ? "es" : ""})`}>{fmtBadge("G", ga)}</span>}
         </span>
       )}
       {info && (

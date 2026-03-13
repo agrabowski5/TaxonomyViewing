@@ -28,6 +28,7 @@ interface Props {
   exiobaseCoverage?: Map<string, CoverageInfo>;
   uslciCoverage?: Map<string, CoverageInfo>;
   bafuCoverage?: Map<string, CoverageInfo>;
+  gabiCoverage?: Map<string, CoverageInfo>;
   side?: "left" | "right";
   gapHighlight?: GapHighlightData;
   onClearGapHighlight?: () => void;
@@ -49,6 +50,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
     exiobaseCoverage,
     uslciCoverage,
     bafuCoverage,
+    gabiCoverage,
     side,
     gapHighlight,
     onClearGapHighlight,
@@ -105,6 +107,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
               exiobaseCoverage={exiobaseCoverage}
               uslciCoverage={uslciCoverage}
               bafuCoverage={bafuCoverage}
+              gabiCoverage={gabiCoverage}
               gapHighlight={gapHighlight}
             />
           )}

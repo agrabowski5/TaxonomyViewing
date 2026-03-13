@@ -14,7 +14,7 @@ import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
 import type { AboutSectionHandle, TabNavContext } from "./AboutSection";
-import type { TreeNode, LookupEntry, TaxonomyType, AppData, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance, CoverageInfo } from "./types";
+import type { TreeNode, LookupEntry, TaxonomyType, AppData, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, GabiCoverage, GabiCoverageEntry, LciUnitStats, GenericConcordance, CoverageInfo } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
 import "./builder/builder.css";
@@ -640,7 +640,7 @@ interface ResolutionChain {
 function traceResolutionChain(
   node: TreeNode,
   taxonomy: TaxonomyType,
-  database: "epa" | "exiobase" | "ecoinvent" | "uslci" | "bafu",
+  database: "epa" | "exiobase" | "ecoinvent" | "uslci" | "bafu" | "gabi",
   data: AppData,
 ): ResolutionChain | null {
   const steps: ResolutionStep[] = [];
@@ -977,13 +977,13 @@ function traceResolutionChain(
     return null;
   }
 
-  // ========================= USLCI / BAFU =========================
-  if (database === "uslci" || database === "bafu") {
+  // ========================= USLCI / BAFU / GaBi =========================
+  if (database === "uslci" || database === "bafu" || database === "gabi") {
     const isUslci = database === "uslci";
-    const cov = isUslci ? data.uslciCoverage?.coverage : data.bafuCoverage?.coverage;
+    const cov = isUslci ? data.uslciCoverage?.coverage : database === "bafu" ? data.bafuCoverage?.coverage : data.gabiCoverage?.coverage;
     if (!cov) return null;
-    const dbLabel = isUslci ? "US LCI" : "BAFU";
-    const lcaDbId = isUslci ? "uslci" : "bafu";
+    const dbLabel = isUslci ? "US LCI" : database === "bafu" ? "BAFU" : "GaBi";
+    const lcaDbId = database;
 
     function lookupHs(hsBase: string): ResolutionChain | null {
       if (isUslci) {
@@ -1384,6 +1384,74 @@ function BafuFactorDisplay({ entry, getChain, onOpenTab }: { entry: BafuCoverage
   return <LciFactorDisplay entry={entry} title="Direct Emissions (BAFU)" source="BAFU:2025 (direct process emissions only, GWP-100 AR6)" cardClass="bafu-card" getChain={getChain} onOpenTab={onOpenTab} />;
 }
 
+// Look up GaBi chapter data for a selected node (keyed by HS 2-digit chapter, same as BAFU)
+function getGabiChapterData(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  gabiCoverage: GabiCoverage | null,
+  concordance: ConcordanceData,
+): GabiCoverageEntry | null {
+  if (!gabiCoverage) return null;
+  const cov = gabiCoverage.coverage;
+
+  if (HS_FAMILY.includes(taxonomy)) {
+    const hsBase = getHsBase(node.code, taxonomy);
+    if (!hsBase || hsBase.length < 2) return null;
+    const chapter = hsBase.substring(0, 2);
+    return cov[chapter] ?? null;
+  }
+
+  if (taxonomy === "cpc") {
+    const cleanCpc = stripCode(node.code);
+    for (let len = cleanCpc.length; len >= 4; len--) {
+      const prefix = cleanCpc.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        const chapter = hsMappings[0].code.substring(0, 2);
+        if (cov[chapter]) return cov[chapter];
+      }
+    }
+  }
+
+  if (taxonomy === "t1") {
+    const origin = getT1Origin(node.id, {} as Record<string, LookupEntry>, node.code);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 2) {
+        const chapter = hsBase.substring(0, 2);
+        return cov[chapter] ?? null;
+      }
+    }
+  }
+
+  if (taxonomy === "t2") {
+    const origin = getT2Origin(node.id);
+    if (origin === "hts") {
+      const hsBase = getHsBase(node.code, "hts");
+      if (hsBase && hsBase.length >= 2) {
+        const chapter = hsBase.substring(0, 2);
+        return cov[chapter] ?? null;
+      }
+    } else if (origin === "cpc") {
+      const cleanCpc = stripCode(node.code);
+      for (let len = cleanCpc.length; len >= 4; len--) {
+        const prefix = cleanCpc.substring(0, len);
+        const hsMappings = concordance.cpcToHs[prefix];
+        if (hsMappings && hsMappings.length > 0) {
+          const chapter = hsMappings[0].code.substring(0, 2);
+          if (cov[chapter]) return cov[chapter];
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function GabiFactorDisplay({ entry, getChain, onOpenTab }: { entry: GabiCoverageEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
+  return <LciFactorDisplay entry={entry} title="Direct Emissions (GaBi/Sphera)" source="GaBi/Sphera 2026.1 (direct process emissions only, GWP-100 AR6)" cardClass="gabi-card" getChain={getChain} onOpenTab={onOpenTab} />;
+}
+
 function UslciFactorDisplay({ entry, getChain, onOpenTab }: { entry: UslciCoverageEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return <LciFactorDisplay entry={entry} title="Direct Emissions (US LCI)" source="NREL USLCI (direct process emissions only, GWP-100 AR6)" cardClass="uslci-card" getChain={getChain} onOpenTab={onOpenTab} />;
 }
@@ -1458,6 +1526,7 @@ interface DescendantRanges {
   epa: DbRange | null;
   exiobase: DbRange | null;
   bafu: DbRange | null;
+  gabi: DbRange | null;
   uslci: DbRange | null;
   ecoinventCount: number;
   totalLeaves: number;
@@ -1479,13 +1548,14 @@ function computeDescendantRanges(
 ): DescendantRanges {
   const leaves = collectLeafNodes(node);
   const ranges: DescendantRanges = {
-    epa: null, exiobase: null, bafu: null, uslci: null,
+    epa: null, exiobase: null, bafu: null, gabi: null, uslci: null,
     ecoinventCount: 0, totalLeaves: leaves.length,
   };
 
   const epaVals: number[] = [];
   const exioVals: number[] = [];
   const bafuVals: number[] = [];
+  const gabiVals: number[] = [];
   const uslciVals: number[] = [];
 
   for (const leaf of leaves) {
@@ -1502,6 +1572,13 @@ function computeDescendantRanges(
     if (bf && bf.withGhgData > 0) {
       const kgStats = bf.unitStats["kg"];
       if (kgStats) bafuVals.push(kgStats.median);
+    }
+
+    // GaBi
+    const gf = getGabiChapterData(leaf, taxonomy, data.gabiCoverage, data.concordance);
+    if (gf && gf.withGhgData > 0) {
+      const kgStats = gf.unitStats["kg"];
+      if (kgStats) gabiVals.push(kgStats.median);
     }
 
     // USLCI
@@ -1525,6 +1602,9 @@ function computeDescendantRanges(
   if (bafuVals.length > 0) {
     ranges.bafu = { min: Math.min(...bafuVals), max: Math.max(...bafuVals), count: bafuVals.length, unit: "kg CO₂e / kg" };
   }
+  if (gabiVals.length > 0) {
+    ranges.gabi = { min: Math.min(...gabiVals), max: Math.max(...gabiVals), count: gabiVals.length, unit: "kg CO₂e / kg" };
+  }
   if (uslciVals.length > 0) {
     ranges.uslci = { min: Math.min(...uslciVals), max: Math.max(...uslciVals), count: uslciVals.length, unit: "kg CO₂e / kg" };
   }
@@ -1533,7 +1613,7 @@ function computeDescendantRanges(
 }
 
 function DescendantRangeDisplay({ ranges }: { ranges: DescendantRanges }) {
-  const hasAny = ranges.epa || ranges.exiobase || ranges.bafu || ranges.uslci || ranges.ecoinventCount > 0;
+  const hasAny = ranges.epa || ranges.exiobase || ranges.bafu || ranges.gabi || ranges.uslci || ranges.ecoinventCount > 0;
   if (!hasAny) return null;
 
   return (
@@ -1580,6 +1660,15 @@ function DescendantRangeDisplay({ ranges }: { ranges: DescendantRanges }) {
               {formatGhg(ranges.bafu.min)} – {formatGhg(ranges.bafu.max)} {ranges.bafu.unit}
             </span>
             <span className="dr-count">({ranges.bafu.count} leaves)</span>
+          </div>
+        )}
+        {ranges.gabi && (
+          <div className="dr-row">
+            <span className="dr-badge dr-gabi">GaBi</span>
+            <span className="dr-value">
+              {formatGhg(ranges.gabi.min)} – {formatGhg(ranges.gabi.max)} {ranges.gabi.unit}
+            </span>
+            <span className="dr-count">({ranges.gabi.count} leaves)</span>
           </div>
         )}
       </div>
@@ -2115,6 +2204,57 @@ function computeBafuCoverage(
   // Use kg-unit process count to match what the comparison panel displays
   const coverageMap = new Map(
     Object.entries(bafuCoverage.coverage)
+      .filter(([, entry]) => entry.withGhgData > 0)
+      .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.withGhgData] as const)
+  );
+
+  function walk(nodes: TreeNode[]) {
+    for (const node of nodes) {
+      const clean = stripCode(node.code);
+      let count = 0;
+      let matchKey = "";
+
+      if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(node.id) === "cpc") || (taxonomy === "t1" && node.id.startsWith("t1-svc-"))) {
+        for (let len = clean.length; len >= 4; len--) {
+          const prefix = clean.substring(0, len);
+          const hsMappings = concordance.cpcToHs[prefix];
+          if (hsMappings && hsMappings.length > 0) {
+            const chapter = hsMappings[0].code.substring(0, 2);
+            const pc = coverageMap.get(chapter);
+            if (pc) { count = pc; matchKey = chapter; }
+            break;
+          }
+        }
+      } else if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(node.id) === "hts") || (taxonomy === "t1" && !node.id.startsWith("t1-svc-"))) {
+        if (/^\d+$/.test(clean) && clean.length >= 2) {
+          const ch = clean.substring(0, 2);
+          const pc = coverageMap.get(ch);
+          if (pc) { count = pc; matchKey = ch; }
+        }
+      }
+
+      if (count > 0) raw.set(node.id, { count, key: matchKey });
+      if (node.children) walk(node.children);
+    }
+  }
+
+  walk(tree);
+  return assignDirectionality(raw);
+}
+
+function computeGabiCoverage(
+  tree: TreeNode[],
+  taxonomy: TaxonomyType,
+  gabiCoverage: GabiCoverage | null,
+  concordance: ConcordanceData,
+  strict: boolean,
+): Map<string, CoverageInfo> {
+  // GaBi only has HS-2 chapter-level matching — disabled entirely in strict mode
+  if (strict) return new Map();
+  if (!gabiCoverage) return new Map();
+  const raw = new Map<string, { count: number; key: string }>();
+  const coverageMap = new Map(
+    Object.entries(gabiCoverage.coverage)
       .filter(([, entry]) => entry.withGhgData > 0)
       .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.withGhgData] as const)
   );
@@ -2717,6 +2857,11 @@ function AppContent() {
     return getBafuChapterData(selectedNode, selectedFrom, data.bafuCoverage, data.concordance);
   }, [selectedNode, selectedFrom, data]);
 
+  const gabiFactor = useMemo(() => {
+    if (!selectedNode || !selectedFrom || !data) return null;
+    return getGabiChapterData(selectedNode, selectedFrom, data.gabiCoverage, data.concordance);
+  }, [selectedNode, selectedFrom, data]);
+
   const uslciFactor = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return null;
     return getUslciData(selectedNode, selectedFrom, data.uslciCoverage, data.concordance);
@@ -3304,6 +3449,14 @@ function AppContent() {
     () => data ? computeBafuCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.bafuCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
     [data, rightTaxonomy, getTreeData, strictMatch]
   );
+  const leftGabiCoverage = useMemo(
+    () => data ? computeGabiCoverage(getTreeData(leftTaxonomy), leftTaxonomy, data.gabiCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, leftTaxonomy, getTreeData, strictMatch]
+  );
+  const rightGabiCoverage = useMemo(
+    () => data ? computeGabiCoverage(getTreeData(rightTaxonomy), rightTaxonomy, data.gabiCoverage, data.concordance, strictMatch) : new Map<string, CoverageInfo>(),
+    [data, rightTaxonomy, getTreeData, strictMatch]
+  );
 
   // Ecoinvent info for selected node
   const ecoinventInfo = useMemo((): EcoinventInfo => {
@@ -3312,7 +3465,7 @@ function AppContent() {
   }, [selectedNode, selectedFrom, data]);
 
   // Lazy resolution chain factories — only computed when user clicks "Show resolution path"
-  const getResolutionChain = useCallback((db: "epa" | "exiobase" | "ecoinvent" | "uslci" | "bafu") => {
+  const getResolutionChain = useCallback((db: "epa" | "exiobase" | "ecoinvent" | "uslci" | "bafu" | "gabi") => {
     if (!selectedNode || !selectedFrom || !data) return null;
     return traceResolutionChain(selectedNode, selectedFrom, db, data);
   }, [selectedNode, selectedFrom, data]);
@@ -3321,6 +3474,7 @@ function AppContent() {
   const getEcoinventChain = useCallback(() => getResolutionChain("ecoinvent"), [getResolutionChain]);
   const getUslciChain = useCallback(() => getResolutionChain("uslci"), [getResolutionChain]);
   const getBafuChain = useCallback(() => getResolutionChain("bafu"), [getResolutionChain]);
+  const getGabiChain = useCallback(() => getResolutionChain("gabi"), [getResolutionChain]);
 
   // Helper to open the about panel to a specific tab with optional navigation context
   const openAboutTab = useCallback((tab: "concordances" | "browser", ctx?: TabNavContext) => {
@@ -3490,6 +3644,7 @@ function AppContent() {
               exiobaseCoverage={leftExiobaseCoverage}
               uslciCoverage={leftUslciCoverage}
               bafuCoverage={leftBafuCoverage}
+              gabiCoverage={leftGabiCoverage}
               side="left"
               gapHighlight={gapHighlight?.taxonomy === leftTaxonomy ? gapHighlight : undefined}
               onClearGapHighlight={() => setGapHighlight(null)}
@@ -3570,6 +3725,7 @@ function AppContent() {
                 exiobaseCoverage={rightExiobaseCoverage}
                 uslciCoverage={rightUslciCoverage}
                 bafuCoverage={rightBafuCoverage}
+                gabiCoverage={rightGabiCoverage}
                 side="right"
               />
             </>
@@ -3705,6 +3861,10 @@ function AppContent() {
               <BafuFactorDisplay entry={bafuFactor} getChain={getBafuChain} onOpenTab={openAboutTab} />
             )}
 
+            {gabiFactor && gabiFactor.withGhgData > 0 && (
+              <GabiFactorDisplay entry={gabiFactor} getChain={getGabiChain} onOpenTab={openAboutTab} />
+            )}
+
             {uslciFactor && uslciFactor.withGhgData > 0 && (
               <UslciFactorDisplay entry={uslciFactor} getChain={getUslciChain} onOpenTab={openAboutTab} />
             )}
@@ -3726,7 +3886,7 @@ function AppContent() {
               <DescendantRangeDisplay ranges={descendantRanges} />
             )}
 
-            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !exiobaseProducts && !(bafuFactor && bafuFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && !ecoinventInfo.isic && (
+            {mappings.length === 0 && !emissionFactor && !exiobaseFactor && !exiobaseProducts && !(bafuFactor && bafuFactor.withGhgData > 0) && !(gabiFactor && gabiFactor.withGhgData > 0) && !(uslciFactor && uslciFactor.withGhgData > 0) && !ecoinventInfo.cpc && !ecoinventInfo.hs && !ecoinventInfo.isic && (
               <div className="comparison-item no-mapping">
                 <p className="name">No mappings found at this level</p>
               </div>
