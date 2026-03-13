@@ -2834,7 +2834,7 @@ function AppContent() {
           <span className={`match-mode-label ${strictMatch ? "active" : ""}`}>Exact</span>
           <span
             className="match-mode-help"
-            title="Click to see Coverage Mapping Rules"
+            title={"Relaxed: broader coverage via ancestor fallback, prefix shortening, and chapter-level matching.\nExact: only precise code-level matches — no fallbacks.\n\nClick for full details."}
             onClick={() => aboutRef.current?.openToTab("lca")}
           >?</span>
         </div>
