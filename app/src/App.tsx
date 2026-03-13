@@ -2908,6 +2908,7 @@ function AppContent() {
               exiobaseCoverage={leftExiobaseCoverage}
               uslciCoverage={leftUslciCoverage}
               bafuCoverage={leftBafuCoverage}
+              side="left"
             />
           </>
         </div>
@@ -2985,6 +2986,7 @@ function AppContent() {
                 exiobaseCoverage={rightExiobaseCoverage}
                 uslciCoverage={rightUslciCoverage}
                 bafuCoverage={rightBafuCoverage}
+                side="right"
               />
             </>
           )}

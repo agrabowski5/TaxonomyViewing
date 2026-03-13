@@ -2296,8 +2296,17 @@
   display: block;
   margin: 8px auto 4px;
   width: 100%;
-  max-width: 360px;
+  max-width: 420px;
   height: auto;
+}
+
+.cm-edge-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin: 18px 0 4px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
 }
 
 /* ===== Resolution Methods Tab ===== */
@@ -2514,8 +2523,8 @@
 }
 
 .lca-m-one {
-  background: #d1fae5;
-  color: #065f46;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .lca-m-many {

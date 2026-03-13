@@ -20,6 +20,7 @@ interface Props {
   exiobaseCoverage?: Map<string, CoverageInfo>;
   uslciCoverage?: Map<string, CoverageInfo>;
   bafuCoverage?: Map<string, CoverageInfo>;
+  side?: "left" | "right";
 }
 
 export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function TaxonomyTree(
@@ -38,6 +39,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
     exiobaseCoverage,
     uslciCoverage,
     bafuCoverage,
+    side,
   },
   ref
 ) {
@@ -51,12 +53,14 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
           {fullName}
         </h2>
         <div className="panel-legend">{legend}</div>
-        <div className="panel-badge-key">
-          <span className="badge-key-label">LCA badges:</span>
-          <span className="badge-key-item">1:1 = exclusive match</span>
-          <span className="badge-key-item">1:N = one code → N entries</span>
-          <span className="badge-key-item">N:1 = many codes → one entry</span>
-        </div>
+        {side !== "right" && (
+          <div className="panel-badge-key">
+            <span className="badge-key-label">LCA badges:</span>
+            <span className="badge-key-item">1:1 = exclusive match</span>
+            <span className="badge-key-item">1:N = one code → N entries</span>
+            <span className="badge-key-item">N:1 = many codes → one entry</span>
+          </div>
+        )}
       </div>
       <div className="tree-container" ref={container.ref}>
         <Tree<TreeNode>

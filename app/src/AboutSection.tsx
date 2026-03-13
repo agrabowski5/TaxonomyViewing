@@ -1392,7 +1392,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
       <div className="cm-metric-explainer">
         {mode === "coverage" && (<>
           <div className="cm-equation-block">
-            <span className="cm-equation-label">Coverage</span>
+            <span className="cm-equation-label">Reachability</span>
             <span className="cm-equation">=</span>
             <span className="cm-equation-frac">
               <span className="cm-frac-num">covered leaves</span>
@@ -1403,7 +1403,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
             What percentage of a taxonomy&rsquo;s most-specific codes (leaf nodes) can be resolved to <em>at least one</em> LCA data entry. A leaf counts as &ldquo;covered&rdquo; regardless of how many entries match or how specific they are.
           </p>
           {/* Mini tree diagram */}
-          <svg className="cm-tree-diagram" viewBox="0 0 340 150" aria-label="Coverage diagram">
+          <svg className="cm-tree-diagram" viewBox="0 0 340 150" aria-label="Reachability diagram">
             {/* Root */}
             <circle cx="170" cy="20" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
             <text x="170" y="24" textAnchor="middle" fontSize="9" fill="#6b7280">root</text>
@@ -1428,7 +1428,131 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
             <circle cx="300" cy="118" r="10" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
             <text x="300" y="122" textAnchor="middle" fontSize="8" fontWeight="700" fill="#ef4444">&#x2717;</text>
             {/* Labels */}
-            <text x="170" y="147" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Coverage = 3 / 4 = 75%</text>
+            <text x="170" y="147" textAnchor="middle" fontSize="11" fontWeight="600" fill="#374151">Reachability = 3 / 4 = 75%</text>
+          </svg>
+
+          {/* Edge Case 1: Parent coverage does NOT propagate */}
+          <h4 className="cm-edge-heading">Edge Case: Parent Has LCA Entry</h4>
+          <p className="cm-metric-desc">
+            A parent node having an LCA database match does <strong>not</strong> propagate coverage to its children.
+            Each leaf is evaluated <strong>independently</strong> using its own code through the concordance chain.
+          </p>
+          <svg className="cm-tree-diagram" viewBox="0 0 420 200" aria-label="Parent coverage does not propagate">
+            {/* Parent node with LCA match */}
+            <circle cx="210" cy="28" r="14" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />
+            <text x="210" y="32" textAnchor="middle" fontSize="8" fontWeight="700" fill="#92400e">01</text>
+            <text x="262" y="22" fontSize="8" fill="#92400e" fontWeight="600">parent &ldquo;01&rdquo;</text>
+            <text x="262" y="33" fontSize="8" fill="#92400e">has ecoinvent match</text>
+            {/* Branch lines */}
+            <line x1="200" y1="42" x2="110" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
+            <line x1="210" y1="42" x2="210" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
+            <line x1="220" y1="42" x2="310" y2="78" stroke="#d1d5db" strokeWidth="1.5" />
+            {/* Leaf nodes */}
+            <circle cx="110" cy="90" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="110" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0101</text>
+            <circle cx="210" cy="90" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+            <text x="210" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0102</text>
+            <circle cx="310" cy="90" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="310" y="94" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0103</text>
+            {/* Annotations for each leaf */}
+            <text x="110" y="116" textAnchor="middle" fontSize="7" fill="#16a34a">own HS-6 match</text>
+            <text x="210" y="116" textAnchor="middle" fontSize="7" fill="#ef4444">no HS-6 match</text>
+            <text x="310" y="116" textAnchor="middle" fontSize="7" fill="#16a34a">own HS-6 match</text>
+            {/* Crossed-out arrow from parent to uncovered leaf */}
+            <line x1="210" y1="42" x2="210" y2="64" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
+            {/* Big X over the propagation idea */}
+            <line x1="195" y1="52" x2="225" y2="68" stroke="#ef4444" strokeWidth="2" />
+            <line x1="225" y1="52" x2="195" y2="68" stroke="#ef4444" strokeWidth="2" />
+            {/* Result box */}
+            <rect x="30" y="135" width="360" height="52" rx="6" fill="#fff7ed" stroke="#f59e0b" strokeWidth="1" />
+            <text x="210" y="153" textAnchor="middle" fontSize="10" fontWeight="600" fill="#92400e">Parent &ldquo;01&rdquo; has data, but leaf &ldquo;0102&rdquo; is NOT covered</text>
+            <text x="210" y="168" textAnchor="middle" fontSize="9" fill="#78716c">Each leaf resolves through its own code &mdash; no downward inheritance</text>
+            <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#78716c">Reachability = 2 / 3 = 67% (parent&rsquo;s match is irrelevant)</text>
+          </svg>
+
+          {/* Edge Case 2: Relaxed ancestor fallback */}
+          <h4 className="cm-edge-heading">Edge Case: Ancestor Fallback (Relaxed Mode)</h4>
+          <p className="cm-metric-desc">
+            In <strong>Relaxed</strong> mode, if a leaf&rsquo;s exact code isn&rsquo;t found in a database, the system tries
+            shorter prefixes of that code (walking <em>up</em> the code hierarchy). This is <strong>not</strong> parent-to-child propagation
+            &mdash; it&rsquo;s the leaf looking upward for the nearest available data.
+          </p>
+          <svg className="cm-tree-diagram" viewBox="0 0 420 210" aria-label="Ancestor fallback in relaxed mode">
+            {/* Database column */}
+            <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT DATABASE</text>
+            <rect x="290" y="25" width="80" height="24" rx="5" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+            <text x="330" y="41" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">CPC &ldquo;011&rdquo;</text>
+            <text x="330" y="62" fontSize="7" fill="#6b7280" textAnchor="middle">(3-digit group)</text>
+            {/* Taxonomy tree side */}
+            <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY TREE</text>
+            {/* CPC 0 → 01 → 011 → 0111, 0112 */}
+            <circle cx="100" cy="35" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+            <text x="100" y="39" textAnchor="middle" fontSize="8" fill="#6b7280">01</text>
+            <line x1="100" y1="45" x2="100" y2="65" stroke="#d1d5db" strokeWidth="1.5" />
+            <circle cx="100" cy="75" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+            <text x="100" y="79" textAnchor="middle" fontSize="8" fill="#6b7280">011</text>
+            <line x1="93" y1="85" x2="60" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
+            <line x1="107" y1="85" x2="140" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
+            {/* Leaves */}
+            <circle cx="60" cy="125" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="60" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0111</text>
+            <circle cx="140" cy="125" r="12" fill="#dcfce7" stroke="#22c55e" strokeWidth="2" />
+            <text x="140" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#16a34a">0112</text>
+            {/* Arrows: leaf tries exact, fails, then prefix match succeeds */}
+            <path d="M 72 122 Q 200 80 288 37" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
+            <path d="M 152 122 Q 200 110 288 40" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="4,3" markerEnd="url(#arrowGreen)" />
+            <defs>
+              <marker id="arrowGreen" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0, 6 2, 0 4" fill="#22c55e" /></marker>
+            </defs>
+            {/* Annotation */}
+            <text x="210" y="95" textAnchor="middle" fontSize="7" fill="#16a34a" fontWeight="600">exact &ldquo;0111&rdquo; not found</text>
+            <text x="210" y="106" textAnchor="middle" fontSize="7" fill="#16a34a">prefix &ldquo;011&rdquo; matches!</text>
+            {/* Result box */}
+            <rect x="30" y="148" width="360" height="52" rx="6" fill="#ecfdf5" stroke="#22c55e" strokeWidth="1" />
+            <text x="210" y="166" textAnchor="middle" fontSize="10" fontWeight="600" fill="#065f46">Relaxed: leaf &ldquo;0111&rdquo; covered via ancestor code &ldquo;011&rdquo;</text>
+            <text x="210" y="181" textAnchor="middle" fontSize="9" fill="#6b7280">The leaf looks upward for the nearest matching prefix in the database</text>
+            <text x="210" y="194" textAnchor="middle" fontSize="9" fill="#6b7280">This is NOT parent propagation &mdash; it&rsquo;s the leaf resolving itself</text>
+          </svg>
+
+          {/* Edge Case 3: Exact mode */}
+          <h4 className="cm-edge-heading">Edge Case: Exact Mode (No Fallback)</h4>
+          <p className="cm-metric-desc">
+            In <strong>Exact</strong> mode, ancestor fallback is disabled. If the database doesn&rsquo;t have the leaf&rsquo;s precise code,
+            that leaf is <strong>not covered</strong> &mdash; even if a broader parent code exists in the database.
+          </p>
+          <svg className="cm-tree-diagram" viewBox="0 0 420 190" aria-label="Exact mode no fallback">
+            {/* Database column */}
+            <text x="330" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">ECOINVENT DATABASE</text>
+            <rect x="290" y="25" width="80" height="24" rx="5" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5" />
+            <text x="330" y="41" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">CPC &ldquo;011&rdquo;</text>
+            <text x="330" y="62" fontSize="7" fill="#6b7280" textAnchor="middle">(3-digit group only)</text>
+            {/* Taxonomy tree */}
+            <text x="100" y="14" textAnchor="middle" fontSize="9" fontWeight="600" fill="#6b7280">TAXONOMY TREE</text>
+            <circle cx="100" cy="35" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+            <text x="100" y="39" textAnchor="middle" fontSize="8" fill="#6b7280">01</text>
+            <line x1="100" y1="45" x2="100" y2="65" stroke="#d1d5db" strokeWidth="1.5" />
+            <circle cx="100" cy="75" r="10" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
+            <text x="100" y="79" textAnchor="middle" fontSize="8" fill="#6b7280">011</text>
+            <line x1="93" y1="85" x2="60" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
+            <line x1="107" y1="85" x2="140" y2="115" stroke="#d1d5db" strokeWidth="1.5" />
+            {/* Leaves - uncovered in exact mode */}
+            <circle cx="60" cy="125" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+            <text x="60" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0111</text>
+            <circle cx="140" cy="125" r="12" fill="#fef2f2" stroke="#ef4444" strokeWidth="2" />
+            <text x="140" y="129" textAnchor="middle" fontSize="7" fontWeight="700" fill="#ef4444">0112</text>
+            {/* Blocked arrows */}
+            <line x1="72" y1="120" x2="180" y2="80" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
+            <line x1="152" y1="120" x2="180" y2="85" stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
+            {/* X marks */}
+            <line x1="170" y1="72" x2="190" y2="92" stroke="#ef4444" strokeWidth="2.5" />
+            <line x1="190" y1="72" x2="170" y2="92" stroke="#ef4444" strokeWidth="2.5" />
+            {/* Annotation */}
+            <text x="210" y="98" textAnchor="middle" fontSize="7" fill="#ef4444" fontWeight="600">exact &ldquo;0111&rdquo; not in DB</text>
+            <text x="210" y="109" textAnchor="middle" fontSize="7" fill="#ef4444">prefix fallback disabled</text>
+            {/* Result box */}
+            <rect x="30" y="142" width="360" height="40" rx="6" fill="#fef2f2" stroke="#ef4444" strokeWidth="1" />
+            <text x="210" y="158" textAnchor="middle" fontSize="10" fontWeight="600" fill="#991b1b">Exact: leaves &ldquo;0111&rdquo; &amp; &ldquo;0112&rdquo; are NOT covered</text>
+            <text x="210" y="173" textAnchor="middle" fontSize="9" fill="#78716c">DB has &ldquo;011&rdquo; but Exact mode requires the leaf&rsquo;s precise code</text>
           </svg>
         </>)}
 
@@ -1529,7 +1653,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
 
       <div className="cm-mode-toggle">
         <button className={`cm-mode-btn ${mode === "coverage" ? "cm-mode-active" : ""}`} onClick={() => setMode("coverage")}>
-          Coverage
+          Reachability
         </button>
         <button className={`cm-mode-btn ${mode === "specificity" ? "cm-mode-active" : ""}`} onClick={() => setMode("specificity")}>
           Specificity
@@ -1650,7 +1774,7 @@ function CoverageMatrixTab({ data }: { data: AppData | null }) {
             <>
               <li><strong>Leaf Coverage</strong> = unique source-level data entries / total leaves. Shows what fraction of the taxonomy gets a distinct data point.</li>
               <li>Leaf Coverage combines coverage breadth with data granularity &mdash; a database scores high only if it both covers many leaves <em>and</em> provides distinct data for them.</li>
-              <li>Compare with <strong>Coverage</strong> (how many leaves match anything) and <strong>Specificity</strong> (how unique the data is among matched leaves).</li>
+              <li>Compare with <strong>Reachability</strong> (how many leaves match anything) and <strong>Specificity</strong> (how unique the data is among matched leaves).</li>
             </>
           )}
         </ul>
