@@ -1134,7 +1134,7 @@ function EmissionFactorDisplay({ entry, chain, onOpenTab }: { entry: EmissionFac
   );
 }
 
-function ExiobaseFactorDisplay({ entry }: { entry: ExiobaseFactorEntry }) {
+function ExiobaseFactorDisplay({ entry, chain, onOpenTab }: { entry: ExiobaseFactorEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return (
     <div className="emission-factor-card exiobase-card">
       <h4>Carbon Intensity (EXIOBASE)</h4>
@@ -1148,6 +1148,7 @@ function ExiobaseFactorDisplay({ entry }: { entry: ExiobaseFactorEntry }) {
         ))}
       </div>
       <div className="emission-source">{entry.source}</div>
+      {chain && <ResolutionChainToggle chain={chain} onOpenTab={onOpenTab} />}
     </div>
   );
 }
@@ -3692,7 +3693,7 @@ function AppContent() {
             )}
 
             {exiobaseFactor && (
-              <ExiobaseFactorDisplay entry={exiobaseFactor} />
+              <ExiobaseFactorDisplay entry={exiobaseFactor} chain={resolutionChains.exiobase} onOpenTab={openAboutTab} />
             )}
             {exiobaseProducts && (
               <ExiobaseProductDisplay match={exiobaseProducts} chain={resolutionChains.exiobase} onOpenTab={openAboutTab} />
