@@ -13,7 +13,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
-import type { AboutSectionHandle } from "./AboutSection";
+import type { AboutSectionHandle, TabNavContext } from "./AboutSection";
 import type { TreeNode, LookupEntry, TaxonomyType, AppData, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, LciUnitStats, GenericConcordance, CoverageInfo } from "./types";
 import type { CustomNode } from "./builder/types";
 import "./App.css";
@@ -627,7 +627,9 @@ interface ResolutionStep {
   code: string;        // the actual code at this step
   description?: string; // optional description
   system: string;      // "HS", "CPC", "NAICS", "ISIC", "EXIOBASE", etc.
-  concordance?: string; // concordance table used (for linking to browser)
+  concordance?: string; // concordance table ID (for linking to Concordance Browser)
+  lcaDb?: string;      // LCA database ID (for linking to LCA Data Browser)
+  searchCode?: string; // code to search for when opening the browser
 }
 
 interface ResolutionChain {
@@ -648,34 +650,129 @@ function traceResolutionChain(
   // Step 1: source node
   steps.push({ label: `${taxLabel} node`, code: node.code, description: node.name, system: taxLabel });
 
-  // Determine HS base for HS-family
+  // Classify taxonomy
   const isHs = HS_FAMILY.includes(taxonomy);
   const isT1Hts = taxonomy === "t1" && !node.id.startsWith("t1-svc-");
   const isT2Hts = taxonomy === "t2" && node.id.startsWith("t2-hts-");
   const isCpc = taxonomy === "cpc" || (taxonomy === "t1" && node.id.startsWith("t1-svc-")) || (taxonomy === "t2" && !node.id.startsWith("t2-hts-"));
+  const isGenericConc = CONCORDANCE_TAXONOMIES.includes(taxonomy); // naics, isic, nace, cpa, bea
 
-  if (database === "epa") {
+  // Helper: resolve generic concordance taxonomies to HS codes (with chain steps)
+  function resolveGenericToHs(): string[] {
+    if (taxonomy === "naics" && data.naicsHsConcordance) {
+      const mappings = data.naicsHsConcordance.forward[clean];
+      if (mappings && mappings.length > 0) {
+        const hsCodes = mappings.map(m => m.code);
+        steps.push({ label: "NAICS→HS concordance", code: `${clean} → ${hsCodes[0]}${hsCodes.length > 1 ? ` (+${hsCodes.length - 1})` : ""}`, system: "HS", concordance: "naicsHs", searchCode: clean });
+        return hsCodes;
+      }
+    }
+    if ((taxonomy === "isic" || taxonomy === "nace") && data.isicCpcConcordance) {
+      const cpcMappings = data.isicCpcConcordance.forward[clean];
+      if (cpcMappings && cpcMappings.length > 0) {
+        const cpcCode = cpcMappings[0].code;
+        steps.push({ label: `${taxonomy.toUpperCase()}→CPC concordance`, code: `${clean} → ${cpcCode}`, system: "CPC", concordance: "isicCpc", searchCode: clean });
+        const hsMappings = data.concordance?.cpcToHs[cpcCode];
+        if (hsMappings && hsMappings.length > 0) {
+          const hsCodes = hsMappings.map(m => m.code);
+          steps.push({ label: "CPC→HS concordance", code: `${cpcCode} → ${hsCodes[0]}${hsCodes.length > 1 ? ` (+${hsCodes.length - 1})` : ""}`, system: "HS", concordance: "cpcHs", searchCode: cpcCode });
+          return hsCodes;
+        }
+        return []; // CPC found but no HS mapping
+      }
+    }
+    if (taxonomy === "cpa" && data.cpaHsConcordance) {
+      const mappings = data.cpaHsConcordance.forward[clean];
+      if (mappings && mappings.length > 0) {
+        const hsCodes = mappings.map(m => m.code);
+        steps.push({ label: "CPA→HS concordance", code: `${clean} → ${hsCodes[0]}${hsCodes.length > 1 ? ` (+${hsCodes.length - 1})` : ""}`, system: "HS", concordance: "cpaHs", searchCode: clean });
+        return hsCodes;
+      }
+    }
+    if (taxonomy === "bea" && data.beaHsConcordance) {
+      const mappings = data.beaHsConcordance.forward[clean];
+      if (mappings && mappings.length > 0) {
+        const hsCodes = mappings.map(m => m.code);
+        steps.push({ label: "BEA→HS concordance", code: `${clean} → ${hsCodes[0]}${hsCodes.length > 1 ? ` (+${hsCodes.length - 1})` : ""}`, system: "HS", concordance: "beaHs", searchCode: clean });
+        return hsCodes;
+      }
+    }
+    return [];
+  }
+
+  // Helper: get HS-6 base from HS-family or combined taxonomies
+  function getHs6(): string | null {
     if (isHs || isT1Hts || isT2Hts) {
       const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
       if (!hsBase || hsBase.length < 6) return null;
       const hs6 = hsBase.substring(0, 6);
       if (!isHs) steps.push({ label: "HS-6 extract", code: hs6, system: "HS" });
-      const ef = data.emissionFactors?.[hs6];
-      if (!ef) return null;
-      steps.push({ label: "EPA/USEEIO lookup", code: ef.naicsCode, description: ef.naicsDescription, system: "NAICS" });
-      return { steps, database: "EPA/USEEIO" };
+      return hs6;
     }
+    return null;
+  }
+
+  // Helper: get CPC code from CPC or combined taxonomies
+  function getCpcCode(): string | null {
     if (isCpc) {
-      const cpcCode = taxonomy === "t1" ? (clean.startsWith("SVC") ? clean.substring(3) : clean) : clean;
-      for (let len = cpcCode.length; len >= 4; len--) {
-        const prefix = cpcCode.substring(0, len);
-        const hsMappings = data.concordance?.cpcToHs[prefix];
-        if (hsMappings && hsMappings.length > 0) {
-          const hsCode = hsMappings[0].code;
-          steps.push({ label: "CPC→HS concordance", code: `${prefix} → ${hsCode}`, system: "HS", concordance: "cpcHs" });
-          const ef = data.emissionFactors?.[hsCode];
-          if (!ef) return null;
-          steps.push({ label: "EPA/USEEIO lookup", code: ef.naicsCode, description: ef.naicsDescription, system: "NAICS" });
+      if (taxonomy === "t1") return clean.startsWith("SVC") ? clean.substring(3) : clean;
+      return clean;
+    }
+    return null;
+  }
+
+  // Helper: resolve CPC to HS via concordance
+  function cpcToHs(cpcCode: string): string | null {
+    for (let len = cpcCode.length; len >= 4; len--) {
+      const prefix = cpcCode.substring(0, len);
+      const hsMappings = data.concordance?.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        const hsCode = hsMappings[0].code;
+        steps.push({ label: "CPC→HS concordance", code: `${prefix} → ${hsCode}${hsMappings.length > 1 ? ` (+${hsMappings.length - 1})` : ""}`, system: "HS", concordance: "cpcHs", searchCode: prefix });
+        return hsCode;
+      }
+    }
+    return null;
+  }
+
+  // ========================= EPA/USEEIO =========================
+  if (database === "epa") {
+    const factors = data.emissionFactors;
+    if (!factors) return null;
+
+    // Try direct HS
+    const hs6 = getHs6();
+    if (hs6) {
+      const ef = factors[hs6];
+      if (ef) {
+        steps.push({ label: "EPA/USEEIO factor", code: ef.naicsCode, description: ef.naicsDescription, system: "EPA", lcaDb: "epa", searchCode: hs6 });
+        return { steps, database: "EPA/USEEIO" };
+      }
+      return null;
+    }
+
+    // Try CPC→HS
+    const cpcCode = getCpcCode();
+    if (cpcCode) {
+      const hsCode = cpcToHs(cpcCode);
+      if (hsCode) {
+        const ef = factors[hsCode];
+        if (ef) {
+          steps.push({ label: "EPA/USEEIO factor", code: ef.naicsCode, description: ef.naicsDescription, system: "EPA", lcaDb: "epa", searchCode: hsCode });
+          return { steps, database: "EPA/USEEIO" };
+        }
+      }
+      return null;
+    }
+
+    // Try generic concordance → HS
+    if (isGenericConc) {
+      const hsCodes = resolveGenericToHs();
+      for (const hs of hsCodes) {
+        const hs6Code = hs.substring(0, 6);
+        const ef = factors[hs6Code];
+        if (ef) {
+          steps.push({ label: "EPA/USEEIO factor", code: ef.naicsCode, description: ef.naicsDescription, system: "EPA", lcaDb: "epa", searchCode: hs6Code });
           return { steps, database: "EPA/USEEIO" };
         }
       }
@@ -683,156 +780,266 @@ function traceResolutionChain(
     return null;
   }
 
+  // ========================= EXIOBASE =========================
   if (database === "exiobase") {
     const c = data.exiobaseConcordance;
     if (!c) return null;
+
+    function addExioProducts(exioCodes: string[], concLabel: string, concId: string, matchCode: string): ResolutionChain {
+      const uniqueCodes = [...new Set(exioCodes)];
+      const names = uniqueCodes.map(code => c!.products[code] ?? code).slice(0, 3);
+      steps.push({ label: concLabel, code: matchCode, system: "EXIOBASE", concordance: concId, searchCode: matchCode });
+      const displayCodes = uniqueCodes.slice(0, 3).join(", ");
+      const displayNames = names.join("; ");
+      steps.push({ label: `EXIOBASE product${uniqueCodes.length > 1 ? "s" : ""} (${uniqueCodes.length})`, code: displayCodes, description: displayNames, system: "EXIOBASE", lcaDb: "exiobase", searchCode: matchCode });
+      return { steps, database: "EXIOBASE" };
+    }
+
+    // HS-family direct
     if (isHs || isT1Hts || isT2Hts) {
       const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
       if (!hsBase) return null;
+      if (!isHs && !isT1Hts && !isT2Hts) {
+        // already added in getHs6, but we handle separately here
+      }
       for (let len = Math.min(6, hsBase.length); len >= 4; len--) {
         const prefix = hsBase.substring(0, len);
         const exioCodes = c.hsToExio[prefix];
         if (exioCodes && exioCodes.length > 0) {
           if (!isHs) steps.push({ label: "HS extract", code: prefix, system: "HS" });
-          const names = exioCodes.map(code => c.products[code] ?? code).slice(0, 3);
-          steps.push({ label: "HS→EXIOBASE concordance", code: prefix, system: "EXIOBASE", concordance: "exioHs" });
-          steps.push({ label: "EXIOBASE products", code: exioCodes.slice(0, 3).join(", "), description: names.join("; "), system: "EXIOBASE" });
-          return { steps, database: "EXIOBASE" };
+          return addExioProducts(exioCodes, "HS→EXIOBASE", "exioHs", prefix);
         }
       }
+      return null;
     }
+
+    // CPC: try CPA bridge, then CPC→HS→EXIOBASE
     if (isCpc) {
-      const cpcCode = taxonomy === "t1" ? (clean.startsWith("SVC") ? clean.substring(3) : clean) : clean;
+      const cpcCode = getCpcCode()!;
+      // Try CPA direct (CPC codes often overlap with CPA)
       for (let len = cpcCode.length; len >= 2; len--) {
         const prefix = cpcCode.substring(0, len);
         const exioCodes = c.cpaToExio[prefix];
         if (exioCodes && exioCodes.length > 0) {
-          const names = exioCodes.map(code => c.products[code] ?? code).slice(0, 3);
-          steps.push({ label: "CPA→EXIOBASE concordance", code: prefix, system: "EXIOBASE", concordance: "exioCpa" });
-          steps.push({ label: "EXIOBASE products", code: exioCodes.slice(0, 3).join(", "), description: names.join("; "), system: "EXIOBASE" });
-          return { steps, database: "EXIOBASE" };
+          return addExioProducts(exioCodes, "CPA→EXIOBASE", "exioCpa", prefix);
         }
       }
+      // Try CPC→HS→EXIOBASE
+      for (let len = cpcCode.length; len >= 4; len--) {
+        const prefix = cpcCode.substring(0, len);
+        const hsMappings = data.concordance?.cpcToHs[prefix];
+        if (hsMappings) {
+          for (const m of hsMappings) {
+            const exioCodes = c.hsToExio[m.code];
+            if (exioCodes && exioCodes.length > 0) {
+              steps.push({ label: "CPC→HS concordance", code: `${prefix} → ${m.code}`, system: "HS", concordance: "cpcHs", searchCode: prefix });
+              return addExioProducts(exioCodes, "HS→EXIOBASE", "exioHs", m.code);
+            }
+          }
+        }
+      }
+      return null;
     }
+
+    // CPA: direct
+    if (taxonomy === "cpa") {
+      for (let len = clean.length; len >= 2; len--) {
+        const prefix = clean.substring(0, len);
+        const exioCodes = c.cpaToExio[prefix];
+        if (exioCodes && exioCodes.length > 0) {
+          return addExioProducts(exioCodes, "CPA→EXIOBASE", "exioCpa", prefix);
+        }
+      }
+      return null;
+    }
+
+    // ISIC: direct
     if (taxonomy === "isic") {
       for (let len = clean.length; len >= 1; len--) {
         const prefix = clean.substring(0, len);
         const exioCodes = c.isicToExio[prefix];
         if (exioCodes && exioCodes.length > 0) {
-          const names = exioCodes.map(code => c.products[code] ?? code).slice(0, 3);
-          steps.push({ label: "ISIC→EXIOBASE concordance", code: prefix, system: "EXIOBASE", concordance: "exioIsic" });
-          steps.push({ label: "EXIOBASE products", code: exioCodes.slice(0, 3).join(", "), description: names.join("; "), system: "EXIOBASE" });
-          return { steps, database: "EXIOBASE" };
+          return addExioProducts(exioCodes, "ISIC→EXIOBASE", "exioIsic", prefix);
         }
       }
+      return null;
     }
+
+    // NACE: try naceToExio then isicToExio
     if (taxonomy === "nace") {
       for (let len = clean.length; len >= 1; len--) {
         const prefix = clean.substring(0, len);
         const exioCodes = c.naceToExio[prefix] ?? c.isicToExio[prefix];
         if (exioCodes && exioCodes.length > 0) {
-          const names = exioCodes.map(code => c.products[code] ?? code).slice(0, 3);
-          steps.push({ label: "NACE→EXIOBASE concordance", code: prefix, system: "EXIOBASE", concordance: "exioNace" });
-          steps.push({ label: "EXIOBASE products", code: exioCodes.slice(0, 3).join(", "), description: names.join("; "), system: "EXIOBASE" });
-          return { steps, database: "EXIOBASE" };
+          const concId = c.naceToExio[prefix] ? "exioNace" : "exioIsic";
+          return addExioProducts(exioCodes, `${c.naceToExio[prefix] ? "NACE" : "ISIC"}→EXIOBASE`, concId, prefix);
+        }
+      }
+      return null;
+    }
+
+    // NAICS/BEA: chain through HS
+    if (taxonomy === "naics" || taxonomy === "bea") {
+      const hsCodes = resolveGenericToHs();
+      for (const hs of hsCodes) {
+        for (let len = Math.min(6, hs.length); len >= 4; len--) {
+          const prefix = hs.substring(0, len);
+          const exioCodes = c.hsToExio[prefix];
+          if (exioCodes && exioCodes.length > 0) {
+            return addExioProducts(exioCodes, "HS→EXIOBASE", "exioHs", prefix);
+          }
         }
       }
     }
+
     return null;
   }
 
+  // ========================= ecoinvent =========================
   if (database === "ecoinvent") {
     const em = data.ecoinventMapping;
     if (!em) return null;
+
+    // CPC direct + CPC→HS fallback
     if (isCpc) {
-      const cpcCode = taxonomy === "t1" ? (clean.startsWith("SVC") ? clean.substring(3) : clean) : clean;
+      const cpcCode = getCpcCode()!;
       if (em.cpc[cpcCode]) {
-        steps.push({ label: "ecoinvent CPC lookup", code: cpcCode, description: `${em.cpc[cpcCode].count} product(s)`, system: "ecoinvent" });
+        steps.push({ label: "ecoinvent CPC lookup", code: cpcCode, description: `${em.cpc[cpcCode].count} product(s)`, system: "ecoinvent", lcaDb: "ecoinvent", searchCode: cpcCode });
         return { steps, database: "ecoinvent" };
       }
-      // Try CPC→HS chain
       for (let len = cpcCode.length; len >= 4; len--) {
         const prefix = cpcCode.substring(0, len);
         const hsMappings = data.concordance?.cpcToHs[prefix];
         if (hsMappings && hsMappings.length > 0) {
           const hsCode = hsMappings[0].code;
-          steps.push({ label: "CPC→HS concordance", code: `${prefix} → ${hsCode}`, system: "HS", concordance: "cpcHs" });
+          steps.push({ label: "CPC→HS concordance", code: `${prefix} → ${hsCode}`, system: "HS", concordance: "cpcHs", searchCode: prefix });
           if (em.hs[hsCode]) {
-            steps.push({ label: "ecoinvent HS lookup", code: hsCode, description: `${em.hs[hsCode].count} product(s)`, system: "ecoinvent" });
+            steps.push({ label: "ecoinvent HS lookup", code: hsCode, description: `${em.hs[hsCode].count} product(s)`, system: "ecoinvent", lcaDb: "ecoinvent", searchCode: hsCode });
             return { steps, database: "ecoinvent" };
           }
         }
       }
+      return null;
     }
+
+    // HS direct
     if (isHs || isT1Hts || isT2Hts) {
       const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
       if (hsBase) {
         for (let len = Math.min(6, hsBase.length); len >= 2; len -= 2) {
           const prefix = hsBase.substring(0, len);
           if (em.hs[prefix]) {
-            if (prefix.length < hsBase.length) {
-              steps.push({ label: `HS prefix match (${prefix.length}-digit)`, code: prefix, system: "HS" });
-            }
-            steps.push({ label: "ecoinvent HS lookup", code: prefix, description: `${em.hs[prefix].count} product(s)`, system: "ecoinvent" });
+            if (prefix.length < hsBase.length) steps.push({ label: `HS prefix match (${prefix.length}-digit)`, code: prefix, system: "HS" });
+            steps.push({ label: "ecoinvent HS lookup", code: prefix, description: `${em.hs[prefix].count} product(s)`, system: "ecoinvent", lcaDb: "ecoinvent", searchCode: prefix });
+            return { steps, database: "ecoinvent" };
+          }
+        }
+      }
+      return null;
+    }
+
+    // ISIC/NACE direct via ecoinvent ISIC codes
+    if (taxonomy === "isic" || taxonomy === "nace") {
+      for (let len = Math.min(4, clean.length); len >= 2; len--) {
+        const prefix = clean.substring(0, len);
+        if (em.isic[prefix]) {
+          steps.push({ label: "ecoinvent ISIC lookup", code: prefix, description: `${em.isic[prefix].count} product(s)`, system: "ecoinvent", lcaDb: "ecoinvent", searchCode: prefix });
+          return { steps, database: "ecoinvent" };
+        }
+      }
+      return null;
+    }
+
+    // CPA: try CPA→HS→ecoinvent
+    if (taxonomy === "cpa") {
+      // CPA codes often match CPC codes for ecoinvent direct lookup
+      if (em.cpc[clean]) {
+        steps.push({ label: "ecoinvent CPC lookup (via CPA)", code: clean, description: `${em.cpc[clean].count} product(s)`, system: "ecoinvent", lcaDb: "ecoinvent", searchCode: clean });
+        return { steps, database: "ecoinvent" };
+      }
+      if (data.cpaHsConcordance) {
+        const mappings = data.cpaHsConcordance.forward[clean];
+        if (mappings && mappings.length > 0) {
+          const hsCode = mappings[0].code;
+          steps.push({ label: "CPA→HS concordance", code: `${clean} → ${hsCode}`, system: "HS", concordance: "cpaHs", searchCode: clean });
+          if (em.hs[hsCode]) {
+            steps.push({ label: "ecoinvent HS lookup", code: hsCode, description: `${em.hs[hsCode].count} product(s)`, system: "ecoinvent", lcaDb: "ecoinvent", searchCode: hsCode });
+            return { steps, database: "ecoinvent" };
+          }
+        }
+      }
+      return null;
+    }
+
+    // Generic concordance taxonomies (NAICS, BEA): chain to HS
+    if (isGenericConc) {
+      const hsCodes = resolveGenericToHs();
+      for (const hs of hsCodes) {
+        for (let len = Math.min(6, hs.length); len >= 2; len -= 2) {
+          const prefix = hs.substring(0, len);
+          if (em.hs[prefix]) {
+            steps.push({ label: "ecoinvent HS lookup", code: prefix, description: `${em.hs[prefix].count} product(s)`, system: "ecoinvent", lcaDb: "ecoinvent", searchCode: prefix });
             return { steps, database: "ecoinvent" };
           }
         }
       }
     }
-    if (taxonomy === "isic" || taxonomy === "nace") {
-      for (let len = Math.min(4, clean.length); len >= 2; len--) {
-        const prefix = clean.substring(0, len);
-        if (em.isic[prefix]) {
-          steps.push({ label: "ecoinvent ISIC lookup", code: prefix, description: `${em.isic[prefix].count} product(s)`, system: "ecoinvent" });
-          return { steps, database: "ecoinvent" };
-        }
-      }
-    }
+
     return null;
   }
 
+  // ========================= USLCI / BAFU =========================
   if (database === "uslci" || database === "bafu") {
     const isUslci = database === "uslci";
     const cov = isUslci ? data.uslciCoverage?.coverage : data.bafuCoverage?.coverage;
     if (!cov) return null;
     const dbLabel = isUslci ? "US LCI" : "BAFU";
+    const lcaDbId = isUslci ? "uslci" : "bafu";
 
-    if (isHs || isT1Hts || isT2Hts) {
-      const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
-      if (!hsBase) return null;
+    function lookupHs(hsBase: string): ResolutionChain | null {
       if (isUslci) {
         const hs6 = hsBase.substring(0, 6);
-        const entry = cov[hs6];
+        const entry = cov![hs6];
         if (entry) {
-          steps.push({ label: `${dbLabel} HS-6 lookup`, code: hs6, description: `${(entry as UslciCoverageEntry).processCount} process(es)`, system: dbLabel });
+          steps.push({ label: `${dbLabel} HS-6 lookup`, code: hs6, description: `${(entry as UslciCoverageEntry).processCount} process(es)`, system: dbLabel, lcaDb: lcaDbId, searchCode: hs6 });
           return { steps, database: dbLabel };
         }
       } else {
         const ch = hsBase.substring(0, 2);
-        const entry = cov[ch];
+        const entry = cov![ch];
         if (entry) {
-          steps.push({ label: `${dbLabel} HS-2 chapter lookup`, code: ch, description: `${(entry as BafuCoverageEntry).processCount} process(es)`, system: dbLabel });
+          steps.push({ label: `${dbLabel} HS-2 chapter lookup`, code: ch, description: `${(entry as BafuCoverageEntry).processCount} process(es)`, system: dbLabel, lcaDb: lcaDbId, searchCode: ch });
           return { steps, database: dbLabel };
         }
       }
+      return null;
     }
+
+    // HS-family direct
+    if (isHs || isT1Hts || isT2Hts) {
+      const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
+      if (!hsBase) return null;
+      if (!isHs) steps.push({ label: "HS extract", code: hsBase.substring(0, 6), system: "HS" });
+      return lookupHs(hsBase);
+    }
+
+    // CPC → HS
     if (isCpc) {
-      const cpcCode = taxonomy === "t1" ? (clean.startsWith("SVC") ? clean.substring(3) : clean) : clean;
-      for (let len = cpcCode.length; len >= 4; len--) {
-        const prefix = cpcCode.substring(0, len);
-        const hsMappings = data.concordance?.cpcToHs[prefix];
-        if (hsMappings && hsMappings.length > 0) {
-          const hsCode = hsMappings[0].code;
-          steps.push({ label: "CPC→HS concordance", code: `${prefix} → ${hsCode}`, system: "HS", concordance: "cpcHs" });
-          const lookupCode = isUslci ? hsCode : hsCode.substring(0, 2);
-          const entry = cov[lookupCode];
-          if (entry) {
-            steps.push({ label: `${dbLabel} lookup`, code: lookupCode, system: dbLabel });
-            return { steps, database: dbLabel };
-          }
-        }
+      const cpcCode = getCpcCode()!;
+      const hsCode = cpcToHs(cpcCode);
+      if (hsCode) return lookupHs(hsCode);
+      return null;
+    }
+
+    // Generic concordance taxonomies → HS
+    if (isGenericConc) {
+      const hsCodes = resolveGenericToHs();
+      for (const hs of hsCodes) {
+        const result = lookupHs(hs);
+        if (result) return result;
       }
     }
+
     return null;
   }
 
@@ -843,7 +1050,7 @@ function traceResolutionChain(
 
 function ResolutionChainToggle({ chain, onOpenTab }: {
   chain: ResolutionChain;
-  onOpenTab?: (tab: "concordances" | "browser") => void;
+  onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void;
 }) {
   const [open, setOpen] = React.useState(false);
 
@@ -863,12 +1070,18 @@ function ResolutionChainToggle({ chain, onOpenTab }: {
                   <div className="resolution-step-code">{step.code}</div>
                   {step.description && <div className="resolution-step-desc">{step.description}</div>}
                   {step.concordance && onOpenTab && (
-                    <button className="resolution-link-btn" onClick={() => onOpenTab("concordances")}>
+                    <button className="resolution-link-btn" onClick={() => onOpenTab("concordances", {
+                      concordanceId: step.concordance,
+                      search: step.searchCode ?? step.code,
+                    })}>
                       View in Concordance Browser
                     </button>
                   )}
-                  {!step.concordance && onOpenTab && (
-                    <button className="resolution-link-btn" onClick={() => onOpenTab("browser")}>
+                  {step.lcaDb && onOpenTab && (
+                    <button className="resolution-link-btn" onClick={() => onOpenTab("browser", {
+                      lcaDb: step.lcaDb,
+                      search: step.searchCode ?? step.code,
+                    })}>
                       View in LCA Browser
                     </button>
                   )}
@@ -882,7 +1095,7 @@ function ResolutionChainToggle({ chain, onOpenTab }: {
   );
 }
 
-function EmissionFactorDisplay({ entry, chain, onOpenTab }: { entry: EmissionFactorEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser") => void }) {
+function EmissionFactorDisplay({ entry, chain, onOpenTab }: { entry: EmissionFactorEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   const total = entry.factor;
   const prodPct = total > 0 ? (entry.factorWithoutMargins / total) * 100 : 0;
   const marginPct = total > 0 ? (entry.margins / total) * 100 : 0;
@@ -1076,7 +1289,7 @@ function getExiobaseProducts(
   return null;
 }
 
-function ExiobaseProductDisplay({ match, chain, onOpenTab }: { match: ExiobaseProductMatch; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser") => void }) {
+function ExiobaseProductDisplay({ match, chain, onOpenTab }: { match: ExiobaseProductMatch; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return (
     <div className="emission-factor-card exiobase-products-card">
       <h4>EXIOBASE Product Mapping</h4>
@@ -1163,11 +1376,11 @@ function getBafuChapterData(
   return null;
 }
 
-function BafuFactorDisplay({ entry, chain, onOpenTab }: { entry: BafuCoverageEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser") => void }) {
+function BafuFactorDisplay({ entry, chain, onOpenTab }: { entry: BafuCoverageEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return <LciFactorDisplay entry={entry} title="Direct Emissions (BAFU)" source="BAFU:2025 (direct process emissions only, GWP-100 AR6)" cardClass="bafu-card" chain={chain} onOpenTab={onOpenTab} />;
 }
 
-function UslciFactorDisplay({ entry, chain, onOpenTab }: { entry: UslciCoverageEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser") => void }) {
+function UslciFactorDisplay({ entry, chain, onOpenTab }: { entry: UslciCoverageEntry; chain?: ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return <LciFactorDisplay entry={entry} title="Direct Emissions (US LCI)" source="NREL USLCI (direct process emissions only, GWP-100 AR6)" cardClass="uslci-card" chain={chain} onOpenTab={onOpenTab} />;
 }
 
@@ -1386,7 +1599,7 @@ function LciFactorDisplay({ entry, title, source, cardClass, chain, onOpenTab }:
   source: string;
   cardClass: string;
   chain?: ResolutionChain | null;
-  onOpenTab?: (tab: "concordances" | "browser") => void;
+  onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void;
 }) {
   if (entry.withGhgData === 0) return null;
 
@@ -1944,7 +2157,7 @@ function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode, chain, onO
   hsCode: string | null;
   isicCode: string | null;
   chain?: ResolutionChain | null;
-  onOpenTab?: (tab: "concordances" | "browser") => void;
+  onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void;
 }) {
   if (!cpc && !hs && !isic) return null;
 
@@ -3106,9 +3319,9 @@ function AppContent() {
     };
   }, [selectedNode, selectedFrom, data]);
 
-  // Helper to open the about panel to a specific tab
-  const openAboutTab = useCallback((tab: "concordances" | "browser") => {
-    aboutRef.current?.openToTab(tab);
+  // Helper to open the about panel to a specific tab with optional navigation context
+  const openAboutTab = useCallback((tab: "concordances" | "browser", ctx?: TabNavContext) => {
+    aboutRef.current?.openToTab(tab, ctx);
   }, []);
 
   // Aggregate EF ranges across all descendants when a parent node is selected

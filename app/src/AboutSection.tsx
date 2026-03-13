@@ -1,8 +1,14 @@
 import { useState, useMemo, useImperativeHandle, forwardRef, Fragment } from "react";
 import type { AppData, TreeNode, TaxonomyType, GenericConcordance, LookupEntry } from "./types";
 
+export type TabNavContext = {
+  concordanceId?: string;  // pre-select concordance in browser
+  lcaDb?: string;          // pre-select LCA database in browser
+  search?: string;         // pre-fill search
+};
+
 export type AboutSectionHandle = {
-  openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances") => void;
+  openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances", ctx?: TabNavContext) => void;
   close: () => void;
 };
 
@@ -2297,9 +2303,9 @@ function matchesSearch(terms: string[], ...fields: string[]): boolean {
 
 const PAGE_SIZE = 200;
 
-function LcaDataBrowserTab({ data }: { data: AppData | null }) {
-  const [db, setDb] = useState<LcaDb>("ecoinvent");
-  const [search, setSearch] = useState("");
+function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData | null; initialDb?: string; initialSearch?: string }) {
+  const [db, setDb] = useState<LcaDb>((initialDb as LcaDb) || "ecoinvent");
+  const [search, setSearch] = useState(initialSearch ?? "");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
 
@@ -2699,9 +2705,9 @@ function exioProductName(code: string, data: AppData): string {
 
 interface ConcRow { from: string; fromDesc: string; to: string; toDesc: string; partial: string; similarity: string }
 
-function ConcordanceBrowserTab({ data }: { data: AppData | null }) {
-  const [conc, setConc] = useState<ConcordanceId>("cpcHs");
-  const [search, setSearch] = useState("");
+function ConcordanceBrowserTab({ data, initialConc, initialSearch }: { data: AppData | null; initialConc?: string; initialSearch?: string }) {
+  const [conc, setConc] = useState<ConcordanceId>((initialConc as ConcordanceId) || "cpcHs");
+  const [search, setSearch] = useState(initialSearch ?? "");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
 
@@ -2914,9 +2920,10 @@ interface AboutSectionProps {
 export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(function AboutSection({ data, onNavigateToNode, onHighlightGaps }, ref) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances">("taxonomies");
+  const [navContext, setNavContext] = useState<TabNavContext | undefined>();
 
   useImperativeHandle(ref, () => ({
-    openToTab(t) { setTab(t); setOpen(true); },
+    openToTab(t, ctx) { setNavContext(ctx); setTab(t); setOpen(true); },
     close() { setOpen(false); },
   }));
 
@@ -2993,8 +3000,8 @@ export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(fu
           {tab === "lca" && <LcaDatabasesTab />}
           {tab === "methods" && <ResolutionMethodsTab />}
           {tab === "matrix" && <CoverageMatrixTab data={data} onNavigateToNode={onNavigateToNode} onHighlightGaps={onHighlightGaps} onCloseModal={() => setOpen(false)} />}
-          {tab === "browser" && <LcaDataBrowserTab data={data} />}
-          {tab === "concordances" && <ConcordanceBrowserTab data={data} />}
+          {tab === "browser" && <LcaDataBrowserTab data={data} initialDb={navContext?.lcaDb} initialSearch={navContext?.search} />}
+          {tab === "concordances" && <ConcordanceBrowserTab data={data} initialConc={navContext?.concordanceId} initialSearch={navContext?.search} />}
         </div>
       </div>
     </div>
