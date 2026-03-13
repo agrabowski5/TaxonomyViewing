@@ -47,8 +47,8 @@ test.describe('Taxonomy Explorer - Two Pane Interface', () => {
     await leftSelector.selectOption('cn');
     await expect(leftSelector).toHaveValue('cn');
     await page.waitForTimeout(500);
-    const paneInfo = page.locator('.left-pane .pane-info .full-name');
-    await expect(paneInfo).toContainText(/Combined Nomenclature/i);
+    const header = page.locator('.left-pane .panel-header h2');
+    await expect(header).toContainText(/Combined Nomenclature/i);
   });
 
   test('can switch taxonomy in right pane', async ({ page }) => {
@@ -56,8 +56,8 @@ test.describe('Taxonomy Explorer - Two Pane Interface', () => {
     await rightSelector.selectOption('hts');
     await expect(rightSelector).toHaveValue('hts');
     await page.waitForTimeout(500);
-    const paneInfo = page.locator('.right-pane .pane-info .full-name');
-    await expect(paneInfo).toContainText(/Harmonized Tariff Schedule/i);
+    const header = page.locator('.right-pane .panel-header h2');
+    await expect(header).toContainText(/Harmonized Tariff Schedule/i);
   });
 
   test('search bar is functional', async ({ page }) => {

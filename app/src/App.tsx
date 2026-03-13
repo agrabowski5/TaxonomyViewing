@@ -3629,10 +3629,6 @@ function AppContent() {
             </select>
           </div>
           <>
-            <div className="pane-info">
-              <p className="full-name">{TAXONOMY_INFO[leftTaxonomy].fullName}</p>
-              <p className="legend">{TAXONOMY_INFO[leftTaxonomy].legend}</p>
-            </div>
             <TaxonomyTree
               key={`${leftTaxonomy}-${debouncedSearch}`}
               ref={treeRefs[leftTaxonomy]}
@@ -3709,10 +3705,6 @@ function AppContent() {
                 >
                   {taxonomyOptions}
                 </select>
-              </div>
-              <div className="pane-info">
-                <p className="full-name">{TAXONOMY_INFO[rightTaxonomy].fullName}</p>
-                <p className="legend">{TAXONOMY_INFO[rightTaxonomy].legend}</p>
               </div>
               <TaxonomyTree
                 key={`${rightTaxonomy}-${debouncedSearch}`}
