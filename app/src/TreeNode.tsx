@@ -1,5 +1,6 @@
 import type { NodeRendererProps } from "react-arborist";
 import type { TreeNode as TNode, MappingInfo, CoverageInfo } from "./types";
+import type { GapHighlightData } from "./TaxonomyTree";
 
 interface Props extends NodeRendererProps<TNode> {
   mappingInfo?: Record<string, MappingInfo>;
@@ -10,6 +11,7 @@ interface Props extends NodeRendererProps<TNode> {
   exiobaseCoverage?: Map<string, CoverageInfo>;
   bafuCoverage?: Map<string, CoverageInfo>;
   uslciCoverage?: Map<string, CoverageInfo>;
+  gapHighlight?: GapHighlightData;
 }
 
 function fmtBadge(letter: string, info: CoverageInfo): string {
@@ -25,7 +27,7 @@ function countDescendants(n: TNode): number {
   return count;
 }
 
-export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage, uslciCoverage, bafuCoverage }: Props) {
+export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage, uslciCoverage, bafuCoverage, gapHighlight }: Props) {
   const data = node.data;
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
@@ -36,9 +38,13 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
   const us = uslciCoverage?.get(data.id);
   const ba = bafuCoverage?.get(data.id);
 
+  // Gap highlighting
+  const isGapLeaf = gapHighlight?.leafIds.has(data.id) ?? false;
+  const isGapAncestor = !isGapLeaf && (gapHighlight?.ancestorIds.has(data.id) ?? false);
+
   return (
     <div
-      className={`tree-node ${node.isSelected ? "selected" : ""}`}
+      className={`tree-node ${node.isSelected ? "selected" : ""} ${isGapLeaf ? "gap-leaf" : ""} ${isGapAncestor ? "gap-ancestor" : ""}`}
       style={style}
       onClick={(event) => {
         event.stopPropagation();

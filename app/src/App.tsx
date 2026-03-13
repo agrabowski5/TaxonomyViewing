@@ -1796,6 +1796,13 @@ function AppContent() {
   const [mappingPanelCollapsed, setMappingPanelCollapsed] = useState(false);
   const [panelHeight, setPanelHeight] = useState(200);
   const [strictMatch, setStrictMatch] = useState(true);
+  const [gapHighlight, setGapHighlight] = useState<{
+    taxonomy: TaxonomyType;
+    db: string;
+    dbLabel: string;
+    leafIds: Set<string>;
+    ancestorIds: Set<string>;
+  } | null>(null);
   const aboutRef = useRef<AboutSectionHandle>(null);
   const panelDragging = useRef(false);
 
@@ -2506,6 +2513,36 @@ function AppContent() {
     [leftTaxonomy, rightTaxonomy, treeRefs, getTreeData]
   );
 
+  // Handle gap highlight activation from Coverage Matrix drilldown
+  const handleHighlightGaps = useCallback(
+    (taxonomy: TaxonomyType, dbKey: string, dbLabel: string, uncoveredLeafIds: string[]) => {
+      // Switch left pane to the target taxonomy
+      if (leftTaxonomy !== taxonomy) {
+        setLeftTaxonomy(taxonomy);
+      }
+
+      const leafIdSet = new Set(uncoveredLeafIds);
+
+      // Build ancestor set: for each uncovered leaf, find all its ancestors
+      const treeData = getTreeData(taxonomy);
+      const ancestorSet = new Set<string>();
+      for (const leafId of uncoveredLeafIds) {
+        const path = findPathToNode(treeData, leafId);
+        for (const id of path) ancestorSet.add(id);
+      }
+
+      setGapHighlight({ taxonomy, db: dbKey, dbLabel, leafIds: leafIdSet, ancestorIds: ancestorSet });
+    },
+    [leftTaxonomy, getTreeData]
+  );
+
+  // Clear gap highlight when taxonomy changes away from highlighted one
+  useEffect(() => {
+    if (gapHighlight && leftTaxonomy !== gapHighlight.taxonomy) {
+      setGapHighlight(null);
+    }
+  }, [leftTaxonomy, gapHighlight]);
+
   // Handle builder custom node click → map to left pane via sourceOrigin
   const handleBuilderNodeSelect = useCallback(
     (node: TreeNode) => {
@@ -2906,7 +2943,7 @@ function AppContent() {
             </button>
           )}
         </div>
-        <AboutSection ref={aboutRef} data={data} onNavigateToNode={handleNavigateToNode} />
+        <AboutSection ref={aboutRef} data={data} onNavigateToNode={handleNavigateToNode} onHighlightGaps={handleHighlightGaps} />
       </header>
 
       <BuilderBanner />
@@ -2951,6 +2988,8 @@ function AppContent() {
               uslciCoverage={leftUslciCoverage}
               bafuCoverage={leftBafuCoverage}
               side="left"
+              gapHighlight={gapHighlight?.taxonomy === leftTaxonomy ? gapHighlight : undefined}
+              onClearGapHighlight={() => setGapHighlight(null)}
             />
           </>
         </div>

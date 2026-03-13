@@ -4,6 +4,14 @@ import { TreeNodeRenderer } from "./TreeNode";
 import { useContainerSize } from "./useContainerSize";
 import type { TreeNode, MappingInfo, CoverageInfo } from "./types";
 
+export interface GapHighlightData {
+  taxonomy: string;
+  db: string;
+  dbLabel: string;
+  leafIds: Set<string>;
+  ancestorIds: Set<string>;
+}
+
 interface Props {
   data: TreeNode[];
   openByDefault?: boolean;
@@ -21,6 +29,8 @@ interface Props {
   uslciCoverage?: Map<string, CoverageInfo>;
   bafuCoverage?: Map<string, CoverageInfo>;
   side?: "left" | "right";
+  gapHighlight?: GapHighlightData;
+  onClearGapHighlight?: () => void;
 }
 
 export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function TaxonomyTree(
@@ -40,6 +50,8 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
     uslciCoverage,
     bafuCoverage,
     side,
+    gapHighlight,
+    onClearGapHighlight,
   },
   ref
 ) {
@@ -62,6 +74,13 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
           </div>
         )}
       </div>
+      {gapHighlight && (
+        <div className="gap-highlight-banner">
+          <span className="gap-highlight-banner-dot" />
+          Showing {gapHighlight.leafIds.size.toLocaleString()} uncovered leaves for <strong>{gapHighlight.dbLabel}</strong>
+          <button className="gap-highlight-banner-close" onClick={onClearGapHighlight}>✕ Exit</button>
+        </div>
+      )}
       <div className="tree-container" ref={container.ref}>
         <Tree<TreeNode>
           ref={ref as React.Ref<TreeApi<TreeNode> | undefined>}
@@ -86,6 +105,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
               exiobaseCoverage={exiobaseCoverage}
               uslciCoverage={uslciCoverage}
               bafuCoverage={bafuCoverage}
+              gapHighlight={gapHighlight}
             />
           )}
         </Tree>

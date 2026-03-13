@@ -1283,9 +1283,11 @@ function computeGapDrilldown(
 
 const GAP_PAGE_SIZE = 50;
 
-function GapDrilldownPanel({ gap, onNavigateToNode, onClose }: {
+function GapDrilldownPanel({ gap, onNavigateToNode, onHighlightGaps, onCloseModal, onClose }: {
   gap: GapDrilldownResult;
   onNavigateToNode?: (taxonomy: TaxonomyType, nodeId: string) => void;
+  onHighlightGaps?: (taxonomy: TaxonomyType, dbKey: string, dbLabel: string, uncoveredLeafIds: string[]) => void;
+  onCloseModal?: () => void;
   onClose: () => void;
 }) {
   const [gapSearch, setGapSearch] = useState("");
@@ -1327,7 +1329,21 @@ function GapDrilldownPanel({ gap, onNavigateToNode, onClose }: {
             {gap.leaves.length.toLocaleString()} of {gap.total.toLocaleString()} leaves uncovered
           </div>
         </div>
-        <button className="gap-drilldown-close" onClick={onClose}>✕ Close</button>
+        <div className="gap-drilldown-actions">
+          {onHighlightGaps && (
+            <button
+              className="gap-highlight-btn"
+              onClick={() => {
+                onHighlightGaps(gap.taxonomy, gap.db, gap.dbLabel, gap.leaves.map(l => l.node.id));
+                if (onCloseModal) onCloseModal();
+              }}
+              title="Highlight uncovered nodes in the left tree pane"
+            >
+              Highlight gaps in tree
+            </button>
+          )}
+          <button className="gap-drilldown-close" onClick={onClose}>✕ Close</button>
+        </div>
       </div>
 
       {/* Stacked bar */}
@@ -1670,9 +1686,10 @@ function ResolutionMethodsTab() {
   );
 }
 
-function CoverageMatrixTab({ data, onNavigateToNode, onCloseModal }: {
+function CoverageMatrixTab({ data, onNavigateToNode, onHighlightGaps, onCloseModal }: {
   data: AppData | null;
   onNavigateToNode?: (taxonomy: TaxonomyType, nodeId: string) => void;
+  onHighlightGaps?: (taxonomy: TaxonomyType, dbKey: string, dbLabel: string, uncoveredLeafIds: string[]) => void;
   onCloseModal?: () => void;
 }) {
   const [mode, setMode] = useState<MatrixMode>("leafCoverage");
@@ -2251,6 +2268,8 @@ function CoverageMatrixTab({ data, onNavigateToNode, onCloseModal }: {
         <GapDrilldownPanel
           gap={gapData}
           onNavigateToNode={handleJumpToNode}
+          onHighlightGaps={onHighlightGaps}
+          onCloseModal={onCloseModal}
           onClose={() => setDrilldown(null)}
         />
       )}
@@ -2889,9 +2908,10 @@ function reportBugUrl() {
 interface AboutSectionProps {
   data: AppData | null;
   onNavigateToNode?: (taxonomy: TaxonomyType, nodeId: string) => void;
+  onHighlightGaps?: (taxonomy: TaxonomyType, dbKey: string, dbLabel: string, uncoveredLeafIds: string[]) => void;
 }
 
-export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(function AboutSection({ data, onNavigateToNode }, ref) {
+export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(function AboutSection({ data, onNavigateToNode, onHighlightGaps }, ref) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances">("taxonomies");
 
@@ -2972,7 +2992,7 @@ export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(fu
           {tab === "taxonomies" && <TaxonomyMapTab />}
           {tab === "lca" && <LcaDatabasesTab />}
           {tab === "methods" && <ResolutionMethodsTab />}
-          {tab === "matrix" && <CoverageMatrixTab data={data} onNavigateToNode={onNavigateToNode} onCloseModal={() => setOpen(false)} />}
+          {tab === "matrix" && <CoverageMatrixTab data={data} onNavigateToNode={onNavigateToNode} onHighlightGaps={onHighlightGaps} onCloseModal={() => setOpen(false)} />}
           {tab === "browser" && <LcaDataBrowserTab data={data} />}
           {tab === "concordances" && <ConcordanceBrowserTab data={data} />}
         </div>
