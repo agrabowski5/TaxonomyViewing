@@ -3083,37 +3083,49 @@ function AppContent() {
 
       // Cross-pane sync: open ancestors level by level, then scroll to and select
       if (mappedNodeId) {
-        const otherRef = treeRefs[otherTax];
-        const treeData = getTreeData(otherTax);
-        const ancestorPath = findPathToNode(treeData, mappedNodeId);
+        const otherPane = pane === "left" ? "right" : "left";
+        const otherViewMode = otherPane === "left" ? leftViewMode : rightViewMode;
 
-        // Open each ancestor sequentially (each needs a re-render before the next is visible)
-        let delay = 50;
-        for (const ancestorId of ancestorPath) {
+        if (otherViewMode === "graph") {
+          // Graph mode: use graph ref for sync
+          const graphRef = otherPane === "left" ? leftGraphRef : rightGraphRef;
+          if (graphRef.current) {
+            graphRef.current.expandToNode(mappedNodeId);
+          }
+        } else {
+          // List mode: use react-arborist ref
+          const otherRef = treeRefs[otherTax];
+          const treeData = getTreeData(otherTax);
+          const ancestorPath = findPathToNode(treeData, mappedNodeId);
+
+          // Open each ancestor sequentially (each needs a re-render before the next is visible)
+          let delay = 50;
+          for (const ancestorId of ancestorPath) {
+            setTimeout(() => {
+              const tree = otherRef.current;
+              if (tree) {
+                const ancestor = tree.get(ancestorId);
+                if (ancestor && !ancestor.isOpen) ancestor.open();
+              }
+            }, delay);
+            delay += 80;
+          }
+
+          // After all ancestors are opened, scroll to and select the target
           setTimeout(() => {
             const tree = otherRef.current;
             if (tree) {
-              const ancestor = tree.get(ancestorId);
-              if (ancestor && !ancestor.isOpen) ancestor.open();
+              const targetNode = tree.get(mappedNodeId!);
+              if (targetNode) {
+                tree.scrollTo(targetNode.id);
+                targetNode.select();
+              }
             }
-          }, delay);
-          delay += 80;
+          }, delay + 100);
         }
-
-        // After all ancestors are opened, scroll to and select the target
-        setTimeout(() => {
-          const tree = otherRef.current;
-          if (tree) {
-            const targetNode = tree.get(mappedNodeId!);
-            if (targetNode) {
-              tree.scrollTo(targetNode.id);
-              targetNode.select();
-            }
-          }
-        }, delay + 100);
       }
     },
-    [leftTaxonomy, rightTaxonomy, data, getLookup, findAnyMappedEntry, treeRefs, getTreeData]
+    [leftTaxonomy, rightTaxonomy, leftViewMode, rightViewMode, data, getLookup, findAnyMappedEntry, treeRefs, getTreeData]
   );
 
   // Handle gap drilldown "Show in tree" navigation
@@ -3126,36 +3138,42 @@ function AppContent() {
 
       // Determine which pane has this taxonomy
       const targetPane = leftTaxonomy === taxonomy ? "left" : rightTaxonomy === taxonomy ? "right" : "left";
+      const viewMode = targetPane === "left" ? leftViewMode : rightViewMode;
       const treeRef = treeRefs[taxonomy];
       const treeData = getTreeData(taxonomy);
 
       // Allow time for taxonomy switch + modal close before navigating
       setTimeout(() => {
-        const ancestorPath = findPathToNode(treeData, nodeId);
-        let delay = 50;
-        for (const ancestorId of ancestorPath) {
+        if (viewMode === "graph") {
+          const graphRef = targetPane === "left" ? leftGraphRef : rightGraphRef;
+          if (graphRef.current) graphRef.current.expandToNode(nodeId);
+        } else {
+          const ancestorPath = findPathToNode(treeData, nodeId);
+          let delay = 50;
+          for (const ancestorId of ancestorPath) {
+            setTimeout(() => {
+              const tree = treeRef.current;
+              if (tree) {
+                const ancestor = tree.get(ancestorId);
+                if (ancestor && !ancestor.isOpen) ancestor.open();
+              }
+            }, delay);
+            delay += 80;
+          }
           setTimeout(() => {
             const tree = treeRef.current;
             if (tree) {
-              const ancestor = tree.get(ancestorId);
-              if (ancestor && !ancestor.isOpen) ancestor.open();
+              const targetNode = tree.get(nodeId);
+              if (targetNode) {
+                tree.scrollTo(targetNode.id);
+                targetNode.select();
+              }
             }
-          }, delay);
-          delay += 80;
+          }, delay + 100);
         }
-        setTimeout(() => {
-          const tree = treeRef.current;
-          if (tree) {
-            const targetNode = tree.get(nodeId);
-            if (targetNode) {
-              tree.scrollTo(targetNode.id);
-              targetNode.select();
-            }
-          }
-        }, delay + 100);
       }, 300);
     },
-    [leftTaxonomy, rightTaxonomy, treeRefs, getTreeData]
+    [leftTaxonomy, rightTaxonomy, leftViewMode, rightViewMode, treeRefs, getTreeData]
   );
 
   // Handle gap highlight activation from Coverage Matrix drilldown
