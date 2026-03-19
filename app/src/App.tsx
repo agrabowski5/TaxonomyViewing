@@ -2096,6 +2096,16 @@ function computeUslciCoverage(
       .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.withGhgData] as const)
   );
 
+  // Build a fingerprint per HS-6 from its process names so that
+  // assignDirectionality detects when multiple HS codes share the exact same set of processes
+  const hsFingerprint = new Map<string, string>();
+  for (const [hs6, entry] of Object.entries(uslciCoverage.coverage)) {
+    if (entry.withGhgData > 0) {
+      const names = entry.topProcesses.map(p => p.name).sort().join("|");
+      hsFingerprint.set(hs6, names || hs6);
+    }
+  }
+
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
       const clean = stripCode(node.code);
@@ -2133,7 +2143,7 @@ function computeUslciCoverage(
         if (/^\d+$/.test(clean) && clean.length >= 6) {
           const hs6 = clean.substring(0, 6);
           const pc = coverageMap.get(hs6);
-          if (pc) { count = pc; matchKey = hs6; }
+          if (pc) { count = pc; matchKey = hsFingerprint.get(hs6) ?? hs6; }
         }
       }
 
