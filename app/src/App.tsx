@@ -2091,10 +2091,9 @@ function computeUslciCoverage(
   if (!uslciCoverage) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
   // Use kg-unit process count to match what the comparison panel displays
-  // In strict mode, exclude broad (ambiguous NAICS prefix) matches
   const coverageMap = new Map(
     Object.entries(uslciCoverage.coverage)
-      .filter(([, entry]) => entry.withGhgData > 0 && !(strict && entry.broad))
+      .filter(([, entry]) => entry.withGhgData > 0)
       .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.withGhgData] as const)
   );
 
@@ -2145,7 +2144,17 @@ function computeUslciCoverage(
         if (/^\d+$/.test(clean) && clean.length >= 6) {
           const hs6 = clean.substring(0, 6);
           const pc = coverageMap.get(hs6);
-          if (pc) { count = pc; matchKey = hsFingerprint.get(hs6) ?? hs6; }
+          if (pc) {
+            const entry = uslciCoverage!.coverage[hs6];
+            // In strict mode, use the NAICS-4 code as key so that all HS nodes
+            // sharing the same broad NAICS prefix are grouped correctly as N:1
+            if (strict && entry?.broad) {
+              matchKey = `naics:${entry.naicsCodes.join(",")}`;
+            } else {
+              matchKey = hsFingerprint.get(hs6) ?? hs6;
+            }
+            count = pc;
+          }
         }
       }
 
