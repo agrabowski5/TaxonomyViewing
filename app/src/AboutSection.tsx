@@ -36,7 +36,7 @@ const URLS = {
   ecoinvent: "https://ecoinvent.org/the-ecoinvent-database/",
   epa: "https://www.epa.gov/land-research/us-environmentally-extended-input-output-useeio-technical-content",
   exiobase: "https://zenodo.org/records/10604610",
-  uslci: "https://www.nrel.gov/lci/",
+  uslci: "https://www.nlr.gov/analysis/lci",
   bafu: "https://www.bafu.admin.ch/bafu/en/home/topics/economy-consumption/info-specialists/environmental-data-of-economic-activities.html",
 };
 
