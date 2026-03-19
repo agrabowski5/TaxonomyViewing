@@ -1368,18 +1368,12 @@
   white-space: nowrap;
 }
 
-/* EXIOBASE Product Mapping card */
-.exiobase-products-card {
-  border-color: #7c3aed;
-  background: linear-gradient(135deg, #faf5ff, #ede9fe);
-}
-.exiobase-products-card h4 {
-  color: #6d28d9;
-}
+/* EXIOBASE Product Mapping (inside exiobase-card) */
 .exiobase-match-via {
   font-size: 10px;
-  color: #7c3aed;
+  color: #0369a1;
   margin-bottom: 6px;
+  margin-top: 8px;
   font-weight: 500;
 }
 .exiobase-product-list {
@@ -1395,7 +1389,7 @@
 }
 .exiobase-product-code {
   font-weight: 600;
-  color: #6d28d9;
+  color: #0369a1;
   min-width: 50px;
   font-size: 10px;
 }

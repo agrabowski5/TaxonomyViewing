@@ -1189,20 +1189,42 @@ function EmissionFactorDisplay({ entry, getChain, onOpenTab }: { entry: Emission
   );
 }
 
-function ExiobaseFactorDisplay({ entry, getChain, onOpenTab }: { entry: ExiobaseFactorEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
+function ExiobaseDisplay({ factor, products, getChain, onOpenTab }: { factor: ExiobaseFactorEntry | null; products: ExiobaseProductMatch | null; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return (
     <div className="emission-factor-card exiobase-card">
-      <h4>Carbon Intensity (EXIOBASE)</h4>
-      <div className="emission-main">
-        <span className="emission-value">{entry.factor.toFixed(3)}</span>
-        <span className="emission-unit">{entry.unit}</span>
-      </div>
-      <div className="exiobase-sectors">
-        {entry.sectors.map((s, i) => (
-          <span key={i} className="exiobase-sector-tag">{s}</span>
-        ))}
-      </div>
-      <div className="emission-source">{entry.source}</div>
+      <h4>EXIOBASE</h4>
+      {factor && (
+        <>
+          <div className="emission-main">
+            <span className="emission-value">{factor.factor.toFixed(3)}</span>
+            <span className="emission-unit">{factor.unit}</span>
+          </div>
+          <div className="exiobase-sectors">
+            {factor.sectors.map((s, i) => (
+              <span key={i} className="exiobase-sector-tag">{s}</span>
+            ))}
+          </div>
+          <div className="emission-source">{factor.source}</div>
+        </>
+      )}
+      {products && (
+        <>
+          <div className="exiobase-match-via">
+            Product mapping via {products.matchedVia.toUpperCase()} {products.matchedCode}
+          </div>
+          <div className="exiobase-product-list">
+            {products.products.slice(0, 8).map((p, i) => (
+              <div key={i} className="exiobase-product-item">
+                <span className="exiobase-product-code">{p.code}</span>
+                <span className="exiobase-product-name">{p.name}</span>
+              </div>
+            ))}
+            {products.products.length > 8 && (
+              <div className="exiobase-more">+{products.products.length - 8} more</div>
+            )}
+          </div>
+        </>
+      )}
       {getChain && <ResolutionChainToggle getChain={getChain} onOpenTab={onOpenTab} />}
     </div>
   );
@@ -1345,28 +1367,6 @@ function getExiobaseProducts(
   return null;
 }
 
-function ExiobaseProductDisplay({ match, getChain, onOpenTab }: { match: ExiobaseProductMatch; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
-  return (
-    <div className="emission-factor-card exiobase-products-card">
-      <h4>EXIOBASE Product Mapping</h4>
-      <div className="exiobase-match-via">
-        Matched via {match.matchedVia.toUpperCase()} {match.matchedCode}
-      </div>
-      <div className="exiobase-product-list">
-        {match.products.slice(0, 8).map((p, i) => (
-          <div key={i} className="exiobase-product-item">
-            <span className="exiobase-product-code">{p.code}</span>
-            <span className="exiobase-product-name">{p.name}</span>
-          </div>
-        ))}
-        {match.products.length > 8 && (
-          <div className="exiobase-more">+{match.products.length - 8} more</div>
-        )}
-      </div>
-      {getChain && <ResolutionChainToggle getChain={getChain} onOpenTab={onOpenTab} />}
-    </div>
-  );
-}
 
 // Look up BAFU chapter data for a selected node (keyed by HS 2-digit chapter)
 function getBafuChapterData(
@@ -3870,11 +3870,8 @@ function AppContent() {
               <EmissionFactorDisplay entry={emissionFactor} getChain={getEpaChain} onOpenTab={openAboutTab} />
             )}
 
-            {exiobaseFactor && (
-              <ExiobaseFactorDisplay entry={exiobaseFactor} getChain={getExiobaseChain} onOpenTab={openAboutTab} />
-            )}
-            {exiobaseProducts && (
-              <ExiobaseProductDisplay match={exiobaseProducts} getChain={getExiobaseChain} onOpenTab={openAboutTab} />
+            {(exiobaseFactor || exiobaseProducts) && (
+              <ExiobaseDisplay factor={exiobaseFactor} products={exiobaseProducts} getChain={getExiobaseChain} onOpenTab={openAboutTab} />
             )}
 
             {bafuFactor && bafuFactor.withGhgData > 0 && (
