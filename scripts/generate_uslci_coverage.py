@@ -124,9 +124,15 @@ def parse_uslci_processes_legacy():
 
 
 def parse_census_concordance_reverse(naics_codes):
-    """Parse Census imp-code.txt → dict of HS-6 → set of matching NAICS codes."""
+    """Parse Census imp-code.txt → dict of HS-6 → set of matching NAICS codes.
+    Also returns hs_to_naics6: HS-6 → set of actual 6-digit NAICS codes matched,
+    and naics4_to_naics6: NAICS-4 → set of 6-digit sub-codes seen in Census data.
+    """
     path = os.path.join(RAW_DIR, 'imp-code.txt')
     hs_to_naics = {}
+    hs_to_naics6 = {}  # HS-6 → set of actual 6-digit NAICS codes that matched
+    naics4_to_naics6 = defaultdict(set)  # NAICS-4 → all 6-digit sub-codes in Census
+    naics4_prefixes = {n for n in naics_codes if len(n) == 4}
     with open(path, 'r', encoding='ascii', errors='ignore') as f:
         for line in f:
             if len(line) < 271:
@@ -136,10 +142,15 @@ def parse_census_concordance_reverse(naics_codes):
             if not hts10 or not naics6 or not hts10[:6].isdigit() or not naics6.isdigit():
                 continue
             hs6 = hts10[:6]
+            # Track all 6-digit sub-codes for each NAICS-4 prefix in Census
+            prefix4 = naics6[:4]
+            if prefix4 in naics4_prefixes:
+                naics4_to_naics6[prefix4].add(naics6)
             for n in naics_codes:
                 if naics6.startswith(n):
                     hs_to_naics.setdefault(hs6, set()).add(n)
-    return hs_to_naics
+                    hs_to_naics6.setdefault(hs6, set()).add(naics6)
+    return hs_to_naics, hs_to_naics6, naics4_to_naics6
 
 
 def generate():
@@ -152,13 +163,35 @@ def generate():
     print(f"  Found {total_processes} processes with {len(naics_codes)} unique NAICS codes")
 
     print("  Building NAICS->HS-6 mapping from Census concordance...")
-    hs_to_naics = parse_census_concordance_reverse(naics_codes)
+    hs_to_naics, hs_to_naics6, naics4_to_naics6 = parse_census_concordance_reverse(naics_codes)
     print(f"  Found {len(hs_to_naics)} HS-6 codes with USLCI coverage")
 
     # Build output with emission factor data
     coverage = {}
+    broad_count = 0
     for hs6, naics_set in hs_to_naics.items():
         codes = sorted(naics_set)
+
+        # Determine if this is a "broad" prefix match:
+        # A match is broad if any NAICS-4 code fans out to multiple NAICS-6
+        # sub-codes in Census, and NOT all of those sub-codes map to this HS-6.
+        # E.g., NAICS 1112 has sub-codes 111211 (Potato) and 111219 (Other Veg/Melon).
+        # HS 080711 (watermelon) only maps via 111219, not 111211, so we can't be sure
+        # that a USLCI process tagged NAICS 1112 actually belongs here.
+        actual_naics6 = hs_to_naics6.get(hs6, set())
+        is_broad = False
+        for n in codes:
+            if len(n) <= 5:
+                all_sub = naics4_to_naics6.get(n[:4], set())
+                if len(all_sub) > 1:
+                    # Check: do ALL sub-codes under this NAICS-4 map to this HS-6?
+                    # If not, the match is ambiguous.
+                    if not all_sub.issubset(actual_naics6):
+                        is_broad = True
+                        break
+
+        if is_broad:
+            broad_count += 1
 
         # Collect all processes for this HS-6
         all_procs = []
@@ -200,7 +233,11 @@ def generate():
             'unitStats': unit_stats,
             'topProcesses': top_processes,
         }
+        if is_broad:
+            entry['broad'] = True
         coverage[hs6] = entry
+
+    print(f"  Broad (ambiguous NAICS prefix) matches: {broad_count} / {len(coverage)}")
 
     output = {
         'coverage': coverage,

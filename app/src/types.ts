@@ -109,6 +109,7 @@ export interface UslciCoverageEntry {
   withGhgData: number;
   unitStats: Record<string, LciUnitStats>;
   topProcesses: LciProcess[];
+  broad?: boolean;
 }
 
 export interface UslciCoverage {

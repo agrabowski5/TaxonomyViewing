@@ -1040,9 +1040,10 @@ function traceResolutionChain(
     function lookupHs(hsBase: string): ResolutionChain | null {
       if (isUslci) {
         const hs6 = hsBase.substring(0, 6);
-        const entry = cov![hs6];
+        const entry = cov![hs6] as UslciCoverageEntry | undefined;
         if (entry) {
-          steps.push({ label: `${dbLabel} HS-6 lookup`, code: hs6, description: `${(entry as UslciCoverageEntry).processCount} process(es)`, system: dbLabel, lcaDb: lcaDbId, searchCode: hs6 });
+          const broadNote = entry.broad ? " (broad NAICS-4 prefix match — may be imprecise)" : "";
+          steps.push({ label: `${dbLabel} HS-6 lookup`, code: hs6, description: `${entry.processCount} process(es) via NAICS ${entry.naicsCodes.join(", ")}${broadNote}`, system: dbLabel, lcaDb: lcaDbId, searchCode: hs6 });
           return { steps, database: dbLabel };
         }
       } else {
@@ -2090,9 +2091,10 @@ function computeUslciCoverage(
   if (!uslciCoverage) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
   // Use kg-unit process count to match what the comparison panel displays
+  // In strict mode, exclude broad (ambiguous NAICS prefix) matches
   const coverageMap = new Map(
     Object.entries(uslciCoverage.coverage)
-      .filter(([, entry]) => entry.withGhgData > 0)
+      .filter(([, entry]) => entry.withGhgData > 0 && !(strict && entry.broad))
       .map(([key, entry]) => [key, entry.unitStats["kg"]?.count ?? entry.withGhgData] as const)
   );
 
