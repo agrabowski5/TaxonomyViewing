@@ -1158,7 +1158,7 @@ function EmissionFactorDisplay({ entry, getChain, onOpenTab }: { entry: Emission
 
   return (
     <div className="emission-factor-card">
-      <h4>Carbon Intensity</h4>
+      <h4>Carbon Intensity (EPA/USEEIO)</h4>
       <div className="emission-main">
         <span className="emission-value">{total.toFixed(3)}</span>
         <span className="emission-unit">{entry.unit}</span>

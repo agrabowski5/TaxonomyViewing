@@ -2577,7 +2577,7 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
         {db === "ecoinvent" && data?.ecoinventMapping && (
           <>{data.ecoinventMapping.stats.totalProducts.toLocaleString()} products &middot; {data.ecoinventMapping.stats.uniqueCpcCodes} CPC &middot; {data.ecoinventMapping.stats.uniqueHsCodes} HS &middot; {data.ecoinventMapping.stats.uniqueIsicCodes} ISIC codes</>
         )}
-        {db === "epa" && <>EPA Supply Chain GHG Emission Factors v1.3 &middot; kg CO2e / 2022 USD</>}
+        {db === "epa" && <>EPA Supply Chain GHG Emission Factors v1.3 (USEEIO) &middot; kg CO2e / 2022 USD</>}
         {db === "exiobase" && data?.exiobaseConcordance && (
           <>{data.exiobaseConcordance.stats.uniqueExioProducts} products &middot; {data.exiobaseConcordance.stats.hsCodesMatched} HS &middot; {data.exiobaseConcordance.stats.cpaCodesMatched} CPA &middot; {data.exiobaseConcordance.stats.isicCodesMatched} ISIC &middot; {data.exiobaseConcordance.stats.naceCodesMatched} NACE codes</>
         )}
