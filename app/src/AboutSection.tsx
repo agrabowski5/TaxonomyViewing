@@ -507,10 +507,10 @@ function LcaDatabasesTab() {
           {/* EPA / USEEIO */}
           <a href={URLS.epa} target="_blank" rel="noopener noreferrer">
             <g className="about-node-hover">
-              <title>{"EPA / USEEIO v2.1\nUS Environmentally-Extended Input-Output Model\nEmission factors: kg CO\u2082e / 2022 USD\nClick to open data source"}</title>
+              <title>{"EPA Supply Chain GHG Emission Factors v1.3 (USEEIO)\nUS Environmentally-Extended Input-Output Model\nEmission factors: kg CO\u2082e / 2022 USD\nClick to open data source"}</title>
               <rect x="210" y="185" width="130" height="52" rx="8" fill="#15803d" />
               <text x="275" y="207" textAnchor="middle" className="about-node-text-sm">EPA/USEEIO</text>
-              <text x="275" y="224" textAnchor="middle" style={{ fontSize: "8.5px", fill: "#dcfce7" }}>v2.1</text>
+              <text x="275" y="224" textAnchor="middle" style={{ fontSize: "8.5px", fill: "#dcfce7" }}>v1.3</text>
             </g>
           </a>
           <text x="275" y="253" textAnchor="middle" className="about-node-detail">Emission factors</text>
@@ -675,7 +675,7 @@ function LcaDatabasesTab() {
               <td>Product inventory (4,399 products)</td>
             </tr>
             <tr>
-              <td><strong>EPA / USEEIO v2.1</strong></td>
+              <td><strong>EPA / USEEIO v1.3</strong></td>
               <td><span className="about-conc-badge official">HS-6</span></td>
               <td>Via NAICS {"\u2192"} HS concordance</td>
               <td>Emission factors (kg CO&#8322;e / 2022 USD)</td>
@@ -711,7 +711,7 @@ function LcaDatabasesTab() {
             <ExtLink href={URLS.ecoinvent}>Data source</ExtLink>
           </div>
           <div className="about-detail-card" style={{ borderLeftColor: "#15803d" }}>
-            <strong>EPA / USEEIO v2.1</strong>
+            <strong>EPA / USEEIO v1.3</strong>
             <p>US Environmentally-Extended Input-Output model. Provides supply-chain greenhouse gas emission factors (kg CO&#8322;e per 2022 USD) linked via NAICS-to-HS concordance.</p>
             <ExtLink href={URLS.epa}>Data source</ExtLink>
           </div>
@@ -2343,7 +2343,7 @@ function CoverageMatrixTab({ data, onNavigateToNode, onHighlightGaps, onCloseMod
 type LcaDb = "ecoinvent" | "epa" | "exiobase" | "uslci" | "bafu" | "gabi";
 const LCA_DB_OPTIONS: { key: LcaDb; label: string; color: string }[] = [
   { key: "ecoinvent", label: "ecoinvent v3.12", color: "#b45309" },
-  { key: "epa", label: "EPA / USEEIO v2.1", color: "#15803d" },
+  { key: "epa", label: "EPA / USEEIO v1.3", color: "#15803d" },
   { key: "exiobase", label: "EXIOBASE 3.8.2", color: "#6d28d9" },
   { key: "uslci", label: "US LCI (NREL)", color: "#0369a1" },
   { key: "bafu", label: "BAFU:2025", color: "#be123c" },
