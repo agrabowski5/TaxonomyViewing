@@ -2448,35 +2448,146 @@ function EcoinventDisplay({ cpc, hs, isic, cpcCode, hsCode, isicCode, getChain, 
 }
 
 // Filter tree data to only include nodes matching a search term (and their ancestors)
-function filterTreeData(tree: TreeNode[], term: string): TreeNode[] {
-  if (!term.trim()) return tree;
-  const lower = term.trim().toLowerCase();
+// ===== BM25 Tree Search =====
 
-  function nodeMatches(node: TreeNode): boolean {
-    return (
-      node.code.toLowerCase().includes(lower) ||
-      node.name.toLowerCase().includes(lower)
-    );
+const TREE_STOP_WORDS = new Set([
+  "a", "an", "the", "of", "in", "at", "for", "to", "and", "or", "by", "from",
+  "with", "on", "per", "not", "no", "is", "are", "its", "be", "as", "was",
+  "other", "others", "elsewhere", "specified", "including", "thereof", "whether",
+  "nes", "nesoi", "n.e.s.", "n.e.s",
+]);
+
+function searchTokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(t => t.length > 1 && !TREE_STOP_WORDS.has(t));
+}
+
+function searchStem(word: string): string {
+  if (word.length <= 4) return word;
+  return word
+    .replace(/ies$/, "y").replace(/ing$/, "").replace(/tion$/, "t")
+    .replace(/ness$/, "").replace(/ment$/, "").replace(/able$/, "")
+    .replace(/ised$/, "").replace(/ized$/, "").replace(/ous$/, "")
+    .replace(/ive$/, "").replace(/ed$/, "").replace(/er$/, "")
+    .replace(/ly$/, "").replace(/es$/, "").replace(/s$/, "");
+}
+
+function scoreNodeBM25(
+  nodeText: string,
+  queryTerms: string[],
+  rawQueryTerms: string[],
+  queryLower: string,
+): number {
+  const nodeTokens = searchTokenize(nodeText);
+  const nodeStemmed = nodeTokens.map(searchStem);
+  const nodeLower = nodeText.toLowerCase();
+
+  if (nodeStemmed.length === 0) return 0;
+
+  // Simple TF-based scoring (no corpus-wide IDF since we compute per-search)
+  // Use query term rarity as a proxy: shorter query terms are less specific
+  let score = 0;
+  const nodeTermSet = new Set(nodeStemmed);
+  const nodeRawSet = new Set(nodeTokens);
+
+  for (const qt of queryTerms) {
+    if (nodeTermSet.has(qt)) {
+      // Weight by term length as proxy for specificity
+      score += 1.0 + qt.length * 0.2;
+    }
   }
 
-  function filterNodes(nodes: TreeNode[]): TreeNode[] {
-    const result: TreeNode[] = [];
+  if (score === 0) return 0;
+
+  // Boost: exact unstemmed matches
+  for (const qt of rawQueryTerms) {
+    if (nodeRawSet.has(qt)) score += 0.5;
+  }
+
+  // Boost: full query substring match
+  if (nodeLower.includes(queryLower)) {
+    score += 3.0;
+    if (nodeLower.startsWith(queryLower) || nodeLower.includes(": " + queryLower)) score += 1.0;
+  }
+
+  // Boost: proportion of query terms matched (all terms > some terms)
+  const matchedCount = queryTerms.filter(qt => nodeTermSet.has(qt)).length;
+  score += (matchedCount / queryTerms.length) * 2.0;
+
+  // Slight penalty for very long names with partial match (favors precise matches)
+  if (matchedCount < queryTerms.length) {
+    score *= Math.min(1.0, 3.0 / nodeStemmed.length);
+  }
+
+  return score;
+}
+
+function filterTreeData(tree: TreeNode[], term: string): TreeNode[] {
+  if (!term.trim()) return tree;
+  const queryLower = term.trim().toLowerCase();
+  const queryTerms = searchTokenize(queryLower).map(searchStem);
+  const rawQueryTerms = searchTokenize(queryLower);
+
+  if (queryTerms.length === 0) {
+    // Fallback: pure substring match on code/name (for codes like "2902")
+    const lower = queryLower;
+    function filterSub(nodes: TreeNode[]): TreeNode[] {
+      const result: TreeNode[] = [];
+      for (const node of nodes) {
+        if (node.code.toLowerCase().includes(lower) || node.name.toLowerCase().includes(lower)) {
+          result.push(node);
+        } else if (node.children) {
+          const fc = filterSub(node.children);
+          if (fc.length > 0) result.push({ ...node, children: fc });
+        }
+      }
+      return result;
+    }
+    return filterSub(tree);
+  }
+
+  // Score and filter: each node gets a score; branches are sorted by best descendant score
+  function filterAndScore(nodes: TreeNode[]): { node: TreeNode; score: number }[] {
+    const result: { node: TreeNode; score: number }[] = [];
+
     for (const node of nodes) {
-      if (nodeMatches(node)) {
-        // Node matches: include it with all its children
-        result.push(node);
+      const nodeScore = scoreNodeBM25(
+        node.code + " " + node.name,
+        queryTerms, rawQueryTerms, queryLower,
+      );
+
+      if (nodeScore > 0 && (!node.children || node.children.length === 0)) {
+        // Leaf match
+        result.push({ node, score: nodeScore });
+      } else if (nodeScore > 0 && node.children) {
+        // Branch match — include with all children, scored by this node
+        result.push({ node, score: nodeScore });
       } else if (node.children) {
-        // Node doesn't match: check if any descendants match
-        const filteredChildren = filterNodes(node.children);
-        if (filteredChildren.length > 0) {
-          result.push({ ...node, children: filteredChildren });
+        // Node doesn't match — check descendants
+        const scoredChildren = filterAndScore(node.children);
+        if (scoredChildren.length > 0) {
+          // Sort children by score (best first)
+          scoredChildren.sort((a, b) => b.score - a.score);
+          const bestChildScore = scoredChildren[0].score;
+          const sortedChildren = scoredChildren.map(sc => sc.node);
+          result.push({
+            node: { ...node, children: sortedChildren },
+            score: bestChildScore * 0.95, // slightly discount inherited scores
+          });
         }
       }
     }
+
     return result;
   }
 
-  return filterNodes(tree);
+  const scored = filterAndScore(tree);
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map(s => s.node);
 }
 
 function App() {
