@@ -139,6 +139,10 @@ export interface BafuCoverage {
     mappedWithGhg: number;
     unmappedProcesses: number;
     coveredHsChapters: number;
+    coveredHsCodes?: number;
+    hs6Matched?: number;
+    hs4Matched?: number;
+    chapterOnly?: number;
     source: string;
     note: string;
   };

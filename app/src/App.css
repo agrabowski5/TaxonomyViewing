@@ -3263,11 +3263,13 @@
 .lca-unit {
   font-size: 10.5px;
   color: #6b7280;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: 160px;
+  word-break: break-word;
 }
 
 .lca-products {
-  max-width: 400px;
+  min-width: 300px;
   font-size: 11px;
   color: #4b5563;
   line-height: 1.4;

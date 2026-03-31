@@ -2585,7 +2585,7 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
           <>{data.uslciCoverage.stats.totalProcesses.toLocaleString()} processes &middot; {data.uslciCoverage.stats.totalWithGhg} w/ GHG &middot; {data.uslciCoverage.stats.uniqueNaicsCodes} NAICS &middot; {data.uslciCoverage.stats.coveredHs6Codes.toLocaleString()} HS-6 codes</>
         )}
         {db === "bafu" && data?.bafuCoverage && (
-          <>{data.bafuCoverage.stats.totalProcesses.toLocaleString()} total processes &middot; {data.bafuCoverage.stats.mappedProcesses.toLocaleString()} mapped &middot; {data.bafuCoverage.stats.mappedWithGhg.toLocaleString()} w/ GHG &middot; {data.bafuCoverage.stats.coveredHsChapters} HS chapters</>
+          <>{data.bafuCoverage.stats.totalProcesses.toLocaleString()} total processes &middot; {data.bafuCoverage.stats.mappedProcesses.toLocaleString()} mapped &middot; {data.bafuCoverage.stats.mappedWithGhg.toLocaleString()} w/ GHG &middot; {data.bafuCoverage.stats.coveredHsCodes ?? data.bafuCoverage.stats.coveredHsChapters} HS codes ({data.bafuCoverage.stats.hs6Matched ?? 0} HS-6, {data.bafuCoverage.stats.hs4Matched ?? 0} HS-4, {data.bafuCoverage.stats.chapterOnly ?? 0} chapter-only)</>
         )}
         {db === "gabi" && data?.gabiCoverage && (
           <>{data.gabiCoverage.stats.totalProcesses.toLocaleString()} total processes &middot; {data.gabiCoverage.stats.mappedProcesses.toLocaleString()} mapped &middot; {data.gabiCoverage.stats.mappedWithGhg.toLocaleString()} w/ GHG &middot; {data.gabiCoverage.stats.coveredHsChapters} HS chapters</>
@@ -2707,8 +2707,8 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
           <table className="lca-browser-table">
             <thead>
               <tr>
-                <th>HS Ch.</th>
-                <th title="Total LCI processes mapped to this HS-2 chapter">Processes</th>
+                <th>{db === "bafu" ? "HS Code" : "HS Ch."}</th>
+                <th title={db === "bafu" ? "Total LCI processes mapped to this HS code" : "Total LCI processes mapped to this HS-2 chapter"}>Processes</th>
                 <th title="Processes that have GHG emission data (direct process emissions, GWP-100 AR6)">w/ GHG</th>
                 <th title="Reference units with count and value ranges (min-max)">Unit Ranges</th>
                 <th title="Process names with GHG values in parentheses where available (kg CO2e per functional unit)">Process Details</th>
