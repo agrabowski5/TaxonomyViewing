@@ -1423,7 +1423,9 @@ function getExiobaseProducts(
 }
 
 
-// Look up BAFU data for a selected node — tries HS-6, HS-4, then HS-2 chapter
+// Look up BAFU data for a selected node.
+// In strict mode, only matches at the node's own HS level (no parent fallback).
+// In relaxed mode, tries HS-6 → HS-4 → HS-2 fallback.
 function getBafuChapterData(
   node: TreeNode,
   taxonomy: TaxonomyType,
@@ -1434,16 +1436,33 @@ function getBafuChapterData(
   cpaHsConcordance?: GenericConcordance | null,
   beaHsConcordance?: GenericConcordance | null,
   unspscHsMapping?: FuzzyMappingData,
+  strict?: boolean,
 ): BafuCoverageEntry | null {
   if (!bafuCoverage) return null;
   const hsCodes = resolveNodeToHsCodes(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
   if (!hsCodes) return null;
   for (const hs of hsCodes) {
-    // Try HS-6, HS-4, HS-2 for each resolved code
-    for (let len = Math.min(6, hs.length); len >= 2; len -= 2) {
-      const key = hs.substring(0, len);
+    if (strict) {
+      // Exact mode: only match BAFU keys at this node's own level
+      const key = hs.substring(0, Math.min(6, hs.length));
       const entry = bafuCoverage.coverage[key];
       if (entry) return entry;
+      // Also try exact match at the node's code length (e.g., 4-digit heading)
+      if (hs.length >= 4 && hs.length < 6) {
+        const entry4 = bafuCoverage.coverage[hs.substring(0, 4)];
+        if (entry4) return entry4;
+      }
+      if (hs.length === 2) {
+        const entry2 = bafuCoverage.coverage[hs];
+        if (entry2) return entry2;
+      }
+    } else {
+      // Relaxed mode: try HS-6, HS-4, HS-2 for each resolved code
+      for (let len = Math.min(6, hs.length); len >= 2; len -= 2) {
+        const key = hs.substring(0, len);
+        const entry = bafuCoverage.coverage[key];
+        if (entry) return entry;
+      }
     }
   }
   return null;
@@ -2269,14 +2288,39 @@ function computeBafuCoverage(
       if (hsCodes) {
         for (const hs of hsCodes) {
           let matched = false;
-          // Try HS-6 → HS-4 → HS-2 for each resolved code
-          for (let len = Math.min(6, hs.length); len >= 2; len -= 2) {
-            const key = hs.substring(0, len);
+          if (strict) {
+            // Exact mode: only match at the node's own HS level — no parent fallback
+            const key = hs.substring(0, Math.min(6, hs.length));
             const pc = coverageMap.get(key);
             if (pc) {
               raw.set(node.id, { count: pc, key });
               matched = true;
-              break;
+            }
+            // Also try at exact code length for 4-digit headings
+            if (!matched && hs.length >= 4 && hs.length < 6) {
+              const pc4 = coverageMap.get(hs.substring(0, 4));
+              if (pc4) {
+                raw.set(node.id, { count: pc4, key: hs.substring(0, 4) });
+                matched = true;
+              }
+            }
+            if (!matched && hs.length === 2) {
+              const pc2 = coverageMap.get(hs);
+              if (pc2) {
+                raw.set(node.id, { count: pc2, key: hs });
+                matched = true;
+              }
+            }
+          } else {
+            // Relaxed mode: try HS-6 → HS-4 → HS-2 for each resolved code
+            for (let len = Math.min(6, hs.length); len >= 2; len -= 2) {
+              const key = hs.substring(0, len);
+              const pc = coverageMap.get(key);
+              if (pc) {
+                raw.set(node.id, { count: pc, key });
+                matched = true;
+                break;
+              }
             }
           }
           if (matched) break;
@@ -2895,8 +2939,8 @@ function AppContent() {
 
   const bafuFactor = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return null;
-    return getBafuChapterData(selectedNode, selectedFrom, data.bafuCoverage, data.concordance, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping);
-  }, [selectedNode, selectedFrom, data]);
+    return getBafuChapterData(selectedNode, selectedFrom, data.bafuCoverage, data.concordance, data.naicsHsConcordance, data.isicCpcConcordance, data.cpaHsConcordance, data.beaHsConcordance, data.unspscHsMapping, strictMatch);
+  }, [selectedNode, selectedFrom, data, strictMatch]);
 
   const gabiFactor = useMemo(() => {
     if (!selectedNode || !selectedFrom || !data) return null;
