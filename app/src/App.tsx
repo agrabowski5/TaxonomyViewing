@@ -15,6 +15,7 @@ import { ResetDialog } from "./builder/ResetDialog";
 import { BaseTaxonomyDialog } from "./builder/BaseTaxonomyDialog";
 import { TaxonomyLibraryDialog } from "./builder/TaxonomyLibraryDialog";
 import { AboutSection } from "./AboutSection";
+import { EcoinventBafuTool } from "./EcoinventBafuTool";
 import type { AboutSectionHandle, TabNavContext } from "./AboutSection";
 import type { TreeNode, LookupEntry, TaxonomyType, AppData, ConcordanceData, ConcordanceMapping, EmissionFactorEntry, ExiobaseFactorEntry, ExiobaseConcordance, FuzzyMappingData, EcoinventMapping, EcoinventCodeMapping, UslciCoverage, UslciCoverageEntry, BafuCoverage, BafuCoverageEntry, GabiCoverage, GabiCoverageEntry, LciUnitStats, GenericConcordance, CoverageInfo } from "./types";
 import type { CustomNode } from "./builder/types";
@@ -246,7 +247,57 @@ function resolveFromHsCode(
   return null;
 }
 
-// Resolve a node to its HS-2 chapter for BAFU/GaBi chapter-level matching.
+// Resolve a node to full HS codes (up to HS-6) for BAFU/GaBi multi-level matching.
+// Returns an array of HS codes to try (caller does HS-6 → HS-4 → HS-2 fallback per code).
+function resolveNodeToHsCodes(
+  code: string,
+  taxonomy: TaxonomyType,
+  nodeId: string,
+  concordance: ConcordanceData,
+  naicsHsConcordance: GenericConcordance | null,
+  isicCpcConcordance: GenericConcordance | null,
+  cpaHsConcordance: GenericConcordance | null,
+  beaHsConcordance: GenericConcordance | null,
+  unspscHsMapping?: FuzzyMappingData,
+): string[] | null {
+  const clean = stripCode(code);
+
+  // HS-family: return the code itself (up to 6 digits)
+  if (HS_FAMILY.includes(taxonomy) || (taxonomy === "t2" && getT2Origin(nodeId) === "hts") || (taxonomy === "t1" && !nodeId.startsWith("t1-svc-"))) {
+    if (/^\d+$/.test(clean) && clean.length >= 2) return [clean.substring(0, Math.min(6, clean.length))];
+    return null;
+  }
+
+  // CPC (and CPC-origin T1/T2 nodes): concordance to HS
+  if (taxonomy === "cpc" || (taxonomy === "t2" && getT2Origin(nodeId) === "cpc") || (taxonomy === "t1" && nodeId.startsWith("t1-svc-"))) {
+    for (let len = clean.length; len >= 4; len--) {
+      const prefix = clean.substring(0, len);
+      const hsMappings = concordance.cpcToHs[prefix];
+      if (hsMappings && hsMappings.length > 0) {
+        return hsMappings.map(m => m.code);
+      }
+    }
+    return null;
+  }
+
+  // CONCORDANCE_TAXONOMIES: resolve to HS codes
+  if (CONCORDANCE_TAXONOMIES.includes(taxonomy)) {
+    const hsCodes = resolveToHsCodes(clean, taxonomy, naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, concordance);
+    if (hsCodes.length > 0) return hsCodes;
+    return null;
+  }
+
+  // UNSPSC: fuzzy mapping to HS
+  if (taxonomy === "unspsc" && unspscHsMapping) {
+    const hsEntries = unspscHsMapping.unspscToHs[clean];
+    if (hsEntries && hsEntries.length > 0) return hsEntries.map(e => e.code);
+    return null;
+  }
+
+  return null;
+}
+
+// Resolve a node to its HS-2 chapter for GaBi chapter-level matching.
 // Handles all 13 taxonomy types including concordance taxonomies and UNSPSC.
 function resolveNodeToHs2Chapter(
   code: string,
@@ -1047,11 +1098,14 @@ function traceResolutionChain(
           return { steps, database: dbLabel };
         }
       } else {
-        const ch = hsBase.substring(0, 2);
-        const entry = cov![ch];
-        if (entry) {
-          steps.push({ label: `${dbLabel} HS-2 chapter lookup`, code: ch, description: `${(entry as BafuCoverageEntry).processCount} process(es)`, system: dbLabel, lcaDb: lcaDbId, searchCode: ch });
-          return { steps, database: dbLabel };
+        // BAFU/GaBi: try HS-6 → HS-4 → HS-2 (coverage may be keyed at any level)
+        for (let len = Math.min(6, hsBase.length); len >= 2; len -= 2) {
+          const key = hsBase.substring(0, len);
+          const entry = cov![key];
+          if (entry) {
+            steps.push({ label: `${dbLabel} HS-${len} lookup`, code: key, description: `${(entry as BafuCoverageEntry).processCount} process(es)`, system: dbLabel, lcaDb: lcaDbId, searchCode: key });
+            return { steps, database: dbLabel };
+          }
         }
       }
       return null;
@@ -1061,8 +1115,8 @@ function traceResolutionChain(
     if (isHs || isT1Hts || isT2Hts) {
       const hsBase = getHsBase(node.code, isHs ? taxonomy : "hts");
       if (!hsBase) return null;
-      const lookupKey = isUslci ? hsBase.substring(0, 6) : hsBase.substring(0, 2);
-      steps.push({ label: `HS-${lookupKey.length} ${isUslci ? "code" : "chapter"} (${dbLabel} key)`, code: lookupKey, system: "HS" });
+      const lookupKey = isUslci ? hsBase.substring(0, 6) : hsBase;
+      steps.push({ label: `HS code (${dbLabel} key)`, code: lookupKey, system: "HS" });
       return lookupHs(hsBase);
     }
 
@@ -1369,7 +1423,7 @@ function getExiobaseProducts(
 }
 
 
-// Look up BAFU chapter data for a selected node (keyed by HS 2-digit chapter)
+// Look up BAFU data for a selected node — tries HS-6, HS-4, then HS-2 chapter
 function getBafuChapterData(
   node: TreeNode,
   taxonomy: TaxonomyType,
@@ -1382,16 +1436,24 @@ function getBafuChapterData(
   unspscHsMapping?: FuzzyMappingData,
 ): BafuCoverageEntry | null {
   if (!bafuCoverage) return null;
-  const chapter = resolveNodeToHs2Chapter(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
-  if (!chapter) return null;
-  return bafuCoverage.coverage[chapter] ?? null;
+  const hsCodes = resolveNodeToHsCodes(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
+  if (!hsCodes) return null;
+  for (const hs of hsCodes) {
+    // Try HS-6, HS-4, HS-2 for each resolved code
+    for (let len = Math.min(6, hs.length); len >= 2; len -= 2) {
+      const key = hs.substring(0, len);
+      const entry = bafuCoverage.coverage[key];
+      if (entry) return entry;
+    }
+  }
+  return null;
 }
 
 function BafuFactorDisplay({ entry, getChain, onOpenTab }: { entry: BafuCoverageEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return <LciFactorDisplay entry={entry} title="Direct Emissions (BAFU)" source="BAFU:2025 (direct process emissions only, GWP-100 AR6)" cardClass="bafu-card" getChain={getChain} onOpenTab={onOpenTab} />;
 }
 
-// Look up GaBi chapter data for a selected node (keyed by HS 2-digit chapter, same as BAFU)
+// Look up GaBi chapter data for a selected node (keyed by HS 2-digit chapter)
 function getGabiChapterData(
   node: TreeNode,
   taxonomy: TaxonomyType,
@@ -2191,7 +2253,7 @@ function computeBafuCoverage(
   beaHsConcordance?: GenericConcordance | null,
   unspscHsMapping?: FuzzyMappingData,
 ): Map<string, CoverageInfo> {
-  // BAFU maps at HS-2 chapter level — this IS the native resolution, not a fallback
+  // BAFU coverage is keyed at HS-6, HS-4, or HS-2 level (fuzzy-matched from process names)
   if (!bafuCoverage) return new Map();
   const raw = new Map<string, { count: number; key: string }>();
   // Use kg-unit process count to match what the comparison panel displays
@@ -2203,10 +2265,22 @@ function computeBafuCoverage(
 
   function walk(nodes: TreeNode[]) {
     for (const node of nodes) {
-      const chapter = resolveNodeToHs2Chapter(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
-      if (chapter) {
-        const pc = coverageMap.get(chapter);
-        if (pc) raw.set(node.id, { count: pc, key: chapter });
+      const hsCodes = resolveNodeToHsCodes(node.code, taxonomy, node.id, concordance, naicsHsConcordance ?? null, isicCpcConcordance ?? null, cpaHsConcordance ?? null, beaHsConcordance ?? null, unspscHsMapping);
+      if (hsCodes) {
+        for (const hs of hsCodes) {
+          let matched = false;
+          // Try HS-6 → HS-4 → HS-2 for each resolved code
+          for (let len = Math.min(6, hs.length); len >= 2; len -= 2) {
+            const key = hs.substring(0, len);
+            const pc = coverageMap.get(key);
+            if (pc) {
+              raw.set(node.id, { count: pc, key });
+              matched = true;
+              break;
+            }
+          }
+          if (matched) break;
+        }
       }
       if (node.children) walk(node.children);
     }
@@ -3591,6 +3665,7 @@ function AppContent() {
             </button>
           )}
         </div>
+        <EcoinventBafuTool data={data} />
         <AboutSection ref={aboutRef} data={data} onNavigateToNode={handleNavigateToNode} onHighlightGaps={handleHighlightGaps} />
       </header>
 
