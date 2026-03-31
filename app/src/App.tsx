@@ -1494,6 +1494,162 @@ function GabiFactorDisplay({ entry, getChain, onOpenTab }: { entry: GabiCoverage
   return <LciFactorDisplay entry={entry} title="Direct Emissions (GaBi/Sphera)" source="GaBi/Sphera 2026.1 (direct process emissions only, GWP-100 AR6)" cardClass="gabi-card" getChain={getChain} onOpenTab={onOpenTab} />;
 }
 
+// ===== Find Closest BAFU Entry =====
+
+interface BafuProcessMatch {
+  name: string;
+  ghg: number;
+  unit: string;
+  hsKey: string;
+  score: number;
+}
+
+function buildBafuProcessIndex(bafuCoverage: BafuCoverage): {
+  processes: { name: string; ghg: number; unit: string; hsKey: string }[];
+  stemmed: string[][];
+  raw: Set<string>[];
+} {
+  const processes: { name: string; ghg: number; unit: string; hsKey: string }[] = [];
+  const stemmed: string[][] = [];
+  const raw: Set<string>[] = [];
+
+  for (const [hsKey, entry] of Object.entries(bafuCoverage.coverage)) {
+    for (const p of entry.topProcesses) {
+      const cleanName = p.name.replace(/\s*\{[^}]*\}\s*/g, "").trim();
+      processes.push({ name: cleanName, ghg: p.ghg, unit: p.unit, hsKey });
+      const tokens = searchTokenize(cleanName);
+      stemmed.push(tokens.map(searchStem));
+      raw.push(new Set(tokens));
+    }
+  }
+
+  return { processes, stemmed, raw };
+}
+
+function searchBafuProcesses(
+  index: ReturnType<typeof buildBafuProcessIndex>,
+  query: string,
+  limit: number = 15,
+): BafuProcessMatch[] {
+  const queryLower = query.toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .trim();
+  if (!queryLower) return [];
+
+  const queryTokens = searchTokenize(queryLower);
+  const queryTerms = queryTokens.map(searchStem);
+  const rawQueryTerms = queryTokens;
+
+  if (queryTerms.length === 0) return [];
+
+  const { processes, stemmed, raw } = index;
+  const scores: { idx: number; score: number }[] = [];
+
+  for (let i = 0; i < processes.length; i++) {
+    const docTerms = stemmed[i];
+    const docRaw = raw[i];
+    if (docTerms.length === 0) continue;
+
+    const docTermSet = new Set(docTerms);
+    let score = 0;
+
+    // Term match with specificity weighting
+    for (const qt of queryTerms) {
+      if (docTermSet.has(qt)) {
+        score += 1.0 + qt.length * 0.2;
+      }
+    }
+
+    if (score === 0) continue;
+
+    // Exact unstemmed token matches
+    for (const qt of rawQueryTerms) {
+      if (docRaw.has(qt)) score += 0.5;
+    }
+
+    // Substring match of query in process name
+    const nameLower = processes[i].name.toLowerCase();
+    if (nameLower.includes(queryLower)) {
+      score += 3.0;
+      if (nameLower.startsWith(queryLower)) score += 1.0;
+    }
+
+    // Coverage: proportion of query terms matched
+    const matched = queryTerms.filter(qt => docTermSet.has(qt)).length;
+    score += (matched / queryTerms.length) * 2.0;
+
+    // Penalty for partial match on long names
+    if (matched < queryTerms.length) {
+      score *= Math.min(1.0, 3.0 / docTerms.length);
+    }
+
+    scores.push({ idx: i, score });
+  }
+
+  scores.sort((a, b) => b.score - a.score);
+  return scores.slice(0, limit).map(s => ({
+    ...processes[s.idx],
+    score: s.score,
+  }));
+}
+
+function FindClosestBafu({ nodeName, bafuCoverage }: { nodeName: string; bafuCoverage: BafuCoverage }) {
+  const [open, setOpen] = useState(false);
+
+  const processIndex = useMemo(
+    () => buildBafuProcessIndex(bafuCoverage),
+    [bafuCoverage],
+  );
+
+  const matches = useMemo(() => {
+    if (!open) return [];
+    return searchBafuProcesses(processIndex, nodeName);
+  }, [open, processIndex, nodeName]);
+
+  if (!open) {
+    return (
+      <button className="find-bafu-btn" onClick={() => setOpen(true)}>
+        Find closest BAFU entry
+      </button>
+    );
+  }
+
+  return (
+    <div className="emission-factor-card bafu-closest-card">
+      <div className="bafu-closest-header">
+        <h4>Closest BAFU Processes</h4>
+        <button className="bafu-closest-close" onClick={() => setOpen(false)}>&times;</button>
+      </div>
+      <div className="bafu-closest-query">
+        Searching: <em>{nodeName}</em>
+      </div>
+      {matches.length === 0 ? (
+        <div className="bafu-closest-empty">No matching BAFU processes found</div>
+      ) : (
+        <div className="bafu-closest-results">
+          {matches.map((m, i) => (
+            <div key={i} className="bafu-closest-row">
+              <div className="bafu-closest-rank">{i + 1}</div>
+              <div className="bafu-closest-info">
+                <span className="bafu-closest-name">{m.name}</span>
+                <span className="bafu-closest-meta">
+                  <span className="bafu-closest-hs">HS {m.hsKey}</span>
+                  <span className="bafu-closest-score">{(m.score).toFixed(1)} relevance</span>
+                </span>
+              </div>
+              {m.ghg > 0 && (
+                <div className="bafu-closest-ghg">
+                  {formatGhg(m.ghg)} <span className="bafu-closest-unit">kg CO₂e/{m.unit}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function UslciFactorDisplay({ entry, getChain, onOpenTab }: { entry: UslciCoverageEntry; getChain?: () => ResolutionChain | null; onOpenTab?: (tab: "concordances" | "browser", ctx?: TabNavContext) => void }) {
   return <LciFactorDisplay entry={entry} title="Direct Emissions (US LCI)" source="NREL USLCI (direct process emissions only, GWP-100 AR6)" cardClass="uslci-card" getChain={getChain} onOpenTab={onOpenTab} />;
 }
@@ -4127,6 +4283,10 @@ function AppContent() {
 
             {bafuFactor && bafuFactor.withGhgData > 0 && (
               <BafuFactorDisplay entry={bafuFactor} getChain={getBafuChain} onOpenTab={openAboutTab} />
+            )}
+
+            {data.bafuCoverage && selectedNode && (
+              <FindClosestBafu nodeName={selectedNode.name} bafuCoverage={data.bafuCoverage} />
             )}
 
             {gabiFactor && gabiFactor.processCount > 0 && (

@@ -1465,6 +1465,139 @@
 .bafu-card .lci-process-name { color: #4c0519; }
 .bafu-card .lci-process-value { color: #be123c; }
 
+/* Find Closest BAFU button */
+.find-bafu-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border: 1.5px dashed #be123c;
+  border-radius: 8px;
+  background: transparent;
+  color: #be123c;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.find-bafu-btn:hover {
+  background: #fff1f2;
+  border-style: solid;
+}
+
+/* Closest BAFU results card */
+.bafu-closest-card {
+  border-color: #be123c;
+  background: linear-gradient(135deg, #fff1f2, #ffe4e6);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.bafu-closest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.bafu-closest-header h4 {
+  margin: 0;
+  color: #9f1239;
+  font-size: 13px;
+}
+.bafu-closest-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #9f1239;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.bafu-closest-close:hover { color: #4c0519; }
+.bafu-closest-query {
+  font-size: 11px;
+  color: #881337;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(190, 18, 60, 0.15);
+}
+.bafu-closest-query em {
+  font-style: normal;
+  font-weight: 600;
+}
+.bafu-closest-empty {
+  font-size: 12px;
+  color: #9f1239;
+  font-style: italic;
+  text-align: center;
+  padding: 12px;
+}
+.bafu-closest-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.bafu-closest-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+}
+.bafu-closest-row:first-child {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(190, 18, 60, 0.2);
+}
+.bafu-closest-rank {
+  font-weight: 700;
+  color: #9f1239;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.bafu-closest-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.bafu-closest-name {
+  color: #4c0519;
+  font-weight: 500;
+}
+.bafu-closest-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: #881337;
+}
+.bafu-closest-hs {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  background: rgba(190, 18, 60, 0.08);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.bafu-closest-score {
+  opacity: 0.6;
+}
+.bafu-closest-ghg {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-weight: 600;
+  color: #be123c;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.bafu-closest-unit {
+  font-weight: 400;
+  font-size: 10px;
+  color: #9f1239;
+}
+
 /* GaBi/Sphera card */
 .gabi-card {
   border-color: #7c3aed;
