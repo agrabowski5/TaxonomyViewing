@@ -1538,18 +1538,12 @@ function nodeBafuEntry(
   const hsCodes = resolveNodeToHsCodes(node.code, taxonomy, node.id, concordance, naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, unspscHsMapping);
   if (!hsCodes) return null;
   for (const hs of hsCodes) {
-    // Only exact level match (no fallback — we want to know which nodes truly have data)
+    // Strict: only match BAFU keys at the node's own HS code length — no fallback.
+    // A 6-digit node only matches a 6-digit BAFU key; chapter fallback is handled
+    // by the tree walk finding the actual chapter-level ancestor node.
     const key = hs.substring(0, Math.min(6, hs.length));
     const entry = bafuCoverage.coverage[key];
     if (entry && entry.withGhgData > 0) return { entry, key };
-    if (hs.length >= 4) {
-      const k4 = hs.substring(0, 4);
-      const e4 = bafuCoverage.coverage[k4];
-      if (e4 && e4.withGhgData > 0) return { entry: e4, key: k4 };
-    }
-    const k2 = hs.substring(0, 2);
-    const e2 = bafuCoverage.coverage[k2];
-    if (e2 && e2.withGhgData > 0) return { entry: e2, key: k2 };
   }
   return null;
 }
