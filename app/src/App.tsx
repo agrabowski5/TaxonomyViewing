@@ -1768,7 +1768,7 @@ function LciFactorDisplay({ entry, title, source, cardClass, getChain, onOpenTab
       )}
       {entry.topProcesses.length > 0 && (
         <div className="lci-processes">
-          {entry.topProcesses.slice(0, 5).map((p, i) => (
+          {entry.topProcesses.map((p, i) => (
             <div key={i} className="lci-process">
               <span className="lci-process-name">{p.name}</span>
               {p.ghg > 0 && <span className="lci-process-value">{formatGhg(p.ghg)} kg CO₂e/{p.unit}</span>}

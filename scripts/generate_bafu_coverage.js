@@ -412,7 +412,7 @@ for (const [cat, count] of unmappedSorted.slice(0, 15)) {
   console.log('  ', count, cat);
 }
 
-// Build output: for each HS code, keep top 10 processes by GHG (sorted descending)
+// Build output: for each HS code, keep all processes by GHG (sorted descending)
 // and compute summary stats grouped by reference unit
 const coverage = {};
 for (const [hsCode, data] of Object.entries(hsCodeData)) {
@@ -440,7 +440,7 @@ for (const [hsCode, data] of Object.entries(hsCodeData)) {
 
   // Top 10 processes by GHG (descending)
   procs.sort((a, b) => b.ghg - a.ghg);
-  const topProcesses = procs.slice(0, 10).map(p => ({
+  const topProcesses = procs.slice(0, 50).map(p => ({
     name: p.name.replace(/\s*\{[^}]*\}\s*/g, '').trim(), // strip location tags like {CH}
     ghg: Math.round(p.ghg * 1e6) / 1e6, // 6 decimal places
     unit: p.unit,
