@@ -1494,117 +1494,202 @@ function GabiFactorDisplay({ entry, getChain, onOpenTab }: { entry: GabiCoverage
   return <LciFactorDisplay entry={entry} title="Direct Emissions (GaBi/Sphera)" source="GaBi/Sphera 2026.1 (direct process emissions only, GWP-100 AR6)" cardClass="gabi-card" getChain={getChain} onOpenTab={onOpenTab} />;
 }
 
-// ===== Find Closest BAFU Entry =====
+// ===== Find Closest BAFU Entry (tree walk) =====
 
-interface BafuProcessMatch {
-  name: string;
-  ghg: number;
-  unit: string;
-  hsKey: string;
-  score: number;
+interface NearbyBafuMatch {
+  node: TreeNode;
+  entry: BafuCoverageEntry;
+  bafuKey: string;
+  relationship: "self" | "ancestor" | "sibling" | "cousin" | "descendant";
+  levelsUp: number;    // levels walked up from selected node
+  levelsDown: number;  // levels walked down from common ancestor
+  distance: number;    // total tree distance (up + down)
+  sharedAncestor: string | null; // name of the common ancestor
 }
 
-function buildBafuProcessIndex(bafuCoverage: BafuCoverage): {
-  processes: { name: string; ghg: number; unit: string; hsKey: string }[];
-  stemmed: string[][];
-  raw: Set<string>[];
-} {
-  const processes: { name: string; ghg: number; unit: string; hsKey: string }[] = [];
-  const stemmed: string[][] = [];
-  const raw: Set<string>[] = [];
-
-  for (const [hsKey, entry] of Object.entries(bafuCoverage.coverage)) {
-    for (const p of entry.topProcesses) {
-      const cleanName = p.name.replace(/\s*\{[^}]*\}\s*/g, "").trim();
-      processes.push({ name: cleanName, ghg: p.ghg, unit: p.unit, hsKey });
-      const tokens = searchTokenize(cleanName);
-      stemmed.push(tokens.map(searchStem));
-      raw.push(new Set(tokens));
+// Find the path (list of ancestor nodes) from root to targetId
+function findAncestorPath(tree: TreeNode[], targetId: string): TreeNode[] {
+  const path: TreeNode[] = [];
+  function search(nodes: TreeNode[]): boolean {
+    for (const node of nodes) {
+      path.push(node);
+      if (node.id === targetId) return true;
+      if (node.children && search(node.children)) return true;
+      path.pop();
     }
+    return false;
+  }
+  search(tree);
+  return path;
+}
+
+// Check if a single node has BAFU coverage (returns entry + key or null)
+function nodeBafuEntry(
+  node: TreeNode,
+  taxonomy: TaxonomyType,
+  bafuCoverage: BafuCoverage,
+  concordance: ConcordanceData,
+  naicsHsConcordance: GenericConcordance | null,
+  isicCpcConcordance: GenericConcordance | null,
+  cpaHsConcordance: GenericConcordance | null,
+  beaHsConcordance: GenericConcordance | null,
+  unspscHsMapping?: FuzzyMappingData,
+): { entry: BafuCoverageEntry; key: string } | null {
+  const hsCodes = resolveNodeToHsCodes(node.code, taxonomy, node.id, concordance, naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, unspscHsMapping);
+  if (!hsCodes) return null;
+  for (const hs of hsCodes) {
+    // Only exact level match (no fallback — we want to know which nodes truly have data)
+    const key = hs.substring(0, Math.min(6, hs.length));
+    const entry = bafuCoverage.coverage[key];
+    if (entry && entry.withGhgData > 0) return { entry, key };
+    if (hs.length >= 4) {
+      const k4 = hs.substring(0, 4);
+      const e4 = bafuCoverage.coverage[k4];
+      if (e4 && e4.withGhgData > 0) return { entry: e4, key: k4 };
+    }
+    const k2 = hs.substring(0, 2);
+    const e2 = bafuCoverage.coverage[k2];
+    if (e2 && e2.withGhgData > 0) return { entry: e2, key: k2 };
+  }
+  return null;
+}
+
+function findNearbyBafuNodes(
+  selectedNode: TreeNode,
+  tree: TreeNode[],
+  taxonomy: TaxonomyType,
+  data: AppData,
+): NearbyBafuMatch[] {
+  const bafuCoverage = data.bafuCoverage;
+  if (!bafuCoverage) return [];
+  const conc = data.concordance;
+  const nhs = data.naicsHsConcordance ?? null;
+  const icp = data.isicCpcConcordance ?? null;
+  const chs = data.cpaHsConcordance ?? null;
+  const bhs = data.beaHsConcordance ?? null;
+  const uhm = data.unspscHsMapping;
+
+  const check = (node: TreeNode) => nodeBafuEntry(node, taxonomy, bafuCoverage, conc, nhs, icp, chs, bhs, uhm);
+
+  const results: NearbyBafuMatch[] = [];
+  const seenIds = new Set<string>();
+
+  // Get ancestor path: [root, ..., parent, selectedNode]
+  const path = findAncestorPath(tree, selectedNode.id);
+  if (path.length === 0) return [];
+
+  // 1. Check self
+  const selfEntry = check(selectedNode);
+  if (selfEntry) {
+    results.push({
+      node: selectedNode, entry: selfEntry.entry, bafuKey: selfEntry.key,
+      relationship: "self", levelsUp: 0, levelsDown: 0, distance: 0, sharedAncestor: null,
+    });
+    seenIds.add(selectedNode.id);
   }
 
-  return { processes, stemmed, raw };
-}
+  // 2. Walk up ancestors
+  for (let i = path.length - 2; i >= 0; i--) {
+    const ancestor = path[i];
+    const levelsUp = path.length - 1 - i;
+    const ancEntry = check(ancestor);
+    if (ancEntry && !seenIds.has(ancestor.id)) {
+      results.push({
+        node: ancestor, entry: ancEntry.entry, bafuKey: ancEntry.key,
+        relationship: "ancestor", levelsUp, levelsDown: 0, distance: levelsUp,
+        sharedAncestor: null,
+      });
+      seenIds.add(ancestor.id);
+    }
 
-function searchBafuProcesses(
-  index: ReturnType<typeof buildBafuProcessIndex>,
-  query: string,
-  limit: number = 15,
-): BafuProcessMatch[] {
-  const queryLower = query.toLowerCase()
-    .replace(/[^a-z0-9\s]+/g, " ")
-    .trim();
-  if (!queryLower) return [];
+    // 3. Check siblings/cousins at this ancestor's level
+    if (ancestor.children) {
+      for (const child of ancestor.children) {
+        if (seenIds.has(child.id)) continue;
+        // Skip the branch we came from
+        if (i < path.length - 2 && child.id === path[i + 1].id) continue;
 
-  const queryTokens = searchTokenize(queryLower);
-  const queryTerms = queryTokens.map(searchStem);
-  const rawQueryTerms = queryTokens;
+        const childEntry = check(child);
+        if (childEntry) {
+          const rel = levelsUp === 1 ? "sibling" : "cousin";
+          results.push({
+            node: child, entry: childEntry.entry, bafuKey: childEntry.key,
+            relationship: rel, levelsUp, levelsDown: 1, distance: levelsUp + 1,
+            sharedAncestor: ancestor.name,
+          });
+          seenIds.add(child.id);
+        }
 
-  if (queryTerms.length === 0) return [];
-
-  const { processes, stemmed, raw } = index;
-  const scores: { idx: number; score: number }[] = [];
-
-  for (let i = 0; i < processes.length; i++) {
-    const docTerms = stemmed[i];
-    const docRaw = raw[i];
-    if (docTerms.length === 0) continue;
-
-    const docTermSet = new Set(docTerms);
-    let score = 0;
-
-    // Term match with specificity weighting
-    for (const qt of queryTerms) {
-      if (docTermSet.has(qt)) {
-        score += 1.0 + qt.length * 0.2;
+        // Also check grandchildren (one more level down) for richer results
+        if (child.children) {
+          for (const gc of child.children) {
+            if (seenIds.has(gc.id)) continue;
+            const gcEntry = check(gc);
+            if (gcEntry) {
+              results.push({
+                node: gc, entry: gcEntry.entry, bafuKey: gcEntry.key,
+                relationship: "cousin", levelsUp, levelsDown: 2, distance: levelsUp + 2,
+                sharedAncestor: ancestor.name,
+              });
+              seenIds.add(gc.id);
+            }
+          }
+        }
       }
     }
 
-    if (score === 0) continue;
-
-    // Exact unstemmed token matches
-    for (const qt of rawQueryTerms) {
-      if (docRaw.has(qt)) score += 0.5;
-    }
-
-    // Substring match of query in process name
-    const nameLower = processes[i].name.toLowerCase();
-    if (nameLower.includes(queryLower)) {
-      score += 3.0;
-      if (nameLower.startsWith(queryLower)) score += 1.0;
-    }
-
-    // Coverage: proportion of query terms matched
-    const matched = queryTerms.filter(qt => docTermSet.has(qt)).length;
-    score += (matched / queryTerms.length) * 2.0;
-
-    // Penalty for partial match on long names
-    if (matched < queryTerms.length) {
-      score *= Math.min(1.0, 3.0 / docTerms.length);
-    }
-
-    scores.push({ idx: i, score });
+    // Stop after finding enough
+    if (results.length >= 10) break;
   }
 
-  scores.sort((a, b) => b.score - a.score);
-  return scores.slice(0, limit).map(s => ({
-    ...processes[s.idx],
-    score: s.score,
-  }));
+  // 4. Check descendants (if selected node has children)
+  function walkDescendants(nodes: TreeNode[], depth: number) {
+    if (depth > 3 || results.length >= 15) return;
+    for (const child of nodes) {
+      if (seenIds.has(child.id)) continue;
+      const childEntry = check(child);
+      if (childEntry) {
+        results.push({
+          node: child, entry: childEntry.entry, bafuKey: childEntry.key,
+          relationship: "descendant", levelsUp: 0, levelsDown: depth, distance: depth,
+          sharedAncestor: null,
+        });
+        seenIds.add(child.id);
+      }
+      if (child.children) walkDescendants(child.children, depth + 1);
+    }
+  }
+  if (selectedNode.children) walkDescendants(selectedNode.children, 1);
+
+  // Sort by distance, then by GHG data richness
+  results.sort((a, b) => {
+    if (a.distance !== b.distance) return a.distance - b.distance;
+    return b.entry.withGhgData - a.entry.withGhgData;
+  });
+
+  return results;
 }
 
-function FindClosestBafu({ nodeName, bafuCoverage }: { nodeName: string; bafuCoverage: BafuCoverage }) {
-  const [open, setOpen] = useState(false);
+const REL_LABELS: Record<string, string> = {
+  self: "This node",
+  ancestor: "Ancestor",
+  sibling: "Sibling",
+  cousin: "Cousin",
+  descendant: "Descendant",
+};
 
-  const processIndex = useMemo(
-    () => buildBafuProcessIndex(bafuCoverage),
-    [bafuCoverage],
-  );
+function FindClosestBafu({ selectedNode, tree, taxonomy, data }: {
+  selectedNode: TreeNode;
+  tree: TreeNode[];
+  taxonomy: TaxonomyType;
+  data: AppData;
+}) {
+  const [open, setOpen] = useState(false);
 
   const matches = useMemo(() => {
     if (!open) return [];
-    return searchBafuProcesses(processIndex, nodeName);
-  }, [open, processIndex, nodeName]);
+    return findNearbyBafuNodes(selectedNode, tree, taxonomy, data);
+  }, [open, selectedNode, tree, taxonomy, data]);
 
   if (!open) {
     return (
@@ -1614,36 +1699,55 @@ function FindClosestBafu({ nodeName, bafuCoverage }: { nodeName: string; bafuCov
     );
   }
 
+  const kgStats = (entry: BafuCoverageEntry) => entry.unitStats["kg"];
+
   return (
     <div className="emission-factor-card bafu-closest-card">
       <div className="bafu-closest-header">
-        <h4>Closest BAFU Processes</h4>
+        <h4>Nearest BAFU-Mapped Nodes</h4>
         <button className="bafu-closest-close" onClick={() => setOpen(false)}>&times;</button>
       </div>
       <div className="bafu-closest-query">
-        Searching: <em>{nodeName}</em>
+        From: <em>{selectedNode.code} — {selectedNode.name}</em>
       </div>
       {matches.length === 0 ? (
-        <div className="bafu-closest-empty">No matching BAFU processes found</div>
+        <div className="bafu-closest-empty">No nearby nodes with BAFU data found</div>
       ) : (
         <div className="bafu-closest-results">
-          {matches.map((m, i) => (
-            <div key={i} className="bafu-closest-row">
-              <div className="bafu-closest-rank">{i + 1}</div>
-              <div className="bafu-closest-info">
-                <span className="bafu-closest-name">{m.name}</span>
-                <span className="bafu-closest-meta">
-                  <span className="bafu-closest-hs">HS {m.hsKey}</span>
-                  <span className="bafu-closest-score">{(m.score).toFixed(1)} relevance</span>
-                </span>
-              </div>
-              {m.ghg > 0 && (
-                <div className="bafu-closest-ghg">
-                  {formatGhg(m.ghg)} <span className="bafu-closest-unit">kg CO₂e/{m.unit}</span>
+          {matches.map((m, i) => {
+            const kg = kgStats(m.entry);
+            return (
+              <div key={m.node.id} className={`bafu-closest-row ${m.relationship === "self" ? "bafu-closest-self" : ""}`}>
+                <div className="bafu-closest-rank">{i + 1}</div>
+                <div className="bafu-closest-info">
+                  <span className="bafu-closest-name">{m.node.code} — {m.node.name}</span>
+                  <span className="bafu-closest-meta">
+                    <span className={`bafu-closest-rel bafu-rel-${m.relationship}`}>
+                      {REL_LABELS[m.relationship]}
+                    </span>
+                    <span className="bafu-closest-dist">
+                      {m.distance === 0 ? "exact" : `${m.distance} level${m.distance > 1 ? "s" : ""} away`}
+                      {m.levelsUp > 0 && m.levelsDown > 0 && ` (${m.levelsUp}↑ ${m.levelsDown}↓)`}
+                      {m.levelsUp > 0 && m.levelsDown === 0 && ` (${m.levelsUp}↑)`}
+                      {m.levelsUp === 0 && m.levelsDown > 0 && ` (${m.levelsDown}↓)`}
+                    </span>
+                    <span className="bafu-closest-hs">BAFU {m.bafuKey}</span>
+                  </span>
+                  {m.sharedAncestor && (
+                    <span className="bafu-closest-ancestor">via {m.sharedAncestor}</span>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+                <div className="bafu-closest-data">
+                  <span className="bafu-closest-count">{m.entry.withGhgData} proc.</span>
+                  {kg && (
+                    <span className="bafu-closest-ghg">
+                      {formatGhg(kg.median)} <span className="bafu-closest-unit">kg CO₂e/kg</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -4285,8 +4389,8 @@ function AppContent() {
               <BafuFactorDisplay entry={bafuFactor} getChain={getBafuChain} onOpenTab={openAboutTab} />
             )}
 
-            {data.bafuCoverage && selectedNode && (
-              <FindClosestBafu nodeName={selectedNode.name} bafuCoverage={data.bafuCoverage} />
+            {data.bafuCoverage && selectedNode && selectedFrom && (
+              <FindClosestBafu selectedNode={selectedNode} tree={getTreeData(selectedFrom)} taxonomy={selectedFrom} data={data} />
             )}
 
             {gabiFactor && gabiFactor.processCount > 0 && (
