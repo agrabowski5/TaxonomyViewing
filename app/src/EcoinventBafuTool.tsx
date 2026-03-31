@@ -23,6 +23,163 @@ interface ComparisonResult {
   ecoinventHsCode: string | null;
 }
 
+// ===== BM25 Search Engine =====
+
+// Tokenize text into stemmed terms for BM25 indexing
+const BM25_STOP_WORDS = new Set([
+  "a", "an", "the", "of", "in", "at", "for", "to", "and", "or", "by", "from",
+  "with", "on", "per", "not", "no", "is", "are", "its", "be", "as", "was",
+]);
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9àâäéèêëïîôùûüÿçñ]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(t => t.length > 1 && !BM25_STOP_WORDS.has(t));
+}
+
+// Simple suffix stemmer — strips common suffixes for better recall
+function stem(word: string): string {
+  if (word.length <= 4) return word;
+  return word
+    .replace(/ies$/, "y")
+    .replace(/ing$/, "")
+    .replace(/tion$/, "t")
+    .replace(/ness$/, "")
+    .replace(/ment$/, "")
+    .replace(/able$/, "")
+    .replace(/ised$/, "")
+    .replace(/ized$/, "")
+    .replace(/ous$/, "")
+    .replace(/ive$/, "")
+    .replace(/ed$/, "")
+    .replace(/er$/, "")
+    .replace(/ly$/, "")
+    .replace(/es$/, "")
+    .replace(/s$/, "");
+}
+
+function stemTokenize(text: string): string[] {
+  return tokenize(text).map(stem);
+}
+
+interface BM25Index {
+  products: ProductIndex[];
+  // Per-document: { term → count }
+  docTermFreqs: Map<string, number>[];
+  // Document lengths (number of terms)
+  docLengths: number[];
+  // Average document length
+  avgDocLen: number;
+  // Global: term → number of documents containing it
+  df: Map<string, number>;
+  // Total number of documents
+  N: number;
+  // Raw (unstemmed) tokens per document for exact-match boosting
+  rawTokens: Set<string>[];
+  // Lowercase product names for substring matching
+  lowerNames: string[];
+}
+
+// BM25 parameters (tuned for short product-name documents)
+const K1 = 1.2;   // term saturation
+const B = 0.3;     // length normalization (low because names are similar length)
+
+function buildBM25Index(products: ProductIndex[]): BM25Index {
+  const docTermFreqs: Map<string, number>[] = [];
+  const docLengths: number[] = [];
+  const df = new Map<string, number>();
+  const rawTokens: Set<string>[] = [];
+  const lowerNames: string[] = [];
+
+  for (const p of products) {
+    const terms = stemTokenize(p.product);
+    const raw = new Set(tokenize(p.product));
+    const tf = new Map<string, number>();
+    for (const t of terms) {
+      tf.set(t, (tf.get(t) || 0) + 1);
+    }
+    // Track which terms appear in this document (for DF)
+    for (const t of tf.keys()) {
+      df.set(t, (df.get(t) || 0) + 1);
+    }
+    docTermFreqs.push(tf);
+    docLengths.push(terms.length);
+    rawTokens.push(raw);
+    lowerNames.push(p.product.toLowerCase());
+  }
+
+  const avgDocLen = docLengths.reduce((a, b) => a + b, 0) / (products.length || 1);
+
+  return { products, docTermFreqs, docLengths, avgDocLen, df, N: products.length, rawTokens, lowerNames };
+}
+
+function searchBM25(index: BM25Index, query: string): ProductIndex[] {
+  if (!query.trim()) return [];
+
+  // Strip common ecoinvent activity prefixes to get the product name
+  const cleaned = query.toLowerCase()
+    .replace(/^market\s+for\s+/i, "")
+    .replace(/^market\s+group\s+for\s+/i, "")
+    .replace(/^treatment\s+of\s+/i, "")
+    .replace(/^production\s+of\s+/i, "")
+    .replace(/^processing\s+of\s+/i, "")
+    .trim();
+  if (!cleaned) return [];
+
+  const queryTerms = stemTokenize(cleaned);
+  const rawQueryTerms = tokenize(cleaned);
+  if (queryTerms.length === 0) return [];
+
+  const { products, docTermFreqs, docLengths, avgDocLen, df, N, rawTokens, lowerNames } = index;
+  const scores: { idx: number; score: number }[] = [];
+
+  for (let i = 0; i < N; i++) {
+    const tf = docTermFreqs[i];
+    const dl = docLengths[i];
+    let bm25Score = 0;
+
+    // BM25 score
+    for (const term of queryTerms) {
+      const termTf = tf.get(term) || 0;
+      if (termTf === 0) continue;
+      const termDf = df.get(term) || 0;
+      // IDF with smoothing (BM25 variant that avoids negative IDF)
+      const idf = Math.log((N - termDf + 0.5) / (termDf + 0.5) + 1);
+      const tfNorm = (termTf * (K1 + 1)) / (termTf + K1 * (1 - B + B * dl / avgDocLen));
+      bm25Score += idf * tfNorm;
+    }
+
+    if (bm25Score <= 0) continue;
+
+    // Boost: exact unstemmed token matches (rewards precision)
+    let exactBoost = 0;
+    for (const qt of rawQueryTerms) {
+      if (rawTokens[i].has(qt)) exactBoost += 0.5;
+    }
+
+    // Boost: substring match of full query in product name
+    const name = lowerNames[i];
+    let substringBoost = 0;
+    if (name === cleaned) substringBoost = 3.0;           // exact full match
+    else if (name.startsWith(cleaned)) substringBoost = 2.0;  // starts with
+    else if (name.includes(cleaned)) substringBoost = 1.0;    // contains
+
+    // Boost: query covers most of the product name (penalize very long names with partial match)
+    const coverageRatio = queryTerms.length / Math.max(dl, 1);
+    const coverageBoost = Math.min(coverageRatio, 1.0) * 0.5;
+
+    scores.push({ idx: i, score: bm25Score + exactBoost + substringBoost + coverageBoost });
+  }
+
+  scores.sort((a, b) => b.score - a.score);
+  return scores.slice(0, 50).map(s => products[s.idx]);
+}
+
+// ===== Product Index Builder =====
+
 function buildProductIndex(ecoinvent: EcoinventMapping): ProductIndex[] {
   const seen = new Map<string, ProductIndex>();
 
@@ -59,41 +216,6 @@ function buildProductIndex(ecoinvent: EcoinventMapping): ProductIndex[] {
   }
 
   return Array.from(seen.values());
-}
-
-function searchProducts(index: ProductIndex[], query: string): ProductIndex[] {
-  if (!query.trim()) return [];
-  // Strip common ecoinvent prefixes
-  const cleaned = query.toLowerCase()
-    .replace(/^market\s+for\s+/i, "")
-    .replace(/^treatment\s+of\s+/i, "")
-    .replace(/^production\s+of\s+/i, "")
-    .trim();
-  if (!cleaned) return [];
-
-  const tokens = cleaned.split(/\s+/).filter(t => t.length > 1);
-
-  const scored = index
-    .map(entry => {
-      const name = entry.product.toLowerCase();
-      // Exact match
-      if (name === cleaned) return { entry, score: 100 };
-      // Starts with
-      if (name.startsWith(cleaned)) return { entry, score: 80 };
-      // Contains full query
-      if (name.includes(cleaned)) return { entry, score: 60 };
-      // All tokens present
-      const allTokens = tokens.every(t => name.includes(t));
-      if (allTokens) return { entry, score: 40 };
-      // Some tokens present
-      const matchCount = tokens.filter(t => name.includes(t)).length;
-      if (matchCount > 0) return { entry, score: matchCount / tokens.length * 30 };
-      return { entry, score: 0 };
-    })
-    .filter(s => s.score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  return scored.slice(0, 50).map(s => s.entry);
 }
 
 function resolveToHsCodes(
@@ -325,9 +447,13 @@ export function EcoinventBafuTool({ data }: { data: AppData }) {
     return buildProductIndex(data.ecoinventMapping);
   }, [data.ecoinventMapping]);
 
+  const bm25Index = useMemo(() => {
+    return buildBM25Index(productIndex);
+  }, [productIndex]);
+
   const searchResults = useMemo(() => {
-    return searchProducts(productIndex, query);
-  }, [productIndex, query]);
+    return searchBM25(bm25Index, query);
+  }, [bm25Index, query]);
 
   const comparisonResults = useMemo((): ComparisonResult[] => {
     if (!data.concordance || !data.bafuCoverage) return [];
