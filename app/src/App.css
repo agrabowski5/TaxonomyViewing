@@ -3445,6 +3445,13 @@
   word-break: break-word;
 }
 
+.lca-hl {
+  background: #fef08a;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 .lca-system-badge {
   display: inline-block;
   padding: 1px 5px;

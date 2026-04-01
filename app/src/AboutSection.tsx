@@ -2359,6 +2359,23 @@ function matchesSearch(terms: string[], ...fields: string[]): boolean {
 
 const PAGE_SIZE = 200;
 
+// Highlight search term matches in text with <mark> tags
+function HL({ text, terms }: { text: string; terms: string[] }) {
+  if (!terms.length || !text) return <>{text}</>;
+  // Build a regex matching any term (case-insensitive)
+  const escaped = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+  const parts = text.split(regex);
+  if (parts.length <= 1) return <>{text}</>;
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? <mark key={i} className="lca-hl">{part}</mark> : part
+      )}
+    </>
+  );
+}
+
 function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData | null; initialDb?: string; initialSearch?: string }) {
   const [db, setDb] = useState<LcaDb>((initialDb as LcaDb) || "ecoinvent");
   const [search, setSearch] = useState(initialSearch ?? "");
@@ -2608,12 +2625,12 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
             <tbody>
               {(rows as { code: string; system: string; products: string[]; count: number; type: string; isAncestor: boolean }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
-                  <td className="lca-code">{r.code}</td>
+                  <td className="lca-code"><HL text={r.code} terms={searchTerms} /></td>
                   <td><span className="lca-system-badge" style={{ backgroundColor: r.system === "CPC" ? "#0891b2" : r.system === "HS" ? "#4f46e5" : "#0c4a6e" }}>{r.system}</span></td>
                   <td className="lca-num">{r.count}</td>
                   <td><span className={`lca-mapping-badge ${r.type === "1:1" ? "lca-m-one" : "lca-m-many"}`}>{r.type}</span></td>
                   <td className="lca-num">{r.isAncestor && <span className="conc-partial-badge">ancestor</span>}</td>
-                  <td className="lca-products">{r.products.join("; ")}</td>
+                  <td className="lca-products"><HL text={r.products.join("; ")} terms={searchTerms} /></td>
                 </tr>
               ))}
             </tbody>
@@ -2636,9 +2653,9 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
             <tbody>
               {(rows as { hs: string; naics: string; desc: string; factor: number; production: number; margins: number; unit: string }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
-                  <td className="lca-code">{r.hs}</td>
-                  <td className="lca-code">{r.naics}</td>
-                  <td>{r.desc}</td>
+                  <td className="lca-code"><HL text={r.hs} terms={searchTerms} /></td>
+                  <td className="lca-code"><HL text={r.naics} terms={searchTerms} /></td>
+                  <td><HL text={r.desc} terms={searchTerms} /></td>
                   <td className="lca-num">{r.factor.toFixed(3)}</td>
                   <td className="lca-num">{r.production.toFixed(3)}</td>
                   <td className="lca-num">{r.margins.toFixed(3)}</td>
@@ -2664,12 +2681,12 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
             <tbody>
               {(rows as { product: string; hsCodes: string[]; cpaCodes: string[]; isicCodes: string[]; naceCodes: string[]; factor: number | null; unit: string }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
-                  <td className="lca-products">{r.product}</td>
+                  <td className="lca-products"><HL text={r.product} terms={searchTerms} /></td>
                   <td className="lca-num" title={r.unit}>{r.factor !== null ? r.factor.toFixed(3) : <span className="lca-none">&mdash;</span>}</td>
-                  <td className="lca-code-list">{r.hsCodes.length > 0 ? r.hsCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
-                  <td className="lca-code-list">{r.cpaCodes.length > 0 ? r.cpaCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
-                  <td className="lca-code-list">{r.isicCodes.length > 0 ? r.isicCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
-                  <td className="lca-code-list">{r.naceCodes.length > 0 ? r.naceCodes.join(", ") : <span className="lca-none">&mdash;</span>}</td>
+                  <td className="lca-code-list">{r.hsCodes.length > 0 ? <HL text={r.hsCodes.join(", ")} terms={searchTerms} /> : <span className="lca-none">&mdash;</span>}</td>
+                  <td className="lca-code-list">{r.cpaCodes.length > 0 ? <HL text={r.cpaCodes.join(", ")} terms={searchTerms} /> : <span className="lca-none">&mdash;</span>}</td>
+                  <td className="lca-code-list">{r.isicCodes.length > 0 ? <HL text={r.isicCodes.join(", ")} terms={searchTerms} /> : <span className="lca-none">&mdash;</span>}</td>
+                  <td className="lca-code-list">{r.naceCodes.length > 0 ? <HL text={r.naceCodes.join(", ")} terms={searchTerms} /> : <span className="lca-none">&mdash;</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -2690,13 +2707,13 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
             <tbody>
               {(rows as { hs: string; naics: string; processes: number; withGhg: number; processDetails: { name: string; ghg: number; unit: string }[] }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
-                  <td className="lca-code">{r.hs}</td>
-                  <td className="lca-code">{r.naics}</td>
+                  <td className="lca-code"><HL text={r.hs} terms={searchTerms} /></td>
+                  <td className="lca-code"><HL text={r.naics} terms={searchTerms} /></td>
                   <td className="lca-num">{r.processes}</td>
                   <td className="lca-num">{r.withGhg}</td>
-                  <td className="lca-products">{r.processDetails.map(p =>
+                  <td className="lca-products"><HL text={r.processDetails.map(p =>
                     p.ghg > 0 ? `${p.name} (${p.ghg.toFixed(4)} kg CO₂e/${p.unit})` : p.name
-                  ).join("; ")}</td>
+                  ).join("; ")} terms={searchTerms} /></td>
                 </tr>
               ))}
             </tbody>
@@ -2717,13 +2734,13 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
             <tbody>
               {(rows as { chapter: string; processes: number; withGhg: number; unitSummary: string; processDetails: { name: string; ghg: number; unit: string }[] }[]).slice(0, visibleCount).map((r, i) => (
                 <tr key={i}>
-                  <td className="lca-code">{r.chapter}</td>
+                  <td className="lca-code"><HL text={r.chapter} terms={searchTerms} /></td>
                   <td className="lca-num">{r.processes}</td>
                   <td className="lca-num">{r.withGhg}</td>
-                  <td className="lca-unit" title={r.unitSummary}>{r.unitSummary}</td>
-                  <td className="lca-products">{r.processDetails.map(p =>
+                  <td className="lca-unit" title={r.unitSummary}><HL text={r.unitSummary} terms={searchTerms} /></td>
+                  <td className="lca-products"><HL text={r.processDetails.map(p =>
                     p.ghg > 0 ? `${p.name} (${p.ghg.toFixed(4)} kg CO₂e/${p.unit})` : p.name
-                  ).join("; ")}</td>
+                  ).join("; ")} terms={searchTerms} /></td>
                 </tr>
               ))}
             </tbody>
