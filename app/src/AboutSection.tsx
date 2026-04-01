@@ -2695,7 +2695,7 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
                   <td className="lca-num">{r.processes}</td>
                   <td className="lca-num">{r.withGhg}</td>
                   <td className="lca-products">{r.processDetails.map(p =>
-                    p.ghg > 0 ? `${p.name} (${p.ghg.toFixed(4)} ${p.unit})` : p.name
+                    p.ghg > 0 ? `${p.name} (${p.ghg.toFixed(4)} kg CO₂e/${p.unit})` : p.name
                   ).join("; ")}</td>
                 </tr>
               ))}
@@ -2722,7 +2722,7 @@ function LcaDataBrowserTab({ data, initialDb, initialSearch }: { data: AppData |
                   <td className="lca-num">{r.withGhg}</td>
                   <td className="lca-unit" title={r.unitSummary}>{r.unitSummary}</td>
                   <td className="lca-products">{r.processDetails.map(p =>
-                    p.ghg > 0 ? `${p.name} (${p.ghg.toFixed(4)} ${p.unit})` : p.name
+                    p.ghg > 0 ? `${p.name} (${p.ghg.toFixed(4)} kg CO₂e/${p.unit})` : p.name
                   ).join("; ")}</td>
                 </tr>
               ))}
