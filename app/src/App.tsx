@@ -2804,9 +2804,9 @@ function filterTreeData(tree: TreeNode[], term: string): TreeNode[] {
     return filterSub(tree);
   }
 
-  // Score and filter: each node gets a score; branches are sorted by best descendant score
-  function filterAndScore(nodes: TreeNode[]): { node: TreeNode; score: number }[] {
-    const result: { node: TreeNode; score: number }[] = [];
+  // Score and filter: direct matches float to top, ancestors only shown as paths to matches
+  function filterAndScore(nodes: TreeNode[]): { node: TreeNode; score: number; direct: boolean }[] {
+    const result: { node: TreeNode; score: number; direct: boolean }[] = [];
 
     for (const node of nodes) {
       const nodeScore = scoreNodeBM25(
@@ -2815,23 +2815,37 @@ function filterTreeData(tree: TreeNode[], term: string): TreeNode[] {
       );
 
       if (nodeScore > 0 && (!node.children || node.children.length === 0)) {
-        // Leaf match
-        result.push({ node, score: nodeScore });
-      } else if (nodeScore > 0 && node.children) {
-        // Branch match — include with all children, scored by this node
-        result.push({ node, score: nodeScore });
+        // Leaf match — direct
+        result.push({ node, score: nodeScore, direct: true });
       } else if (node.children) {
-        // Node doesn't match — check descendants
+        // Branch node — always check descendants regardless of own match
         const scoredChildren = filterAndScore(node.children);
-        if (scoredChildren.length > 0) {
-          // Sort children by score (best first)
-          scoredChildren.sort((a, b) => b.score - a.score);
+
+        if (nodeScore > 0 && scoredChildren.length === 0) {
+          // Branch matches but no children match — show it directly
+          // but DON'T include all children (they'd just be noise)
+          result.push({ node: { ...node, children: [] }, score: nodeScore, direct: true });
+        } else if (scoredChildren.length > 0) {
+          // Has matching descendants — sort them, best first
+          scoredChildren.sort((a, b) => {
+            // Direct matches first, then by score
+            if (a.direct !== b.direct) return a.direct ? -1 : 1;
+            return b.score - a.score;
+          });
           const bestChildScore = scoredChildren[0].score;
           const sortedChildren = scoredChildren.map(sc => sc.node);
+          // Use own score if higher (the node itself matches), else inherit from children
+          const effectiveScore = nodeScore > 0
+            ? Math.max(nodeScore, bestChildScore)
+            : bestChildScore * 0.95;
           result.push({
             node: { ...node, children: sortedChildren },
-            score: bestChildScore * 0.95, // slightly discount inherited scores
+            score: effectiveScore,
+            direct: nodeScore > 0,
           });
+        } else if (nodeScore > 0) {
+          // Branch matches, no descendant matches — show as leaf
+          result.push({ node: { ...node, children: [] }, score: nodeScore, direct: true });
         }
       }
     }
@@ -2840,7 +2854,11 @@ function filterTreeData(tree: TreeNode[], term: string): TreeNode[] {
   }
 
   const scored = filterAndScore(tree);
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => {
+    // Direct matches first, then by score
+    if (a.direct !== b.direct) return a.direct ? -1 : 1;
+    return b.score - a.score;
+  });
   return scored.map(s => s.node);
 }
 
@@ -4124,6 +4142,7 @@ function AppContent() {
                 side="left"
                 gapHighlight={gapHighlight?.taxonomy === leftTaxonomy ? gapHighlight : undefined}
                 onClearGapHighlight={() => setGapHighlight(null)}
+                searchTerm={debouncedSearch}
               />
             ) : (
               <GraphTree
@@ -4229,6 +4248,7 @@ function AppContent() {
                   bafuCoverage={rightBafuCoverage}
                   gabiCoverage={rightGabiCoverage}
                   side="right"
+                  searchTerm={debouncedSearch}
                 />
               ) : (
                 <GraphTree

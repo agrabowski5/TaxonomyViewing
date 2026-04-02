@@ -13,6 +13,24 @@ interface Props extends NodeRendererProps<TNode> {
   uslciCoverage?: Map<string, CoverageInfo>;
   gabiCoverage?: Map<string, CoverageInfo>;
   gapHighlight?: GapHighlightData;
+  searchTerm?: string;
+}
+
+function HighlightName({ text, search }: { text: string; search?: string }) {
+  if (!search || !search.trim()) return <>{text}</>;
+  const terms = search.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+  if (terms.length === 0) return <>{text}</>;
+  const escaped = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+  const parts = text.split(regex);
+  if (parts.length <= 1) return <>{text}</>;
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? <mark key={i} className="tree-hl">{part}</mark> : part
+      )}
+    </>
+  );
 }
 
 function fmtBadge(letter: string, info: CoverageInfo): string {
@@ -28,7 +46,7 @@ function countDescendants(n: TNode): number {
   return count;
 }
 
-export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage, uslciCoverage, bafuCoverage, gabiCoverage, gapHighlight }: Props) {
+export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, colorMap, ecoinventCoverage, epaCoverage, exiobaseCoverage, uslciCoverage, bafuCoverage, gabiCoverage, gapHighlight, searchTerm }: Props) {
   const data = node.data;
   const info = mappingInfo?.[data.id];
   const color = colorMap?.[data.id] || "#6b7280";
@@ -73,7 +91,7 @@ export function TreeNodeRenderer({ node, style, mappingInfo, onNodeSelect, color
         {data.code}
       </span>
       <span className="node-name" title={data.name}>
-        {data.name}
+        <HighlightName text={data.name} search={searchTerm} />
       </span>
       {descendantCount > 0 && (
         <span className="descendant-count" title={`${descendantCount} items underneath`}>

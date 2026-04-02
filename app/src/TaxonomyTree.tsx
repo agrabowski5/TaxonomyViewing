@@ -32,6 +32,7 @@ interface Props {
   side?: "left" | "right";
   gapHighlight?: GapHighlightData;
   onClearGapHighlight?: () => void;
+  searchTerm?: string;
 }
 
 export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function TaxonomyTree(
@@ -54,6 +55,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
     side,
     gapHighlight,
     onClearGapHighlight,
+    searchTerm,
   },
   ref
 ) {
@@ -112,6 +114,7 @@ export const TaxonomyTree = forwardRef<TreeApi<TreeNode>, Props>(function Taxono
               bafuCoverage={bafuCoverage}
               gabiCoverage={gabiCoverage}
               gapHighlight={gapHighlight}
+              searchTerm={searchTerm}
             />
           )}
         </Tree>

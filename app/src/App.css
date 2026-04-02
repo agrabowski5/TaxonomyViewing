@@ -1029,6 +1029,13 @@
   color: #854d0e;
 }
 
+.tree-hl {
+  background: #fef08a;
+  color: #854d0e;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 /* ===== Comparison Panel ===== */
 .comparison-panel {
   position: fixed;
