@@ -86,8 +86,26 @@ PAIRS = [
     ("BAFU2HS",          "BAFU",      "HS"),
 ]
 
+# Auto-generate the 6 new code-system pairs against each of the 5 hub DBs
+_HUB_DBS = ["HS", "UNSPSC", "USEEIO", "ECOINVENT", "BAFU"]
+_HUB_KEY = {"HS": "HS", "UNSPSC": "UNSPSC", "USEEIO": "USEEIO",
+            "ECOINVENT": "EI", "BAFU": "BAFU"}
+for _src in ["CPC", "NAICS", "ISIC", "NACE", "CPA", "BEA"]:
+    for _dst in _HUB_DBS:
+        PAIRS.append((f"{_src}2{_HUB_KEY[_dst]}", _src, _dst))
+
 UNSPSC_LOOKUP = ROOT / "app" / "public" / "data" / "unspsc-lookup.json"
 HS_LOOKUP = ROOT / "app" / "public" / "data" / "hs-lookup.json"
+
+# Generic per-taxonomy lookup files. Path format mirrors React tree node IDs.
+GENERIC_LOOKUPS = {
+    "CPC":   (ROOT / "app" / "public" / "data" / "cpc-lookup.json",   "cpc-"),
+    "NAICS": (ROOT / "app" / "public" / "data" / "naics-lookup.json", "naics-"),
+    "ISIC":  (ROOT / "app" / "public" / "data" / "isic-lookup.json",  "isic-"),
+    "NACE":  (ROOT / "app" / "public" / "data" / "nace-lookup.json",  "nace-"),
+    "CPA":   (ROOT / "app" / "public" / "data" / "cpa-lookup.json",   "cpa-"),
+    "BEA":   (ROOT / "app" / "public" / "data" / "bea-lookup.json",   "bea-"),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +198,35 @@ def _load_hs_pool():
     return pool
 
 
+def _load_generic_taxonomy_pool(lookup_path, id_prefix):
+    """Build an entity pool from any taxonomy whose lookup matches the
+    {code, description, sectionName, type} schema. Embedding text is
+    description + section context + level/code, mirroring the HS loader."""
+    if not lookup_path.exists():
+        print(f"  WARN: {lookup_path} missing — skipping", file=sys.stderr)
+        return {}
+    with open(lookup_path, encoding="utf-8") as f:
+        lookup = json.load(f)
+    pool = {}
+    for code, entry in lookup.items():
+        desc = entry.get("description", "").strip()
+        if not desc:
+            continue
+        section_name = entry.get("sectionName", "").strip()
+        level_label = entry.get("type", "")
+        product_parts = []
+        if section_name and section_name != desc:
+            product_parts.append(section_name)
+        if level_label:
+            product_parts.append(f"{level_label} {code}")
+        pool[f"{id_prefix}{code}"] = {
+            "name": desc,
+            "product": " - ".join(product_parts) if product_parts else code,
+            "geo": "",
+        }
+    return pool
+
+
 def collect_entities():
     """Return {db_name: {path: {"name", "product", "geo"}}} for every DB
     referenced by the active PAIRS list."""
@@ -191,6 +238,9 @@ def collect_entities():
         pool["UNSPSC"] = _load_unspsc_pool()
     if "HS" in needed:
         pool["HS"] = _load_hs_pool()
+    for db_name, (lookup_path, id_prefix) in GENERIC_LOOKUPS.items():
+        if db_name in needed:
+            pool[db_name] = _load_generic_taxonomy_pool(lookup_path, id_prefix)
     for db in sorted(needed):
         items = pool.get(db, {})
         print(f"  {db}: {len(items):,} unique entities")

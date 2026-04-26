@@ -60,26 +60,51 @@ def merge(out_dict, fname, side_key):
     print(f"  {fname}: merged {len(ds['rows']):,} rows -> .{side_key}")
 
 
+def build_source(prefix, target_files):
+    """Build a {code: {<target>: match}} dict for one source taxonomy
+    by merging the listed pair files."""
+    out = {}
+    for target_key, fname in target_files.items():
+        merge(out, fname, target_key)
+    return out
+
+
 def main():
-    unspsc = {}
-    merge(unspsc, "UNSPSC2USEEIO.json",    "useeio")
-    merge(unspsc, "UNSPSC2ECOINVENT.json", "ecoinvent")
-    merge(unspsc, "UNSPSC2BAFU.json",      "bafu")
-    merge(unspsc, "UNSPSC2HS.json",        "hs")
+    out = {
+        "unspsc": build_source("UNSPSC", {
+            "useeio":    "UNSPSC2USEEIO.json",
+            "ecoinvent": "UNSPSC2ECOINVENT.json",
+            "bafu":      "UNSPSC2BAFU.json",
+            "hs":        "UNSPSC2HS.json",
+        }),
+        "hs": build_source("HS", {
+            "unspsc":    "HS2UNSPSC.json",
+            "useeio":    "HS2USEEIO.json",
+            "ecoinvent": "HS2ECOINVENT.json",
+            "bafu":      "HS2BAFU.json",
+        }),
+    }
+    # 6 new taxonomy sources, each connecting to the same 5 hub DBs.
+    # Pair file naming convention: <SRC>2{HS,UNSPSC,USEEIO,EI,BAFU}.json
+    for src_key, src_prefix in [
+        ("cpc",   "CPC"),   ("naics", "NAICS"),
+        ("isic",  "ISIC"),  ("nace",  "NACE"),
+        ("cpa",   "CPA"),   ("bea",   "BEA"),
+    ]:
+        out[src_key] = build_source(src_prefix, {
+            "hs":        f"{src_prefix}2HS.json",
+            "unspsc":    f"{src_prefix}2UNSPSC.json",
+            "useeio":    f"{src_prefix}2USEEIO.json",
+            "ecoinvent": f"{src_prefix}2EI.json",
+            "bafu":      f"{src_prefix}2BAFU.json",
+        })
 
-    hs = {}
-    merge(hs, "HS2UNSPSC.json",    "unspsc")
-    merge(hs, "HS2USEEIO.json",    "useeio")
-    merge(hs, "HS2ECOINVENT.json", "ecoinvent")
-    merge(hs, "HS2BAFU.json",      "bafu")
-
-    out = {"unspsc": unspsc, "hs": hs}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     size_mb = OUT.stat().st_size / 1024 / 1024
-    print(f"\nWrote {len(unspsc):,} UNSPSC + {len(hs):,} HS entries -> "
-          f"{OUT.relative_to(ROOT)} ({size_mb:.1f} MB)")
+    summary = ", ".join(f"{k}={len(v):,}" for k, v in out.items())
+    print(f"\nWrote {summary} -> {OUT.relative_to(ROOT)} ({size_mb:.1f} MB)")
 
 
 if __name__ == "__main__":

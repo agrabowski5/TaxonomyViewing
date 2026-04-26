@@ -4400,68 +4400,59 @@ function AppContent() {
             })()}
 
             {/* Embedding-derived semantic matches.
-                Shown when the selected node can be resolved to either a
-                UNSPSC code (UNSPSC, T3 UNSPSC node) or an HS-6 code
-                (HS itself, or any HS-family taxonomy: CN, HTS, CA — and
-                T1/T2 HS-origin nodes). HS-family resolution uses the
-                first 6 digits as the HS-6 backbone. */}
+                For each source taxonomy, look up the selected node's
+                code in the corresponding embedding-matches section and
+                render the closest match in each of the hub DBs (HS,
+                UNSPSC, USEEIO, ECOINVENT, BAFU). HS-family taxonomies
+                (CN, HTS, CA, and HS-origin nodes in T1/T2) resolve via
+                the first 6 digits. */}
             {(() => {
               if (!data.embeddingMatches) return null;
 
               type Row = { db: string; m: { code: string; name: string; geo: string; sim: number } };
-              const rows: Row[] = [];
-              let sourceLabel: string | null = null;
+              const em = data.embeddingMatches;
+              const clean = stripCode(selectedNode.code);
+
+              // Resolve which section of the embedding lookup to query
+              // and what the source code is.
+              let section: keyof typeof em | null = null;
               let sourceCode: string | null = null;
+              let sourceLabel: string | null = null;
 
-              // --- UNSPSC source ---
-              let unspscCode: string | null = null;
-              if (selectedFrom === "unspsc") unspscCode = stripCode(selectedNode.code);
-              else if (selectedFrom === "t3") {
+              if (selectedFrom === "unspsc") {
+                section = "unspsc"; sourceCode = clean; sourceLabel = "UNSPSC";
+              } else if (selectedFrom === "t3") {
                 const m = selectedNode.id.match(/^t3-u-(.+)$/);
-                if (m) unspscCode = m[1];
-              }
-              if (unspscCode) {
-                const e = data.embeddingMatches.unspsc[unspscCode];
-                if (e) {
-                  if (e.hs)        rows.push({ db: "HS",        m: e.hs });
-                  if (e.useeio)    rows.push({ db: "USEEIO",    m: e.useeio });
-                  if (e.ecoinvent) rows.push({ db: "ECOINVENT", m: e.ecoinvent });
-                  if (e.bafu)      rows.push({ db: "BAFU",      m: e.bafu });
-                  sourceLabel = "UNSPSC";
-                  sourceCode = unspscCode;
-                }
-              }
-
-              // --- HS-family source: derive HS-6 from any taxonomy that
-              // shares the HS code base (HS, CN, HTS, CA). T1 HTS-origin
-              // nodes and T2 HTS-origin nodes also resolve via HS-6. ---
-              if (rows.length === 0) {
-                let hs6: string | null = null;
-                const clean = stripCode(selectedNode.code);
-                if (selectedFrom === "hs" || selectedFrom === "cn"
-                    || selectedFrom === "hts" || selectedFrom === "ca") {
-                  if (clean.length >= 6) hs6 = clean.slice(0, 6);
-                } else if (selectedFrom === "t1" || selectedFrom === "t2") {
-                  // T1 IDs: t1-* (HTS) or t1-svc-* (CPC services).
-                  // T2 IDs: t2-* (CPC) or t2-hts-* (HTS detail).
-                  const isHtsOrigin =
-                    (selectedFrom === "t1" && !selectedNode.id.startsWith("t1-svc-"))
-                    || (selectedFrom === "t2" && selectedNode.id.startsWith("t2-hts-"));
-                  if (isHtsOrigin && clean.length >= 6) hs6 = clean.slice(0, 6);
-                }
-                if (hs6) {
-                  const e = data.embeddingMatches.hs[hs6];
-                  if (e) {
-                    if (e.unspsc)    rows.push({ db: "UNSPSC",    m: e.unspsc });
-                    if (e.useeio)    rows.push({ db: "USEEIO",    m: e.useeio });
-                    if (e.ecoinvent) rows.push({ db: "ECOINVENT", m: e.ecoinvent });
-                    if (e.bafu)      rows.push({ db: "BAFU",      m: e.bafu });
-                    sourceLabel = "HS-6";
-                    sourceCode = hs6;
-                  }
-                }
+                if (m) { section = "unspsc"; sourceCode = m[1]; sourceLabel = "UNSPSC"; }
+              } else if (selectedFrom === "hs") {
+                if (clean.length >= 6) { section = "hs"; sourceCode = clean.slice(0, 6); sourceLabel = "HS-6"; }
+              } else if (selectedFrom === "cn" || selectedFrom === "hts" || selectedFrom === "ca") {
+                // HS-family — share the 6-digit HS base
+                if (clean.length >= 6) { section = "hs"; sourceCode = clean.slice(0, 6); sourceLabel = "HS-6"; }
+              } else if (selectedFrom === "t1" || selectedFrom === "t2") {
+                const isHtsOrigin =
+                  (selectedFrom === "t1" && !selectedNode.id.startsWith("t1-svc-"))
+                  || (selectedFrom === "t2" && selectedNode.id.startsWith("t2-hts-"));
+                if (isHtsOrigin && clean.length >= 6) { section = "hs"; sourceCode = clean.slice(0, 6); sourceLabel = "HS-6"; }
+              } else if (selectedFrom === "cpc" || selectedFrom === "naics"
+                         || selectedFrom === "isic" || selectedFrom === "nace"
+                         || selectedFrom === "cpa" || selectedFrom === "bea") {
+                section = selectedFrom; sourceCode = clean;
+                sourceLabel = selectedFrom.toUpperCase();
               }
 
+              if (!section || !sourceCode) return null;
+              const e = em[section]?.[sourceCode];
+              if (!e) return null;
+
+              const rows: Row[] = [];
+              // Suppress the entry that points back to the same DB as the
+              // source (e.g., an HS source's "HS" field would be itself).
+              if (e.hs        && section !== "hs")        rows.push({ db: "HS",        m: e.hs });
+              if (e.unspsc    && section !== "unspsc")    rows.push({ db: "UNSPSC",    m: e.unspsc });
+              if (e.useeio)                                rows.push({ db: "USEEIO",    m: e.useeio });
+              if (e.ecoinvent)                             rows.push({ db: "ECOINVENT", m: e.ecoinvent });
+              if (e.bafu)                                  rows.push({ db: "BAFU",      m: e.bafu });
               if (rows.length === 0) return null;
 
               return (

@@ -198,19 +198,23 @@ export interface EmbeddingMatch {
   sim: number;
 }
 
+export interface EmbeddingMatchSet {
+  hs?: EmbeddingMatch;
+  unspsc?: EmbeddingMatch;
+  useeio?: EmbeddingMatch;
+  ecoinvent?: EmbeddingMatch;
+  bafu?: EmbeddingMatch;
+}
+
 export interface EmbeddingMatches {
-  unspsc: Record<string, {
-    useeio?: EmbeddingMatch;
-    ecoinvent?: EmbeddingMatch;
-    bafu?: EmbeddingMatch;
-    hs?: EmbeddingMatch;
-  }>;
-  hs: Record<string, {
-    unspsc?: EmbeddingMatch;
-    useeio?: EmbeddingMatch;
-    ecoinvent?: EmbeddingMatch;
-    bafu?: EmbeddingMatch;
-  }>;
+  hs:     Record<string, EmbeddingMatchSet>;
+  unspsc: Record<string, EmbeddingMatchSet>;
+  cpc:    Record<string, EmbeddingMatchSet>;
+  naics:  Record<string, EmbeddingMatchSet>;
+  isic:   Record<string, EmbeddingMatchSet>;
+  nace:   Record<string, EmbeddingMatchSet>;
+  cpa:    Record<string, EmbeddingMatchSet>;
+  bea:    Record<string, EmbeddingMatchSet>;
 }
 
 export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2" | "t3"
