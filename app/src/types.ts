@@ -215,6 +215,9 @@ export interface EmbeddingMatches {
   nace:   Record<string, EmbeddingMatchSet>;
   cpa:    Record<string, EmbeddingMatchSet>;
   bea:    Record<string, EmbeddingMatchSet>;
+  cn:     Record<string, EmbeddingMatchSet>;
+  hts:    Record<string, EmbeddingMatchSet>;
+  ca:     Record<string, EmbeddingMatchSet>;
 }
 
 export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2" | "t3"

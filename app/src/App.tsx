@@ -4425,20 +4425,38 @@ function AppContent() {
                 const m = selectedNode.id.match(/^t3-u-(.+)$/);
                 if (m) { section = "unspsc"; sourceCode = m[1]; sourceLabel = "UNSPSC"; }
               } else if (selectedFrom === "hs") {
-                if (clean.length >= 6) { section = "hs"; sourceCode = clean.slice(0, 6); sourceLabel = "HS-6"; }
+                section = "hs"; sourceCode = clean; sourceLabel = `HS ${clean}`;
               } else if (selectedFrom === "cn" || selectedFrom === "hts" || selectedFrom === "ca") {
-                // HS-family — share the 6-digit HS base
-                if (clean.length >= 6) { section = "hs"; sourceCode = clean.slice(0, 6); sourceLabel = "HS-6"; }
+                // Prefer the tariff-line-specific embedding match; fall
+                // back to HS-6 if this code isn't in its own embeddings
+                // (e.g., section/chapter rows that don't appear, or
+                // codes shorter than HS-6).
+                if (em[selectedFrom]?.[selectedNode.code] || em[selectedFrom]?.[clean]) {
+                  section = selectedFrom;
+                  sourceCode = em[selectedFrom][selectedNode.code] ? selectedNode.code : clean;
+                  sourceLabel = `${selectedFrom.toUpperCase()} ${sourceCode}`;
+                } else if (clean.length >= 6) {
+                  section = "hs"; sourceCode = clean.slice(0, 6); sourceLabel = `HS-6 ${sourceCode}`;
+                }
               } else if (selectedFrom === "t1" || selectedFrom === "t2") {
                 const isHtsOrigin =
                   (selectedFrom === "t1" && !selectedNode.id.startsWith("t1-svc-"))
                   || (selectedFrom === "t2" && selectedNode.id.startsWith("t2-hts-"));
-                if (isHtsOrigin && clean.length >= 6) { section = "hs"; sourceCode = clean.slice(0, 6); sourceLabel = "HS-6"; }
+                if (isHtsOrigin) {
+                  // Try HTS first (full tariff-line precision), fall back to HS-6
+                  if (em.hts?.[selectedNode.code] || em.hts?.[clean]) {
+                    section = "hts";
+                    sourceCode = em.hts[selectedNode.code] ? selectedNode.code : clean;
+                    sourceLabel = `HTS ${sourceCode}`;
+                  } else if (clean.length >= 6) {
+                    section = "hs"; sourceCode = clean.slice(0, 6); sourceLabel = `HS-6 ${sourceCode}`;
+                  }
+                }
               } else if (selectedFrom === "cpc" || selectedFrom === "naics"
                          || selectedFrom === "isic" || selectedFrom === "nace"
                          || selectedFrom === "cpa" || selectedFrom === "bea") {
                 section = selectedFrom; sourceCode = clean;
-                sourceLabel = selectedFrom.toUpperCase();
+                sourceLabel = `${selectedFrom.toUpperCase()} ${clean}`;
               }
 
               if (!section || !sourceCode) return null;
@@ -4459,7 +4477,7 @@ function AppContent() {
                 <div className="comparison-item mapped-item embedding-item">
                   <h4>Embedding-Derived Semantic Matches
                     <span className="embedding-source">
-                      from {sourceLabel} {sourceCode} · embeddinggemma · cosine
+                      from {sourceLabel} · embeddinggemma · cosine
                     </span>
                   </h4>
                   {rows.map((r, i) => (

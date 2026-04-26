@@ -90,6 +90,7 @@ def main():
         ("cpc",   "CPC"),   ("naics", "NAICS"),
         ("isic",  "ISIC"),  ("nace",  "NACE"),
         ("cpa",   "CPA"),   ("bea",   "BEA"),
+        ("cn",    "CN"),    ("hts",   "HTS"),    ("ca",    "CA"),
     ]:
         out[src_key] = build_source(src_prefix, {
             "hs":        f"{src_prefix}2HS.json",

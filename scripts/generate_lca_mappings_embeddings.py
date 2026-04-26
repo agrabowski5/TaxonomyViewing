@@ -94,6 +94,12 @@ for _src in ["CPC", "NAICS", "ISIC", "NACE", "CPA", "BEA"]:
     for _dst in _HUB_DBS:
         PAIRS.append((f"{_src}2{_HUB_KEY[_dst]}", _src, _dst))
 
+# HS-family tariff lines (CN-8, HTS-10, CA-10) get their own embeddings
+# rather than relying on HS-6 fallback.
+for _src in ["CN", "HTS", "CA"]:
+    for _dst in _HUB_DBS:
+        PAIRS.append((f"{_src}2{_HUB_KEY[_dst]}", _src, _dst))
+
 UNSPSC_LOOKUP = ROOT / "app" / "public" / "data" / "unspsc-lookup.json"
 HS_LOOKUP = ROOT / "app" / "public" / "data" / "hs-lookup.json"
 
@@ -105,6 +111,9 @@ GENERIC_LOOKUPS = {
     "NACE":  (ROOT / "app" / "public" / "data" / "nace-lookup.json",  "nace-"),
     "CPA":   (ROOT / "app" / "public" / "data" / "cpa-lookup.json",   "cpa-"),
     "BEA":   (ROOT / "app" / "public" / "data" / "bea-lookup.json",   "bea-"),
+    "CN":    (ROOT / "app" / "public" / "data" / "cn-lookup.json",    "cn-"),
+    "HTS":   (ROOT / "app" / "public" / "data" / "hts-lookup.json",   "hts-"),
+    "CA":    (ROOT / "app" / "public" / "data" / "ca-lookup.json",    "ca-"),
 }
 
 
