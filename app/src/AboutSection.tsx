@@ -1,4 +1,4 @@
-import { useState, useMemo, useImperativeHandle, forwardRef, Fragment } from "react";
+import { useState, useMemo, useEffect, useImperativeHandle, forwardRef, Fragment } from "react";
 import type { AppData, TreeNode, TaxonomyType, GenericConcordance, LookupEntry } from "./types";
 
 export type TabNavContext = {
@@ -8,7 +8,7 @@ export type TabNavContext = {
 };
 
 export type AboutSectionHandle = {
-  openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances", ctx?: TabNavContext) => void;
+  openToTab: (tab: "taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances" | "review", ctx?: TabNavContext) => void;
   close: () => void;
 };
 
@@ -2825,14 +2825,31 @@ function ConcordanceBrowserTab({ data, initialConc, initialSearch }: { data: App
     }
 
     if (conc === "unspscHs" && data.unspscHsMapping) {
+      const entries = Object.entries(data.unspscHsMapping.unspscToHs);
+      if (searchTerms.length) {
+        // When searching, materialize only matching rows
+        const out: ConcRow[] = [];
+        for (const [unspsc, mappings] of entries) {
+          const fd = describeCode(unspsc, "UNSPSC", data);
+          for (const m of mappings) {
+            const td = describeCode(m.code, "HS", data);
+            if (matchesSearch(searchTerms, unspsc, fd, m.code, td))
+              out.push({ from: unspsc, fromDesc: fd, to: m.code, toDesc: td, partial: "", similarity: (m.similarity * 100).toFixed(1) + "%" });
+          }
+        }
+        return out;
+      }
+      // No search: materialize only the first page worth of rows to avoid freezing
+      const MAX_ROWS = 5000;
       const out: ConcRow[] = [];
-      for (const [unspsc, mappings] of Object.entries(data.unspscHsMapping.unspscToHs)) {
+      for (const [unspsc, mappings] of entries) {
         const fd = describeCode(unspsc, "UNSPSC", data);
         for (const m of mappings) {
           out.push({ from: unspsc, fromDesc: fd, to: m.code, toDesc: describeCode(m.code, "HS", data), partial: "", similarity: (m.similarity * 100).toFixed(1) + "%" });
+          if (out.length >= MAX_ROWS) break;
         }
+        if (out.length >= MAX_ROWS) break;
       }
-      if (searchTerms.length) return out.filter(r => matchesSearch(searchTerms, r.from, r.fromDesc, r.to, r.toDesc));
       return out;
     }
 
@@ -2882,23 +2899,52 @@ function ConcordanceBrowserTab({ data, initialConc, initialSearch }: { data: App
     return [];
   }, [data, conc, searchTerms]);
 
-  // Summary stats
+  // Summary stats — for unspscHs without search, compute from raw data to avoid materializing 300K rows
   const stats = useMemo(() => {
+    if (conc === "unspscHs" && !searchTerms.length && data?.unspscHsMapping) {
+      const mapping = data.unspscHsMapping.unspscToHs;
+      const uniqueFrom = new Set<string>();
+      const uniqueTo = new Set<string>();
+      const fromToCount = new Map<string, number>();
+      const toFromCount = new Map<string, number>();
+      let totalMappings = 0;
+      for (const [unspsc, mappings] of Object.entries(mapping)) {
+        uniqueFrom.add(unspsc);
+        fromToCount.set(unspsc, mappings.length);
+        totalMappings += mappings.length;
+        for (const m of mappings) {
+          uniqueTo.add(m.code);
+          toFromCount.set(m.code, (toFromCount.get(m.code) ?? 0) + 1);
+        }
+      }
+      // Build from→first-to map for 1:1 calc
+      const fromFirstTo = new Map<string, string>();
+      for (const [unspsc, mappings] of Object.entries(mapping)) {
+        if (mappings.length === 1) fromFirstTo.set(unspsc, mappings[0].code);
+      }
+      const oneToOne = [...fromFirstTo.entries()].filter(([, to]) => (toFromCount.get(to) ?? 0) === 1).length;
+      const oneToMany = [...fromToCount.values()].filter(v => v > 1).length;
+      const manyToOne = [...toFromCount.values()].filter(v => v > 1).length;
+      return { uniqueFrom: uniqueFrom.size, uniqueTo: uniqueTo.size, partialCount: 0, oneToOne, oneToMany, manyToOne, totalMappings };
+    }
     const uniqueFrom = new Set(rows.map(r => r.from));
     const uniqueTo = new Set(rows.map(r => r.to));
     const partialCount = rows.filter(r => r.partial === "partial").length;
-    // Cardinality: count how many "from" codes map to >1 "to" codes and vice versa
     const fromToCount = new Map<string, number>();
     const toFromCount = new Map<string, number>();
+    // Also build from→to map for 1:1 codes (avoid O(n²) rows.find)
+    const fromFirstTo = new Map<string, string>();
     for (const r of rows) {
-      fromToCount.set(r.from, (fromToCount.get(r.from) ?? 0) + 1);
+      const prev = fromToCount.get(r.from) ?? 0;
+      fromToCount.set(r.from, prev + 1);
+      if (prev === 0) fromFirstTo.set(r.from, r.to);
       toFromCount.set(r.to, (toFromCount.get(r.to) ?? 0) + 1);
     }
-    const oneToOne = [...fromToCount.entries()].filter(([k, v]) => v === 1 && (toFromCount.get(rows.find(r => r.from === k)?.to ?? "") ?? 0) === 1).length;
-    const oneToMany = [...fromToCount.entries()].filter(([, v]) => v > 1).length;
-    const manyToOne = [...toFromCount.entries()].filter(([, v]) => v > 1).length;
-    return { uniqueFrom: uniqueFrom.size, uniqueTo: uniqueTo.size, partialCount, oneToOne, oneToMany, manyToOne };
-  }, [rows]);
+    const oneToOne = [...fromToCount.entries()].filter(([k, v]) => v === 1 && (toFromCount.get(fromFirstTo.get(k)!) ?? 0) === 1).length;
+    const oneToMany = [...fromToCount.values()].filter(v => v > 1).length;
+    const manyToOne = [...toFromCount.values()].filter(v => v > 1).length;
+    return { uniqueFrom: uniqueFrom.size, uniqueTo: uniqueTo.size, partialCount, oneToOne, oneToMany, manyToOne, totalMappings: rows.length };
+  }, [rows, conc, searchTerms.length, data]);
 
   const concMeta = CONCORDANCE_OPTIONS.find(c => c.key === conc)!;
   const hasPartial = conc === "cpcHs" || conc === "naicsHs" || conc === "isicCpc" || conc === "cpaHs" || conc === "beaHs" || conc === "beaNaics";
@@ -2930,12 +2976,12 @@ function ConcordanceBrowserTab({ data, initialConc, initialSearch }: { data: App
             onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
             className="lca-search-input"
           />
-          <span className="lca-result-count">{rows.length.toLocaleString()} mappings</span>
+          <span className="lca-result-count">{stats.totalMappings.toLocaleString()} mappings{rows.length < stats.totalMappings ? ` (showing ${rows.length.toLocaleString()}; search to filter)` : ""}</span>
         </div>
       </div>
 
       <div className="lca-stats-bar">
-        <strong>{rows.length.toLocaleString()}</strong> mappings &nbsp;·&nbsp;
+        <strong>{stats.totalMappings.toLocaleString()}</strong> mappings &nbsp;·&nbsp;
         <strong>{stats.uniqueFrom.toLocaleString()}</strong> unique {concMeta.from} codes &nbsp;·&nbsp;
         <strong>{stats.uniqueTo.toLocaleString()}</strong> unique {concMeta.to} codes
         {hasPartial && stats.partialCount > 0 && <> &nbsp;·&nbsp; <strong>{stats.partialCount.toLocaleString()}</strong> partial</>}
@@ -2986,6 +3032,299 @@ function ConcordanceBrowserTab({ data, initialConc, initialSearch }: { data: App
   );
 }
 
+/* =============================== Mapping Review Tab =============================== */
+
+type LcaMappingRow = {
+  id: string;
+  fromName: string;
+  fromGeo: string;
+  fromPath: string;
+  fromProduct?: string;
+  toName: string;
+  toGeo: string;
+  toPath: string;
+  toProduct?: string;
+};
+
+type LcaMappingDataset = {
+  key: string;
+  fromDb: string;
+  toDb: string;
+  rows: LcaMappingRow[];
+};
+
+type LcaMappingIndexEntry = {
+  key: string;
+  fromDb: string;
+  toDb: string;
+  label: string;
+  count: number;
+  file: string;
+};
+
+type Verdict = "good" | "bad";
+
+const VERDICT_STORAGE_PREFIX = "lca-mapping-verdicts:";
+
+function loadVerdicts(datasetKey: string): Record<string, Verdict> {
+  try {
+    const raw = localStorage.getItem(VERDICT_STORAGE_PREFIX + datasetKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveVerdicts(datasetKey: string, verdicts: Record<string, Verdict>) {
+  try {
+    localStorage.setItem(VERDICT_STORAGE_PREFIX + datasetKey, JSON.stringify(verdicts));
+  } catch {
+    /* quota exceeded — silently drop */
+  }
+}
+
+function LcaMappingReviewTab() {
+  const [index, setIndex] = useState<LcaMappingIndexEntry[] | null>(null);
+  const [indexError, setIndexError] = useState<string | null>(null);
+  const [datasetKey, setDatasetKey] = useState<string | null>(null);
+  const [dataset, setDataset] = useState<LcaMappingDataset | null>(null);
+  const [datasetLoading, setDatasetLoading] = useState(false);
+  const [datasetError, setDatasetError] = useState<string | null>(null);
+  const [verdicts, setVerdicts] = useState<Record<string, Verdict>>({});
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "unreviewed" | "good" | "bad">("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
+
+  // Load index once
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL;
+    fetch(`${base}data/lca-mappings/index.json`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((j: { datasets: LcaMappingIndexEntry[] }) => {
+        setIndex(j.datasets);
+        if (j.datasets.length > 0) setDatasetKey(j.datasets[0].key);
+      })
+      .catch(e => setIndexError(e.message ?? String(e)));
+  }, []);
+
+  // Load selected dataset
+  useEffect(() => {
+    if (!datasetKey || !index) return;
+    const meta = index.find(d => d.key === datasetKey);
+    if (!meta) return;
+    setDataset(null);
+    setDatasetError(null);
+    setDatasetLoading(true);
+    setVerdicts(loadVerdicts(datasetKey));
+    setVisibleCount(PAGE_SIZE);
+    const base = import.meta.env.BASE_URL;
+    fetch(`${base}data/lca-mappings/${meta.file}`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((j: LcaMappingDataset) => setDataset(j))
+      .catch(e => setDatasetError(e.message ?? String(e)))
+      .finally(() => setDatasetLoading(false));
+  }, [datasetKey, index]);
+
+  function setVerdict(rowId: string, v: Verdict | null) {
+    setVerdicts(prev => {
+      const next = { ...prev };
+      if (v === null) delete next[rowId];
+      else next[rowId] = v;
+      if (datasetKey) saveVerdicts(datasetKey, next);
+      return next;
+    });
+  }
+
+  function clearAllVerdicts() {
+    if (!datasetKey) return;
+    if (!window.confirm(`Clear all verdicts for ${datasetKey}? This cannot be undone.`)) return;
+    setVerdicts({});
+    saveVerdicts(datasetKey, {});
+  }
+
+  const filteredRows = useMemo(() => {
+    if (!dataset) return [];
+    let rows = dataset.rows;
+    if (searchTerms.length) {
+      rows = rows.filter(r => matchesSearch(searchTerms,
+        r.fromName, r.fromGeo, r.fromProduct ?? "",
+        r.toName, r.toGeo, r.toProduct ?? "",
+      ));
+    }
+    if (filter === "unreviewed") rows = rows.filter(r => !verdicts[r.id]);
+    else if (filter === "good") rows = rows.filter(r => verdicts[r.id] === "good");
+    else if (filter === "bad") rows = rows.filter(r => verdicts[r.id] === "bad");
+    return rows;
+  }, [dataset, searchTerms, filter, verdicts]);
+
+  const stats = useMemo(() => {
+    const total = dataset?.rows.length ?? 0;
+    let good = 0, bad = 0;
+    for (const v of Object.values(verdicts)) {
+      if (v === "good") good++;
+      else if (v === "bad") bad++;
+    }
+    const reviewed = good + bad;
+    const accuracy = reviewed > 0 ? (good / reviewed) * 100 : null;
+    return { total, reviewed, good, bad, accuracy };
+  }, [dataset, verdicts]);
+
+  return (
+    <>
+      <p className="about-intro">
+        Cross-database mapping tables sourced from the LCA Archive.
+        Click <span className="verdict-good-inline">Good</span> or <span className="verdict-bad-inline">Bad</span> on each
+        row to record your judgment; verdicts are saved in your browser and the
+        accuracy below updates live. Use the filter to focus on unreviewed rows.
+      </p>
+
+      {indexError && <div className="lca-stats-bar" style={{ color: "#b91c1c" }}>Failed to load mapping index: {indexError}</div>}
+
+      {index && (
+        <div className="lca-browser-controls">
+          <div className="lca-browser-tabs">
+            {index.map(opt => (
+              <button
+                key={opt.key}
+                className={`lca-db-tab ${datasetKey === opt.key ? "active" : ""}`}
+                onClick={() => { setDatasetKey(opt.key); setSearch(""); setFilter("all"); }}
+                title={`${opt.count.toLocaleString()} mappings`}
+              >
+                {opt.label} <span style={{ opacity: 0.7, fontWeight: 400 }}>({opt.count.toLocaleString()})</span>
+              </button>
+            ))}
+          </div>
+          <div className="lca-browser-search">
+            <input
+              type="text"
+              placeholder="Search products, geography..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
+              className="lca-search-input"
+            />
+            <span className="lca-result-count">{filteredRows.length.toLocaleString()} shown</span>
+          </div>
+        </div>
+      )}
+
+      {/* Filter pills + accuracy summary */}
+      {dataset && (
+        <div className="mapping-review-bar">
+          <div className="mapping-review-filters">
+            {(["all", "unreviewed", "good", "bad"] as const).map(f => (
+              <button
+                key={f}
+                className={`mapping-filter-pill ${filter === f ? "active" : ""}`}
+                onClick={() => { setFilter(f); setVisibleCount(PAGE_SIZE); }}
+              >
+                {f === "all" ? "All" : f === "unreviewed" ? "Unreviewed" : f === "good" ? "Marked good" : "Marked bad"}
+              </button>
+            ))}
+          </div>
+          <div className="mapping-review-stats">
+            <span><strong>{stats.reviewed.toLocaleString()}</strong> / {stats.total.toLocaleString()} reviewed</span>
+            <span className="verdict-good-inline">✓ {stats.good.toLocaleString()}</span>
+            <span className="verdict-bad-inline">✗ {stats.bad.toLocaleString()}</span>
+            <span>
+              Accuracy: <strong>{stats.accuracy === null ? "—" : `${stats.accuracy.toFixed(1)}%`}</strong>
+            </span>
+            <button
+              className="mapping-clear-btn"
+              onClick={clearAllVerdicts}
+              disabled={stats.reviewed === 0}
+              title="Clear all verdicts for this dataset"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {datasetLoading && <div className="lca-stats-bar">Loading mappings…</div>}
+      {datasetError && <div className="lca-stats-bar" style={{ color: "#b91c1c" }}>Failed to load mappings: {datasetError}</div>}
+
+      {dataset && (
+        <div className="lca-browser-table-wrapper">
+          <table className="lca-browser-table mapping-review-table">
+            <thead>
+              <tr>
+                <th style={{ width: "38%" }}>From {dataset.fromDb}</th>
+                <th style={{ width: "38%" }}>To {dataset.toDb}</th>
+                <th style={{ width: "180px" }}>Verdict</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.slice(0, visibleCount).map(r => {
+                const v = verdicts[r.id];
+                const fromExtra = r.fromProduct && r.fromProduct !== r.fromName ? r.fromProduct : null;
+                const toExtra = r.toProduct && r.toProduct !== r.toName ? r.toProduct : null;
+                return (
+                  <tr key={r.id} className={v === "good" ? "row-good" : v === "bad" ? "row-bad" : ""}>
+                    <td>
+                      <div className="mapping-cell-name"><HL text={r.fromName} terms={searchTerms} /></div>
+                      {fromExtra && <div className="mapping-cell-product"><HL text={fromExtra} terms={searchTerms} /></div>}
+                      <div className="mapping-cell-geo"><HL text={r.fromGeo} terms={searchTerms} /></div>
+                    </td>
+                    <td>
+                      <div className="mapping-cell-name"><HL text={r.toName} terms={searchTerms} /></div>
+                      {toExtra && <div className="mapping-cell-product"><HL text={toExtra} terms={searchTerms} /></div>}
+                      <div className="mapping-cell-geo"><HL text={r.toGeo} terms={searchTerms} /></div>
+                    </td>
+                    <td>
+                      <div className="verdict-buttons">
+                        <button
+                          className={`verdict-btn verdict-good ${v === "good" ? "active" : ""}`}
+                          onClick={() => setVerdict(r.id, v === "good" ? null : "good")}
+                          title="Mark as a good match (click again to clear)"
+                        >
+                          ✓ Good
+                        </button>
+                        <button
+                          className={`verdict-btn verdict-bad ${v === "bad" ? "active" : ""}`}
+                          onClick={() => setVerdict(r.id, v === "bad" ? null : "bad")}
+                          title="Mark as a bad match (click again to clear)"
+                        >
+                          ✗ Bad
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {filteredRows.length > visibleCount && (
+            <div className="lca-load-more-wrap">
+              <span className="lca-load-more-info">Showing {visibleCount.toLocaleString()} of {filteredRows.length.toLocaleString()} entries</span>
+              <button className="lca-load-more-btn" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
+                Load {Math.min(PAGE_SIZE, filteredRows.length - visibleCount).toLocaleString()} more
+              </button>
+              <button className="lca-load-more-btn lca-load-all" onClick={() => setVisibleCount(filteredRows.length)}>
+                Show all
+              </button>
+            </div>
+          )}
+
+          {filteredRows.length === 0 && (
+            <div className="lca-stats-bar">No mappings match the current filter.</div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 /* =============================== Build Info =============================== */
 
 declare const __BUILD_HASH__: string;
@@ -3015,7 +3354,7 @@ interface AboutSectionProps {
 
 export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(function AboutSection({ data, onNavigateToNode, onHighlightGaps }, ref) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances">("taxonomies");
+  const [tab, setTab] = useState<"taxonomies" | "lca" | "methods" | "matrix" | "browser" | "concordances" | "review">("taxonomies");
   const [navContext, setNavContext] = useState<TabNavContext | undefined>();
 
   useImperativeHandle(ref, () => ({
@@ -3090,6 +3429,12 @@ export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(fu
             >
               Concordance Browser
             </button>
+            <button
+              className={`about-tab ${tab === "review" ? "active" : ""}`}
+              onClick={() => setTab("review")}
+            >
+              Mapping Review
+            </button>
           </div>
 
           {tab === "taxonomies" && <TaxonomyMapTab />}
@@ -3098,6 +3443,7 @@ export const AboutSection = forwardRef<AboutSectionHandle, AboutSectionProps>(fu
           {tab === "matrix" && <CoverageMatrixTab data={data} onNavigateToNode={onNavigateToNode} onHighlightGaps={onHighlightGaps} onCloseModal={() => setOpen(false)} />}
           {tab === "browser" && <LcaDataBrowserTab data={data} initialDb={navContext?.lcaDb} initialSearch={navContext?.search} />}
           {tab === "concordances" && <ConcordanceBrowserTab data={data} initialConc={navContext?.concordanceId} initialSearch={navContext?.search} />}
+          {tab === "review" && <LcaMappingReviewTab />}
         </div>
       </div>
     </div>
