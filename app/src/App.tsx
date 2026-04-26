@@ -4399,30 +4399,77 @@ function AppContent() {
               );
             })()}
 
-            {/* Embedding-derived semantic matches (UNSPSC -> LCA databases) */}
+            {/* Embedding-derived semantic matches.
+                Shown when the selected node can be resolved to either a
+                UNSPSC code (UNSPSC, T3 UNSPSC node) or an HS-6 code
+                (HS itself, or any HS-family taxonomy: CN, HTS, CA — and
+                T1/T2 HS-origin nodes). HS-family resolution uses the
+                first 6 digits as the HS-6 backbone. */}
             {(() => {
-              if (selectedFrom !== "unspsc" && selectedFrom !== "t3") return null;
               if (!data.embeddingMatches) return null;
-              // Resolve a UNSPSC code from the selected node
+
+              type Row = { db: string; m: { code: string; name: string; geo: string; sim: number } };
+              const rows: Row[] = [];
+              let sourceLabel: string | null = null;
+              let sourceCode: string | null = null;
+
+              // --- UNSPSC source ---
               let unspscCode: string | null = null;
-              if (selectedFrom === "unspsc") {
-                unspscCode = stripCode(selectedNode.code);
-              } else {
-                // T3 UNSPSC node ids look like "t3-u-<code>"
+              if (selectedFrom === "unspsc") unspscCode = stripCode(selectedNode.code);
+              else if (selectedFrom === "t3") {
                 const m = selectedNode.id.match(/^t3-u-(.+)$/);
                 if (m) unspscCode = m[1];
               }
-              if (!unspscCode) return null;
-              const entry = data.embeddingMatches.unspsc[unspscCode];
-              if (!entry || (!entry.useeio && !entry.ecoinvent && !entry.bafu)) return null;
-              const rows: { db: string; m: NonNullable<typeof entry.useeio> }[] = [];
-              if (entry.useeio)    rows.push({ db: "USEEIO",    m: entry.useeio });
-              if (entry.ecoinvent) rows.push({ db: "ECOINVENT", m: entry.ecoinvent });
-              if (entry.bafu)      rows.push({ db: "BAFU",      m: entry.bafu });
+              if (unspscCode) {
+                const e = data.embeddingMatches.unspsc[unspscCode];
+                if (e) {
+                  if (e.hs)        rows.push({ db: "HS",        m: e.hs });
+                  if (e.useeio)    rows.push({ db: "USEEIO",    m: e.useeio });
+                  if (e.ecoinvent) rows.push({ db: "ECOINVENT", m: e.ecoinvent });
+                  if (e.bafu)      rows.push({ db: "BAFU",      m: e.bafu });
+                  sourceLabel = "UNSPSC";
+                  sourceCode = unspscCode;
+                }
+              }
+
+              // --- HS-family source: derive HS-6 from any taxonomy that
+              // shares the HS code base (HS, CN, HTS, CA). T1 HTS-origin
+              // nodes and T2 HTS-origin nodes also resolve via HS-6. ---
+              if (rows.length === 0) {
+                let hs6: string | null = null;
+                const clean = stripCode(selectedNode.code);
+                if (selectedFrom === "hs" || selectedFrom === "cn"
+                    || selectedFrom === "hts" || selectedFrom === "ca") {
+                  if (clean.length >= 6) hs6 = clean.slice(0, 6);
+                } else if (selectedFrom === "t1" || selectedFrom === "t2") {
+                  // T1 IDs: t1-* (HTS) or t1-svc-* (CPC services).
+                  // T2 IDs: t2-* (CPC) or t2-hts-* (HTS detail).
+                  const isHtsOrigin =
+                    (selectedFrom === "t1" && !selectedNode.id.startsWith("t1-svc-"))
+                    || (selectedFrom === "t2" && selectedNode.id.startsWith("t2-hts-"));
+                  if (isHtsOrigin && clean.length >= 6) hs6 = clean.slice(0, 6);
+                }
+                if (hs6) {
+                  const e = data.embeddingMatches.hs[hs6];
+                  if (e) {
+                    if (e.unspsc)    rows.push({ db: "UNSPSC",    m: e.unspsc });
+                    if (e.useeio)    rows.push({ db: "USEEIO",    m: e.useeio });
+                    if (e.ecoinvent) rows.push({ db: "ECOINVENT", m: e.ecoinvent });
+                    if (e.bafu)      rows.push({ db: "BAFU",      m: e.bafu });
+                    sourceLabel = "HS-6";
+                    sourceCode = hs6;
+                  }
+                }
+              }
+
+              if (rows.length === 0) return null;
+
               return (
                 <div className="comparison-item mapped-item embedding-item">
                   <h4>Embedding-Derived Semantic Matches
-                    <span className="embedding-source">embeddinggemma · cosine</span>
+                    <span className="embedding-source">
+                      from {sourceLabel} {sourceCode} · embeddinggemma · cosine
+                    </span>
                   </h4>
                   {rows.map((r, i) => (
                     <div key={i} className="concordance-row">

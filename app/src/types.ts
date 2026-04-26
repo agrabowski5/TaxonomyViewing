@@ -203,6 +203,13 @@ export interface EmbeddingMatches {
     useeio?: EmbeddingMatch;
     ecoinvent?: EmbeddingMatch;
     bafu?: EmbeddingMatch;
+    hs?: EmbeddingMatch;
+  }>;
+  hs: Record<string, {
+    unspsc?: EmbeddingMatch;
+    useeio?: EmbeddingMatch;
+    ecoinvent?: EmbeddingMatch;
+    bafu?: EmbeddingMatch;
   }>;
 }
 

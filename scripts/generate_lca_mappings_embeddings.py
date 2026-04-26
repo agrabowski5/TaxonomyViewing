@@ -75,9 +75,19 @@ PAIRS = [
     ("EI2UNSPSC",        "ECOINVENT", "UNSPSC"),
     ("BAFU2UNSPSC",      "BAFU",      "UNSPSC"),
     ("USEEIO2UNSPSC",    "USEEIO",    "UNSPSC"),
+    # HS (international goods) <-> {UNSPSC, USEEIO, ECOINVENT, BAFU}
+    ("HS2UNSPSC",        "HS",        "UNSPSC"),
+    ("HS2USEEIO",        "HS",        "USEEIO"),
+    ("HS2ECOINVENT",     "HS",        "ECOINVENT"),
+    ("HS2BAFU",          "HS",        "BAFU"),
+    ("UNSPSC2HS",        "UNSPSC",    "HS"),
+    ("USEEIO2HS",        "USEEIO",    "HS"),
+    ("EI2HS",            "ECOINVENT", "HS"),
+    ("BAFU2HS",          "BAFU",      "HS"),
 ]
 
 UNSPSC_LOOKUP = ROOT / "app" / "public" / "data" / "unspsc-lookup.json"
+HS_LOOKUP = ROOT / "app" / "public" / "data" / "hs-lookup.json"
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +149,37 @@ def _load_unspsc_pool():
     return pool
 
 
+def _load_hs_pool():
+    """Build an HS entity pool from app/public/data/hs-lookup.json. Path is
+    `hs-<code>` to mirror the React tree id format. Embedding text uses
+    description plus the section name for hierarchical context."""
+    if not HS_LOOKUP.exists():
+        print(f"  WARN: {HS_LOOKUP} missing — skipping HS", file=sys.stderr)
+        return {}
+    with open(HS_LOOKUP, encoding="utf-8") as f:
+        lookup = json.load(f)
+    pool = {}
+    for code, entry in lookup.items():
+        desc = entry.get("description", "").strip()
+        if not desc:
+            continue
+        section_name = entry.get("sectionName", "").strip()
+        level_label = entry.get("type", "")
+        # Embedding text: name = description; product slot carries
+        # section context + level so the model sees the hierarchy.
+        product_parts = []
+        if section_name:
+            product_parts.append(section_name)
+        if level_label:
+            product_parts.append(f"{level_label} {code}")
+        pool[f"hs-{code}"] = {
+            "name": desc,
+            "product": " - ".join(product_parts) if product_parts else code,
+            "geo": "",
+        }
+    return pool
+
+
 def collect_entities():
     """Return {db_name: {path: {"name", "product", "geo"}}} for every DB
     referenced by the active PAIRS list."""
@@ -148,6 +189,8 @@ def collect_entities():
         pool.update(_load_archive_pool())
     if "UNSPSC" in needed:
         pool["UNSPSC"] = _load_unspsc_pool()
+    if "HS" in needed:
+        pool["HS"] = _load_hs_pool()
     for db in sorted(needed):
         items = pool.get(db, {})
         print(f"  {db}: {len(items):,} unique entities")
