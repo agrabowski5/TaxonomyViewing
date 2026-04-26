@@ -1257,6 +1257,62 @@
   background: #eef2ff;
 }
 
+/* Embedding-derived semantic-similarity matches — placed visually next to
+   concordance/fuzzy mappings, but with a distinct amber palette so it's
+   clear these come from the embedding pipeline, not curated tables. */
+.embedding-item {
+  border-left-color: #d97706 !important;
+  background: #fffbeb;
+}
+
+.embedding-item h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #92400e !important;
+}
+
+.embedding-source {
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+}
+
+.embedding-db-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #fde68a;
+  color: #78350f;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  letter-spacing: 0.3px;
+}
+
+.embedding-sim-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #fef3c7;
+  color: #92400e;
+  flex-shrink: 0;
+  font-weight: 600;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+}
+
+.embedding-geo {
+  font-size: 10px;
+  color: #b45309;
+  font-style: italic;
+}
+
 /* ===== Emission Factor Card ===== */
 .emission-factor-card {
   flex: 1;

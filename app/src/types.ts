@@ -191,6 +191,21 @@ export interface GenericConcordance {
   reverse: Record<string, { code: string; partial?: boolean }[]>;
 }
 
+export interface EmbeddingMatch {
+  code: string;
+  name: string;
+  geo: string;
+  sim: number;
+}
+
+export interface EmbeddingMatches {
+  unspsc: Record<string, {
+    useeio?: EmbeddingMatch;
+    ecoinvent?: EmbeddingMatch;
+    bafu?: EmbeddingMatch;
+  }>;
+}
+
 export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2" | "t3"
   | "naics" | "isic" | "nace" | "cpa" | "bea";
 
@@ -237,4 +252,5 @@ export interface AppData {
   uslciCoverage: UslciCoverage | null;
   bafuCoverage: BafuCoverage | null;
   gabiCoverage: GabiCoverage | null;
+  embeddingMatches: EmbeddingMatches | null;
 }

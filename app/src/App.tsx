@@ -4399,6 +4399,50 @@ function AppContent() {
               );
             })()}
 
+            {/* Embedding-derived semantic matches (UNSPSC -> LCA databases) */}
+            {(() => {
+              if (selectedFrom !== "unspsc" && selectedFrom !== "t3") return null;
+              if (!data.embeddingMatches) return null;
+              // Resolve a UNSPSC code from the selected node
+              let unspscCode: string | null = null;
+              if (selectedFrom === "unspsc") {
+                unspscCode = stripCode(selectedNode.code);
+              } else {
+                // T3 UNSPSC node ids look like "t3-u-<code>"
+                const m = selectedNode.id.match(/^t3-u-(.+)$/);
+                if (m) unspscCode = m[1];
+              }
+              if (!unspscCode) return null;
+              const entry = data.embeddingMatches.unspsc[unspscCode];
+              if (!entry || (!entry.useeio && !entry.ecoinvent && !entry.bafu)) return null;
+              const rows: { db: string; m: NonNullable<typeof entry.useeio> }[] = [];
+              if (entry.useeio)    rows.push({ db: "USEEIO",    m: entry.useeio });
+              if (entry.ecoinvent) rows.push({ db: "ECOINVENT", m: entry.ecoinvent });
+              if (entry.bafu)      rows.push({ db: "BAFU",      m: entry.bafu });
+              return (
+                <div className="comparison-item mapped-item embedding-item">
+                  <h4>Embedding-Derived Semantic Matches
+                    <span className="embedding-source">embeddinggemma · cosine</span>
+                  </h4>
+                  {rows.map((r, i) => (
+                    <div key={i} className="concordance-row">
+                      <span className="embedding-db-badge">{r.db}</span>
+                      <span className="name" title={r.m.geo ? `Geography: ${r.m.geo}` : undefined}>
+                        {r.m.name}
+                        {r.m.geo && <span className="embedding-geo"> · {r.m.geo}</span>}
+                      </span>
+                      <span
+                        className="embedding-sim-badge"
+                        title={`Cosine similarity: ${(r.m.sim * 100).toFixed(1)}%`}
+                      >
+                        {(r.m.sim * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {emissionFactor && (
               <EmissionFactorDisplay entry={emissionFactor} getChain={getEpaChain} onOpenTab={openAboutTab} />
             )}

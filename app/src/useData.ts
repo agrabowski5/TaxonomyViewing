@@ -52,7 +52,8 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
           ]);
         // Optional data — don't block app loading if missing
         const [emissionFactors, exiobaseFactors, exiobaseConcordance, ecoinventMapping, uslciCoverage, bafuCoverage, gabiCoverage,
-               naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, beaNaicsConcordance] = await Promise.all([
+               naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, beaNaicsConcordance,
+               embeddingMatches] = await Promise.all([
           fetch(`${base}data/emission-factors.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/exiobase-factors.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/exiobase-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
@@ -65,6 +66,7 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
           fetch(`${base}data/cpa-hs-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/bea-hs-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
           fetch(`${base}data/bea-naics-concordance.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch(`${base}data/embedding-matches.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
         setData({
           hsTree, cpcTree, cnTree, htsTree, caTree,
@@ -76,6 +78,7 @@ export function useData(): { data: AppData | null; loading: boolean; error: stri
           concordance, unspscTree, unspscLookup, unspscHsMapping,
           naicsHsConcordance, isicCpcConcordance, cpaHsConcordance, beaHsConcordance, beaNaicsConcordance,
           emissionFactors, exiobaseFactors, exiobaseConcordance, ecoinventMapping, uslciCoverage, bafuCoverage, gabiCoverage,
+          embeddingMatches,
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load data");
