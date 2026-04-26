@@ -191,7 +191,7 @@ export interface GenericConcordance {
   reverse: Record<string, { code: string; partial?: boolean }[]>;
 }
 
-export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2"
+export type TaxonomyType = "hs" | "cn" | "hts" | "ca" | "cpc" | "unspsc" | "t1" | "t2" | "t3"
   | "naics" | "isic" | "nace" | "cpa" | "bea";
 
 export interface AppData {
@@ -211,6 +211,8 @@ export interface AppData {
   t1Lookup: Record<string, LookupEntry>;
   t2Tree: TreeNode[];
   t2Lookup: Record<string, LookupEntry>;
+  t3Tree: TreeNode[];
+  t3Lookup: Record<string, LookupEntry>;
   naicsTree: TreeNode[];
   naicsLookup: Record<string, LookupEntry>;
   isicTree: TreeNode[];

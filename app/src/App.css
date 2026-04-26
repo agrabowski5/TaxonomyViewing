@@ -415,6 +415,11 @@
   color: #9f1239;
 }
 
+.taxonomy-label.t3 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .taxonomy-label.naics {
   background: #cffafe;
   color: #0c4a6e;
@@ -3734,4 +3739,10 @@
   background: #b91c1c;
   border-color: #b91c1c;
   color: #fff;
+}
+
+.mapping-sim-cell {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: #475569;
 }

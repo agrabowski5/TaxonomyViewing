@@ -3044,6 +3044,7 @@ type LcaMappingRow = {
   toGeo: string;
   toPath: string;
   toProduct?: string;
+  similarity?: number;
 };
 
 type LcaMappingDataset = {
@@ -3095,6 +3096,7 @@ function LcaMappingReviewTab() {
   const [verdicts, setVerdicts] = useState<Record<string, Verdict>>({});
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "unreviewed" | "good" | "bad">("all");
+  const [sortMode, setSortMode] = useState<"original" | "sim-asc" | "sim-desc">("original");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const searchTerms = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search]);
@@ -3164,8 +3166,17 @@ function LcaMappingReviewTab() {
     if (filter === "unreviewed") rows = rows.filter(r => !verdicts[r.id]);
     else if (filter === "good") rows = rows.filter(r => verdicts[r.id] === "good");
     else if (filter === "bad") rows = rows.filter(r => verdicts[r.id] === "bad");
+    if (sortMode !== "original") {
+      const sign = sortMode === "sim-asc" ? 1 : -1;
+      rows = [...rows].sort((a, b) => sign * ((a.similarity ?? -1) - (b.similarity ?? -1)));
+    }
     return rows;
-  }, [dataset, searchTerms, filter, verdicts]);
+  }, [dataset, searchTerms, filter, verdicts, sortMode]);
+
+  const hasSimilarity = useMemo(
+    () => !!dataset?.rows.some(r => typeof r.similarity === "number"),
+    [dataset],
+  );
 
   const stats = useMemo(() => {
     const total = dataset?.rows.length ?? 0;
@@ -3258,8 +3269,22 @@ function LcaMappingReviewTab() {
           <table className="lca-browser-table mapping-review-table">
             <thead>
               <tr>
-                <th style={{ width: "38%" }}>From {dataset.fromDb}</th>
-                <th style={{ width: "38%" }}>To {dataset.toDb}</th>
+                <th style={{ width: hasSimilarity ? "34%" : "38%" }}>From {dataset.fromDb}</th>
+                <th style={{ width: hasSimilarity ? "34%" : "38%" }}>To {dataset.toDb}</th>
+                {hasSimilarity && (
+                  <th
+                    style={{ width: "70px", cursor: "pointer", userSelect: "none" }}
+                    onClick={() => {
+                      setSortMode(m =>
+                        m === "original" ? "sim-asc" :
+                        m === "sim-asc" ? "sim-desc" : "original");
+                      setVisibleCount(PAGE_SIZE);
+                    }}
+                    title="Click to sort: ascending (worst first) → descending (best first) → original order"
+                  >
+                    Sim {sortMode === "sim-asc" ? "▲" : sortMode === "sim-desc" ? "▼" : "↕"}
+                  </th>
+                )}
                 <th style={{ width: "180px" }}>Verdict</th>
               </tr>
             </thead>
@@ -3280,6 +3305,11 @@ function LcaMappingReviewTab() {
                       {toExtra && <div className="mapping-cell-product"><HL text={toExtra} terms={searchTerms} /></div>}
                       <div className="mapping-cell-geo"><HL text={r.toGeo} terms={searchTerms} /></div>
                     </td>
+                    {hasSimilarity && (
+                      <td className="lca-num mapping-sim-cell">
+                        {typeof r.similarity === "number" ? r.similarity.toFixed(3) : "—"}
+                      </td>
+                    )}
                     <td>
                       <div className="verdict-buttons">
                         <button

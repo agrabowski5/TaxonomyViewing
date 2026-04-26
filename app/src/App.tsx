@@ -48,7 +48,7 @@ function buildColorMap(tree: TreeNode[]): Record<string, string> {
   return colorMap;
 }
 
-const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc", "t1", "t2", "naics", "isic", "nace", "cpa", "bea"];
+const ALL_TAXONOMIES: TaxonomyType[] = ["hs", "cpc", "cn", "hts", "ca", "unspsc", "t1", "t2", "t3", "naics", "isic", "nace", "cpa", "bea"];
 
 const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; taxonomyClass: string; label: string }> = {
   hs: {
@@ -98,6 +98,12 @@ const TAXONOMY_INFO: Record<TaxonomyType, { fullName: string; legend: string; ta
     legend: "CPC Sections \u2192 Divisions \u2192 Groups \u2192 Classes \u2192 Subclasses \u2192 HTS Tariff Lines",
     taxonomyClass: "t2",
     label: "T2",
+  },
+  t3: {
+    fullName: "Taxonomy 3 (USEEIO trunk \u2192 UNSPSC \u2192 ECOINVENT/BAFU)",
+    legend: "USEEIO Industry \u2192 UNSPSC Product \u2192 LCA Process (ECOINVENT or BAFU)  \u00b7 children sorted by embedding similarity (best first)",
+    taxonomyClass: "t3",
+    label: "T3",
   },
   naics: {
     fullName: "NAICS 2022 (North American Industry Classification)",
@@ -2931,6 +2937,7 @@ function AppContent() {
     unspsc: useRef<TreeApi<TreeNode>>(null),
     t1: useRef<TreeApi<TreeNode>>(null),
     t2: useRef<TreeApi<TreeNode>>(null),
+    t3: useRef<TreeApi<TreeNode>>(null),
     naics: useRef<TreeApi<TreeNode>>(null),
     isic: useRef<TreeApi<TreeNode>>(null),
     nace: useRef<TreeApi<TreeNode>>(null),
@@ -2947,7 +2954,7 @@ function AppContent() {
   const getTreeData = useCallback((taxonomy: TaxonomyType): TreeNode[] => {
     if (!data) return [];
     const map: Record<string, TreeNode[]> = {
-      hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree, t1: data.t1Tree, t2: data.t2Tree,
+      hs: data.hsTree, cn: data.cnTree, hts: data.htsTree, ca: data.caTree, cpc: data.cpcTree, unspsc: data.unspscTree, t1: data.t1Tree, t2: data.t2Tree, t3: data.t3Tree,
       naics: data.naicsTree, isic: data.isicTree, nace: data.naceTree, cpa: data.cpaTree, bea: data.beaTree,
     };
     return map[taxonomy] ?? [];
@@ -2956,7 +2963,7 @@ function AppContent() {
   const getLookup = useCallback((taxonomy: TaxonomyType): Record<string, LookupEntry> => {
     if (!data) return {};
     const map: Record<string, Record<string, LookupEntry>> = {
-      hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup, t1: data.t1Lookup, t2: data.t2Lookup,
+      hs: data.hsLookup, cn: data.cnLookup, hts: data.htsLookup, ca: data.caLookup, cpc: data.cpcLookup, unspsc: data.unspscLookup, t1: data.t1Lookup, t2: data.t2Lookup, t3: data.t3Lookup,
       naics: data.naicsLookup, isic: data.isicLookup, nace: data.naceLookup, cpa: data.cpaLookup, bea: data.beaLookup,
     };
     return map[taxonomy] ?? {};
@@ -4015,6 +4022,7 @@ function AppContent() {
       <optgroup label="Combined Taxonomies">
         <option value="t1">T1 - HTS Goods + CPC Services</option>
         <option value="t2">T2 - CPC Backbone + HTS Detail</option>
+        <option value="t3">T3 - USEEIO → UNSPSC → ECOINVENT/BAFU (embedding)</option>
       </optgroup>
     </>
   );
