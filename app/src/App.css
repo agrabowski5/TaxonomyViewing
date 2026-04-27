@@ -1313,6 +1313,20 @@
   font-style: italic;
 }
 
+.embedding-row-clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.12s ease;
+}
+
+.embedding-row-clickable:hover {
+  background: #fde68a;
+}
+
+.embedding-row-clickable:active {
+  background: #fcd34d;
+}
+
 /* ===== Emission Factor Card ===== */
 .emission-factor-card {
   flex: 1;

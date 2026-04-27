@@ -3644,6 +3644,58 @@ function AppContent() {
     [leftTaxonomy, rightTaxonomy, leftViewMode, rightViewMode, treeRefs, getTreeData]
   );
 
+  // Click handler for the embedding-match rows in the comparison panel.
+  // Always targets the *opposite* pane from the one driving the comparison
+  // (selectedFrom), switching that pane's taxonomy if necessary, then
+  // navigates to the matched node id.
+  const handleEmbeddingMatchClick = useCallback(
+    (targetTaxonomy: TaxonomyType, nodeId: string) => {
+      // Pick the pane that's not currently showing selectedFrom
+      const targetPane: "left" | "right" =
+        selectedFrom && rightTaxonomy === selectedFrom ? "left" : "right";
+      const setter = targetPane === "left" ? setLeftTaxonomy : setRightTaxonomy;
+      const currentInTarget = targetPane === "left" ? leftTaxonomy : rightTaxonomy;
+      if (currentInTarget !== targetTaxonomy) setter(targetTaxonomy);
+
+      const viewMode = targetPane === "left" ? leftViewMode : rightViewMode;
+      const treeRef = treeRefs[targetTaxonomy];
+      const treeData = getTreeData(targetTaxonomy);
+
+      // Wait for taxonomy switch to render before scrolling
+      setTimeout(() => {
+        if (viewMode === "graph") {
+          const seq = ++syncSeqRef.current;
+          if (targetPane === "left") setLeftGraphSync({ id: nodeId, seq });
+          else setRightGraphSync({ id: nodeId, seq });
+        } else {
+          const ancestorPath = findPathToNode(treeData, nodeId);
+          let delay = 50;
+          for (const ancestorId of ancestorPath) {
+            setTimeout(() => {
+              const tree = treeRef.current;
+              if (tree) {
+                const ancestor = tree.get(ancestorId);
+                if (ancestor && !ancestor.isOpen) ancestor.open();
+              }
+            }, delay);
+            delay += 80;
+          }
+          setTimeout(() => {
+            const tree = treeRef.current;
+            if (tree) {
+              const targetNode = tree.get(nodeId);
+              if (targetNode) {
+                tree.scrollTo(targetNode.id);
+                targetNode.select();
+              }
+            }
+          }, delay + 100);
+        }
+      }, 300);
+    },
+    [selectedFrom, leftTaxonomy, rightTaxonomy, leftViewMode, rightViewMode, treeRefs, getTreeData],
+  );
+
   // Handle gap highlight activation from Coverage Matrix drilldown
   const handleHighlightGaps = useCallback(
     (taxonomy: TaxonomyType, dbKey: string, dbLabel: string, uncoveredLeafIds: string[]) => {
@@ -4463,14 +4515,17 @@ function AppContent() {
               const e = em[section]?.[sourceCode];
               if (!e) return null;
 
-              const rows: Row[] = [];
-              // Suppress the entry that points back to the same DB as the
-              // source (e.g., an HS source's "HS" field would be itself).
-              if (e.hs        && section !== "hs")        rows.push({ db: "HS",        m: e.hs });
-              if (e.unspsc    && section !== "unspsc")    rows.push({ db: "UNSPSC",    m: e.unspsc });
-              if (e.useeio)                                rows.push({ db: "USEEIO",    m: e.useeio });
-              if (e.ecoinvent)                             rows.push({ db: "ECOINVENT", m: e.ecoinvent });
-              if (e.bafu)                                  rows.push({ db: "BAFU",      m: e.bafu });
+              type RowEx = Row & { tax: TaxonomyType | null };
+              const rows: RowEx[] = [];
+              // db -> the dropdown taxonomy + tree-id prefix to navigate
+              // into when the user clicks the row. USEEIO/ECOINVENT/BAFU
+              // are LCA databases (no taxonomy pane), so they stay
+              // display-only.
+              if (e.hs        && section !== "hs")        rows.push({ db: "HS",        m: e.hs,        tax: "hs" });
+              if (e.unspsc    && section !== "unspsc")    rows.push({ db: "UNSPSC",    m: e.unspsc,    tax: "unspsc" });
+              if (e.useeio)                                rows.push({ db: "USEEIO",    m: e.useeio,    tax: null });
+              if (e.ecoinvent)                             rows.push({ db: "ECOINVENT", m: e.ecoinvent, tax: null });
+              if (e.bafu)                                  rows.push({ db: "BAFU",      m: e.bafu,      tax: null });
               if (rows.length === 0) return null;
 
               return (
@@ -4480,21 +4535,33 @@ function AppContent() {
                       from {sourceLabel} · embeddinggemma · cosine
                     </span>
                   </h4>
-                  {rows.map((r, i) => (
-                    <div key={i} className="concordance-row">
-                      <span className="embedding-db-badge">{r.db}</span>
-                      <span className="name" title={r.m.geo ? `Geography: ${r.m.geo}` : undefined}>
-                        {r.m.name}
-                        {r.m.geo && <span className="embedding-geo"> · {r.m.geo}</span>}
-                      </span>
-                      <span
-                        className="embedding-sim-badge"
-                        title={`Cosine similarity: ${(r.m.sim * 100).toFixed(1)}%`}
+                  {rows.map((r, i) => {
+                    const navigable = r.tax !== null;
+                    const onClick = navigable
+                      ? () => handleEmbeddingMatchClick(r.tax!, `${r.tax}-${r.m.code}`)
+                      : undefined;
+                    return (
+                      <div
+                        key={i}
+                        className={`concordance-row ${navigable ? "embedding-row-clickable" : ""}`}
+                        onClick={onClick}
+                        title={navigable ? `Click to open ${r.db} ${r.m.code} in the opposite pane` : undefined}
+                        role={navigable ? "button" : undefined}
                       >
-                        {(r.m.sim * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                  ))}
+                        <span className="embedding-db-badge">{r.db}</span>
+                        <span className="name">
+                          {r.m.name}
+                          {r.m.geo && <span className="embedding-geo"> · {r.m.geo}</span>}
+                        </span>
+                        <span
+                          className="embedding-sim-badge"
+                          title={`Cosine similarity: ${(r.m.sim * 100).toFixed(1)}%`}
+                        >
+                          {(r.m.sim * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })()}
