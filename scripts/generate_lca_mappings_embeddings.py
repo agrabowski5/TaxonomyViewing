@@ -153,24 +153,48 @@ def _load_archive_pool():
 
 def _load_unspsc_pool():
     """Build a UNSPSC entity pool from app/public/data/unspsc-lookup.json.
-    Path is `unspsc-<code>` to mirror the React tree id format. Embedding
-    text uses description plus the level (segment / family / class / commodity)."""
+    Path is `unspsc-<code>` to mirror the React tree id format.
+
+    UNSPSC hierarchy: segment (2-digit) > family (4) > class (6) >
+    commodity (8). The leaf description on its own ("Bull semen") is
+    often ambiguous to an embedding model, so we synthesize a parent
+    path from the code itself ("Live Plant and Animal Material > Live
+    animals > Cattle > Bull semen") and feed that as the embedding
+    context. Each ancestor's description comes from the same lookup
+    table, so this is purely a smarter text composition — no extra
+    data sources needed."""
     if not UNSPSC_LOOKUP.exists():
         print(f"  WARN: {UNSPSC_LOOKUP} missing — skipping UNSPSC", file=sys.stderr)
         return {}
     with open(UNSPSC_LOOKUP, encoding="utf-8") as f:
         lookup = json.load(f)
+
+    def parent_codes(code):
+        """Return ancestor codes from segment to immediate parent."""
+        if len(code) >= 8:   return [code[:2], code[:4], code[:6]]
+        if len(code) >= 6:   return [code[:2], code[:4]]
+        if len(code) >= 4:   return [code[:2]]
+        return []
+
     pool = {}
     for code, entry in lookup.items():
         desc = entry.get("description", "").strip()
         if not desc:
             continue
         level_label = entry.get("type", "")
+        # Build parent path "Segment > Family > Class > Commodity"
+        ancestor_descs = []
+        for pcode in parent_codes(code):
+            pentry = lookup.get(pcode)
+            if pentry and pentry.get("description"):
+                ancestor_descs.append(pentry["description"].strip())
+        path_str = " > ".join(ancestor_descs + [desc]) if ancestor_descs else desc
         pool[f"unspsc-{code}"] = {
             "name": desc,
-            # Stash the level in `product` so it gets concatenated into the
-            # embedding text and surfaces in the review UI as a sub-line.
-            "product": f"{level_label} ({code})" if level_label else code,
+            # `product` is concatenated into the embedding text. The
+            # parent path is the new disambiguating signal; level/code
+            # remain so the model can still see the granularity.
+            "product": f"{path_str} ({level_label} {code})" if level_label else path_str,
             "geo": "",
         }
     return pool
