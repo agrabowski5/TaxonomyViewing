@@ -4515,17 +4515,20 @@ function AppContent() {
               const e = em[section]?.[sourceCode];
               if (!e) return null;
 
-              type RowEx = Row & { tax: TaxonomyType | null };
+              // Each row's `target` says what clicking should do:
+              //  - {kind: "tax"}     → open the entry in the opposite taxonomy pane
+              //  - {kind: "lcaDb"}   → open the LCA Data Browser tab
+              //                        pre-filtered to this entry
+              type ClickTarget =
+                | { kind: "tax"; tax: TaxonomyType }
+                | { kind: "lcaDb"; db: "useeio" | "ecoinvent" | "bafu"; search: string };
+              type RowEx = Row & { target: ClickTarget };
               const rows: RowEx[] = [];
-              // db -> the dropdown taxonomy + tree-id prefix to navigate
-              // into when the user clicks the row. USEEIO/ECOINVENT/BAFU
-              // are LCA databases (no taxonomy pane), so they stay
-              // display-only.
-              if (e.hs        && section !== "hs")        rows.push({ db: "HS",        m: e.hs,        tax: "hs" });
-              if (e.unspsc    && section !== "unspsc")    rows.push({ db: "UNSPSC",    m: e.unspsc,    tax: "unspsc" });
-              if (e.useeio)                                rows.push({ db: "USEEIO",    m: e.useeio,    tax: null });
-              if (e.ecoinvent)                             rows.push({ db: "ECOINVENT", m: e.ecoinvent, tax: null });
-              if (e.bafu)                                  rows.push({ db: "BAFU",      m: e.bafu,      tax: null });
+              if (e.hs        && section !== "hs")        rows.push({ db: "HS",        m: e.hs,        target: { kind: "tax", tax: "hs" } });
+              if (e.unspsc    && section !== "unspsc")    rows.push({ db: "UNSPSC",    m: e.unspsc,    target: { kind: "tax", tax: "unspsc" } });
+              if (e.useeio)                                rows.push({ db: "USEEIO",    m: e.useeio,    target: { kind: "lcaDb", db: "useeio",    search: e.useeio.name } });
+              if (e.ecoinvent)                             rows.push({ db: "ECOINVENT", m: e.ecoinvent, target: { kind: "lcaDb", db: "ecoinvent", search: e.ecoinvent.name } });
+              if (e.bafu)                                  rows.push({ db: "BAFU",      m: e.bafu,      target: { kind: "lcaDb", db: "bafu",      search: e.bafu.name } });
               if (rows.length === 0) return null;
 
               return (
@@ -4536,17 +4539,20 @@ function AppContent() {
                     </span>
                   </h4>
                   {rows.map((r, i) => {
-                    const navigable = r.tax !== null;
-                    const onClick = navigable
-                      ? () => handleEmbeddingMatchClick(r.tax!, `${r.tax}-${r.m.code}`)
-                      : undefined;
+                    const t = r.target;
+                    const onClick = t.kind === "tax"
+                      ? () => handleEmbeddingMatchClick(t.tax, `${t.tax}-${r.m.code}`)
+                      : () => openAboutTab("browser", { lcaDb: t.db, search: t.search });
+                    const tooltip = t.kind === "tax"
+                      ? `Click to open ${r.db} ${r.m.code} in the opposite pane`
+                      : `Click to open ${r.db} entry in the LCA Data Browser`;
                     return (
                       <div
                         key={i}
-                        className={`concordance-row ${navigable ? "embedding-row-clickable" : ""}`}
+                        className="concordance-row embedding-row-clickable"
                         onClick={onClick}
-                        title={navigable ? `Click to open ${r.db} ${r.m.code} in the opposite pane` : undefined}
-                        role={navigable ? "button" : undefined}
+                        title={tooltip}
+                        role="button"
                       >
                         <span className="embedding-db-badge">{r.db}</span>
                         <span className="name">
